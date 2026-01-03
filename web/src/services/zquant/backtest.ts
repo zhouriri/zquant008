@@ -40,7 +40,7 @@ export async function runBacktest(body: ZQuant.BacktestRunRequest) {
 
 /**
  * 获取回测任务列表
- * GET /api/v1/backtest/tasks
+ * POST /api/v1/backtest/tasks
  */
 export async function getBacktestTasks(params?: {
   skip?: number;
@@ -49,63 +49,73 @@ export async function getBacktestTasks(params?: {
   order?: 'asc' | 'desc';
 }) {
   return request<ZQuant.BacktestTaskResponse[]>('/api/v1/backtest/tasks', {
-    method: 'GET',
-    params,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 获取回测任务详情
- * GET /api/v1/backtest/tasks/{task_id}
+ * POST /api/v1/backtest/tasks/get
  */
 export async function getBacktestTask(taskId: number) {
-  return request<ZQuant.BacktestTaskResponse>(
-    `/api/v1/backtest/tasks/${taskId}`,
-    {
-      method: 'GET',
+  return request<ZQuant.BacktestTaskResponse>('/api/v1/backtest/tasks/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  );
+    data: { task_id: taskId },
+  });
 }
 
 /**
  * 获取回测结果
- * GET /api/v1/backtest/tasks/{task_id}/result
+ * POST /api/v1/backtest/tasks/result
  */
 export async function getBacktestResult(taskId: number) {
-  return request<ZQuant.BacktestResultResponse>(
-    `/api/v1/backtest/tasks/${taskId}/result`,
-    {
-      method: 'GET',
+  return request<ZQuant.BacktestResultResponse>('/api/v1/backtest/tasks/result', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  );
+    data: { task_id: taskId },
+  });
 }
 
 /**
  * 获取绩效报告
- * GET /api/v1/backtest/tasks/{task_id}/performance
+ * POST /api/v1/backtest/tasks/performance
  */
 export async function getPerformance(taskId: number) {
-  return request<ZQuant.PerformanceResponse>(
-    `/api/v1/backtest/tasks/${taskId}/performance`,
-    {
-      method: 'GET',
+  return request<ZQuant.PerformanceResponse>('/api/v1/backtest/tasks/performance', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  );
+    data: { task_id: taskId },
+  });
 }
 
 /**
  * 获取策略框架代码
- * GET /api/v1/backtest/strategies/framework
+ * POST /api/v1/backtest/strategies/framework
  */
 export async function getStrategyFramework() {
   return request<{ code: string }>('/api/v1/backtest/strategies/framework', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
 /**
  * 获取策略模板列表
- * GET /api/v1/backtest/strategies/templates
+ * POST /api/v1/backtest/strategies/templates
  */
 export async function getTemplateStrategies(params?: {
   category?: string;
@@ -113,14 +123,17 @@ export async function getTemplateStrategies(params?: {
   limit?: number;
 }) {
   return request<ZQuant.StrategyResponse[]>('/api/v1/backtest/strategies/templates', {
-    method: 'GET',
-    params,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 获取策略列表
- * GET /api/v1/backtest/strategies
+ * POST /api/v1/backtest/strategies/list
  */
 export async function getStrategies(params?: {
   skip?: number;
@@ -132,23 +145,27 @@ export async function getStrategies(params?: {
   order?: 'asc' | 'desc';
   include_all?: boolean; // 是否包含所有可操作策略
 }) {
-  return request<ZQuant.StrategyResponse[]>('/api/v1/backtest/strategies', {
-    method: 'GET',
-    params,
+  return request<ZQuant.StrategyResponse[]>('/api/v1/backtest/strategies/list', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 获取策略详情
- * GET /api/v1/backtest/strategies/{strategy_id}
+ * POST /api/v1/backtest/strategies/get
  */
 export async function getStrategy(strategyId: number) {
-  return request<ZQuant.StrategyResponse>(
-    `/api/v1/backtest/strategies/${strategyId}`,
-    {
-      method: 'GET',
+  return request<ZQuant.StrategyResponse>('/api/v1/backtest/strategies/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  );
+    data: { strategy_id: strategyId },
+  });
 }
 
 /**
@@ -174,7 +191,7 @@ export async function createStrategy(body: {
 
 /**
  * 更新策略
- * PUT /api/v1/backtest/strategies/{strategy_id}
+ * POST /api/v1/backtest/strategies/{strategy_id}/update
  */
 export async function updateStrategy(
   strategyId: number,
@@ -187,9 +204,9 @@ export async function updateStrategy(
   },
 ) {
   return request<ZQuant.StrategyResponse>(
-    `/api/v1/backtest/strategies/${strategyId}`,
+    `/api/v1/backtest/strategies/${strategyId}/update`,
     {
-      method: 'PUT',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -200,11 +217,20 @@ export async function updateStrategy(
 
 /**
  * 删除策略
- * DELETE /api/v1/backtest/strategies/{strategy_id}
+ * POST /api/v1/backtest/strategies/{strategy_id}/delete
  */
 export async function deleteStrategy(strategyId: number) {
-  return request<void>(`/api/v1/backtest/strategies/${strategyId}`, {
-    method: 'DELETE',
+  return request<void>(`/api/v1/backtest/strategies/${strategyId}/delete`, {
+    method: 'POST',
   });
 }
 
+/**
+ * 删除回测结果
+ * POST /api/v1/backtest/results/{result_id}/delete
+ */
+export async function deleteBacktestResult(resultId: number) {
+  return request<void>(`/api/v1/backtest/results/${resultId}/delete`, {
+    method: 'POST',
+  });
+}

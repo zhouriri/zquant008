@@ -390,7 +390,14 @@ const Fundamentals: React.FC = () => {
 
   const columns: ProColumns<any>[] = [
     {
-      title: '股票代码',
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index',
+      width: 60,
+      fixed: 'left',
+    },
+    {
+      title: 'TS代码',
       dataIndex: 'symbol',
       width: 120,
       sorter: (a, b) => (a.symbol || '').localeCompare(b.symbol || ''),
@@ -491,9 +498,9 @@ const Fundamentals: React.FC = () => {
       >
         <ProFormText
           name="symbols"
-          label="股票代码"
+          label="TS代码"
           placeholder="多个代码用逗号分隔，如：000001.SZ,600000.SH"
-          rules={[{ required: true, message: '请输入股票代码' }]}
+          rules={[{ required: true, message: '请输入TS代码' }]}
           width="md"
         />
         <ProFormSelect

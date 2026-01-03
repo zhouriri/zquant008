@@ -33,7 +33,7 @@ export const APP_NAME = 'ZQuant';
  * 应用版本号
  * 注意：此版本号应与后端 zquant/__init__.py 中的 __version__ 保持一致
  */
-export const APP_VERSION = '0.2.0';
+export const APP_VERSION = '0.3.0';
 
 /**
  * 应用完整名称（包含版本号）

@@ -194,6 +194,25 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         client_host = request.client.host if request.client else "unknown"
         user_agent = request.headers.get("user-agent", "unknown")
 
+        # 跳过 OPTIONS 请求（CORS 预检请求）
+        if method == "OPTIONS":
+            try:
+                return await call_next(request)
+            except Exception as e:
+                logger.error(f"[OPTIONS ERROR] 处理预检请求时出错: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                # 即使出错也尝试返回 200，确保不阻塞前端
+                return Response(
+                    status_code=200,
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "*",
+                        "Access-Control-Allow-Headers": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                    }
+                )
+
         # 获取请求体（仅对POST/PUT/PATCH请求）
         # 注意：读取请求体后需要重新创建Request对象，否则后续无法读取
         body = None
@@ -234,12 +253,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         )
 
         if body:
-            # 敏感信息脱敏
-            if isinstance(body, dict) and "password" in body:
-                body_log = {**body, "password": "***"}
+            # 敏感信息脱敏（使用统一的脱敏函数）
+            if isinstance(body, dict):
+                body_log = _sanitize_sensitive_data(body)
                 logger.debug(f"[REQUEST BODY] [{request_id[:8]}] {json.dumps(body_log, ensure_ascii=False)}")
             else:
-                body_str = json.dumps(body, ensure_ascii=False) if isinstance(body, dict) else str(body)
+                body_str = str(body)
+                # 检查字符串中是否包含敏感信息（简单检查）
+                if any(keyword in body_str.lower() for keyword in ["password", "token", "secret", "api_key"]):
+                    body_str = "(包含敏感信息，已脱敏)"
                 logger.debug(f"[REQUEST BODY] [{request_id[:8]}] {body_str}")
 
         # 处理请求

@@ -61,8 +61,21 @@ def handle_data_api_error(func: Callable) -> Callable:
             # 重新抛出HTTPException，不做处理
             raise
         except Exception as e:
+            # 记录详细错误到日志（包含堆栈跟踪）
+            import traceback
             logger.error(f"API错误 {func.__name__}: {e}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"操作失败: {e!s}")
+            logger.debug(f"错误堆栈:\n{traceback.format_exc()}")
+            
+            # 生产环境不泄露详细错误信息，仅返回通用错误消息
+            from zquant.config import settings
+            if settings.DEBUG:
+                # 开发环境可以显示详细错误
+                detail = f"操作失败: {str(e)}"
+            else:
+                # 生产环境只返回通用错误消息
+                detail = "操作失败，请稍后重试或联系管理员"
+            
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
 
     return wrapper
 
@@ -138,8 +151,19 @@ def wrap_response(message: str = "操作成功", code: int = 200):
             except HTTPException:
                 raise
             except Exception as e:
+                # 记录详细错误到日志
+                import traceback
                 logger.error(f"API错误 {func.__name__}: {e}")
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"操作失败: {e!s}")
+                logger.debug(f"错误堆栈:\n{traceback.format_exc()}")
+                
+                # 生产环境不泄露详细错误信息
+                from zquant.config import settings
+                if settings.DEBUG:
+                    detail = f"操作失败: {str(e)}"
+                else:
+                    detail = "操作失败，请稍后重试或联系管理员"
+                
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
 
         return wrapper
 

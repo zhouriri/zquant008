@@ -22,7 +22,7 @@
 
 import React, { useRef } from 'react';
 import { Card, Space, Button } from 'antd';
-import { ProForm, ProFormInstance } from '@ant-design/pro-components';
+import { ProForm, ProFormInstance, ProFormText, ProFormDatePicker } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { DataTable } from '@/components/DataTable';
 import { useDataQuery } from '@/hooks/useDataQuery';
@@ -155,9 +155,13 @@ export function DataTablePage<TItem extends Record<string, any> = any>(
               placeholder="请输入TS代码，多个代码用逗号分隔"
               width="sm"
             />
-            <ProFormDateRangePicker
-              name="dateRange"
-              label="日期范围"
+            <ProFormDatePicker
+              name="start_date"
+              label="开始日期"
+            />
+            <ProFormDatePicker
+              name="end_date"
+              label="结束日期"
             />
           </>
         )}

@@ -91,7 +91,7 @@ const NotificationIcon: React.FC = () => {
 
   // 获取通知列表（最多10条）
   const { data: notificationsData, refresh: refreshNotifications } = useRequest(
-    () => notifications.getNotifications({ skip: 0, limit: 10, order_by: 'created_at', order: 'desc' }),
+    () => notifications.getNotifications({ skip: 0, limit: 10, order_by: 'created_time', order: 'desc' }),
     {
       refreshDeps: [open],
       onError: () => {
@@ -165,7 +165,7 @@ const NotificationIcon: React.FC = () => {
                     <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>
                       {item.content}
                     </div>
-                    <div className={styles.notificationTime}>{formatTime(item.created_at)}</div>
+                    <div className={styles.notificationTime}>{formatTime(item.created_time)}</div>
                   </div>
                 </List.Item>
               )}

@@ -20,7 +20,7 @@
 //     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 //     - Repository: https://github.com/yoyoung/zquant
 
-import { ProForm, ProFormText, ProFormDatePicker, ProFormDateRangePicker, ProTable } from '@ant-design/pro-components';
+import { ProForm, ProFormText, ProFormDatePicker, ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType, ProFormInstance } from '@ant-design/pro-components';
 import { Button, Card, Tag } from 'antd';
 import dayjs from 'dayjs';
@@ -49,6 +49,13 @@ const DailySummary: React.FC = () => {
   }, [pageCache, location.pathname]);
 
   const columns: ProColumns<ZQuant.TableStatisticsItem>[] = [
+    {
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index',
+      width: 60,
+      fixed: 'left',
+    },
     {
       title: '统计日期',
       dataIndex: 'stat_date',
@@ -170,7 +177,8 @@ const DailySummary: React.FC = () => {
           }
         }}
         initialValues={{
-          dateRange: [dayjs().subtract(7, 'day'), dayjs()],
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
         }}
         submitter={{
           render: (props, doms) => {
@@ -193,9 +201,13 @@ const DailySummary: React.FC = () => {
           label="统计日期"
           placeholder="请选择统计日期"
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="日期范围"
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
         />
       </ProForm>
 
@@ -237,8 +249,8 @@ const DailySummary: React.FC = () => {
           const cacheKey = JSON.stringify({
             stat_date: formValues?.stat_date ? dayjs(formValues.stat_date).format('YYYY-MM-DD') : undefined,
             table_name: formValues?.table_name,
-            start_date: formValues?.dateRange ? dayjs(formValues.dateRange[0]).format('YYYY-MM-DD') : undefined,
-            end_date: formValues?.dateRange ? dayjs(formValues.dateRange[1]).format('YYYY-MM-DD') : undefined,
+            start_date: formValues?.start_date ? dayjs(formValues.start_date).format('YYYY-MM-DD') : undefined,
+            end_date: formValues?.end_date ? dayjs(formValues.end_date).format('YYYY-MM-DD') : undefined,
             order_by,
             order,
             page: params.current || 1,
@@ -265,8 +277,8 @@ const DailySummary: React.FC = () => {
           const requestParams: ZQuant.TableStatisticsRequest = {
             stat_date: formValues?.stat_date ? dayjs(formValues.stat_date).format('YYYY-MM-DD') : undefined,
             table_name: formValues?.table_name,
-            start_date: formValues?.dateRange ? dayjs(formValues.dateRange[0]).format('YYYY-MM-DD') : undefined,
-            end_date: formValues?.dateRange ? dayjs(formValues.dateRange[1]).format('YYYY-MM-DD') : undefined,
+            start_date: formValues?.start_date ? dayjs(formValues.start_date).format('YYYY-MM-DD') : undefined,
+            end_date: formValues?.end_date ? dayjs(formValues.end_date).format('YYYY-MM-DD') : undefined,
             skip: ((params.current || 1) - 1) * (params.pageSize || 20),
             limit: params.pageSize || 20,
             order_by,

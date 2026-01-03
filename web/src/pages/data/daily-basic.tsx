@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Modal, Table, Tag, Typography, Space, message, Spin, Input } from 'antd';
-import { ProForm, ProFormText, ProFormDateRangePicker } from '@ant-design/pro-components';
+import { ProForm, ProFormText, ProFormDatePicker, ProFormSelect } from '@ant-design/pro-components';
 import type { ProColumns, ProFormInstance } from '@ant-design/pro-components';
 import { useLocation } from '@umijs/max';
 import dayjs from 'dayjs';
@@ -33,6 +33,7 @@ import { usePageCache } from '@/hooks/usePageCache';
 import { DataTable, renderDate, renderDateTime, renderNumber, renderPercent, renderFormattedNumber } from '@/components/DataTable';
 import { validateTsCode, validateTsCodes, getTsCodeValidationError } from '@/utils/tsCodeValidator';
 import { formatRequestParamsForDisplay } from '@/utils/requestParamsFormatter';
+import { getExchangeFromTsCode } from '@/utils/codeConverter';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -99,14 +100,14 @@ const DailyBasic: React.FC = () => {
 
   // 处理接口数据获取
   const handleFetchFromApi = async (formValues: any) => {
-    const { ts_code, dateRange } = formValues;
+    const { ts_code, start_date, end_date } = formValues;
     
     if (!ts_code || !ts_code.trim()) {
       message.error('请输入TS代码');
       return;
     }
     
-    if (!dateRange || dateRange.length !== 2) {
+    if (!start_date || !end_date) {
       message.error('请选择日期范围');
       return;
     }
@@ -131,8 +132,8 @@ const DailyBasic: React.FC = () => {
     try {
       const response = await fetchDailyBasicDataFromApi({
         ts_codes: tsCodesStr,
-        start_date: dayjs(dateRange[0]).format('YYYY-MM-DD'),
-        end_date: dayjs(dateRange[1]).format('YYYY-MM-DD'),
+        start_date: dayjs(start_date).format('YYYY-MM-DD'),
+        end_date: dayjs(end_date).format('YYYY-MM-DD'),
       });
       setFetchResult(response);
       // 保存到缓存
@@ -195,14 +196,14 @@ const DailyBasic: React.FC = () => {
 
   // 处理数据校验
   const handleValidate = async (formValues: any) => {
-    const { ts_code, dateRange } = formValues;
+    const { ts_code, start_date, end_date } = formValues;
     
     if (!ts_code || !ts_code.trim()) {
       message.error('请输入TS代码');
       return;
     }
     
-    if (!dateRange || dateRange.length !== 2) {
+    if (!start_date || !end_date) {
       message.error('请选择日期范围');
       return;
     }
@@ -240,8 +241,8 @@ const DailyBasic: React.FC = () => {
     }
 
     // 限制2：时间范围必须在一个月内（30天）
-    const startDate = dayjs(dateRange[0]);
-    const endDate = dayjs(dateRange[1]);
+    const startDate = dayjs(start_date);
+    const endDate = dayjs(end_date);
     const daysDiff = endDate.diff(startDate, 'day');
     if (daysDiff > 30) {
       message.error('数据校验功能的时间范围不能超过一个月（30天），请缩小查询范围');
@@ -252,8 +253,8 @@ const DailyBasic: React.FC = () => {
     try {
       const response = await validateDailyBasicData({
         ts_codes: tsCodesStr,
-        start_date: dayjs(dateRange[0]).format('YYYY-MM-DD'),
-        end_date: dayjs(dateRange[1]).format('YYYY-MM-DD'),
+        start_date: dayjs(start_date).format('YYYY-MM-DD'),
+        end_date: dayjs(end_date).format('YYYY-MM-DD'),
       });
       setValidateResult(response);
       // 保存到缓存
@@ -362,6 +363,13 @@ const DailyBasic: React.FC = () => {
 
   const columns: ProColumns<any>[] = [
     {
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index',
+      width: 60,
+      fixed: 'left',
+    },
+    {
       title: 'TS代码',
       dataIndex: 'ts_code',
       width: 120,
@@ -378,121 +386,121 @@ const DailyBasic: React.FC = () => {
       title: '收盘价',
       dataIndex: 'close',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.close),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.close),
     },
     {
       title: '换手率',
       dataIndex: 'turnover_rate',
       width: 100,
-      render: (_: any, record: any) => renderPercent(record.turnover_rate),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderPercent(record.turnover_rate),
     },
     {
       title: '换手率（自由流通股）',
       dataIndex: 'turnover_rate_f',
       width: 150,
-      render: (_: any, record: any) => renderPercent(record.turnover_rate_f),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderPercent(record.turnover_rate_f),
     },
     {
       title: '量比',
       dataIndex: 'volume_ratio',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.volume_ratio),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.volume_ratio),
     },
     {
       title: '市盈率',
       dataIndex: 'pe',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.pe),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.pe),
     },
     {
       title: '市盈率TTM',
       dataIndex: 'pe_ttm',
       width: 120,
-      render: (_: any, record: any) => renderNumber(record.pe_ttm),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.pe_ttm),
     },
     {
       title: '市净率',
       dataIndex: 'pb',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.pb),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.pb),
     },
     {
       title: '市销率',
       dataIndex: 'ps',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.ps),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.ps),
     },
     {
       title: '市销率TTM',
       dataIndex: 'ps_ttm',
       width: 120,
-      render: (_: any, record: any) => renderNumber(record.ps_ttm),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.ps_ttm),
     },
     {
       title: '股息率',
       dataIndex: 'dv_ratio',
       width: 100,
-      render: (_: any, record: any) => renderPercent(record.dv_ratio),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderPercent(record.dv_ratio),
     },
     {
       title: '股息率TTM',
       dataIndex: 'dv_ttm',
       width: 120,
-      render: (_: any, record: any) => renderPercent(record.dv_ttm),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderPercent(record.dv_ttm),
     },
     {
       title: '总股本（万股）',
       dataIndex: 'total_share',
       width: 130,
-      render: (_: any, record: any) => renderFormattedNumber(record.total_share),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.total_share),
     },
     {
       title: '流通股本（万股）',
       dataIndex: 'float_share',
       width: 140,
-      render: (_: any, record: any) => renderFormattedNumber(record.float_share),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.float_share),
     },
     {
       title: '自由流通股本（万）',
       dataIndex: 'free_share',
       width: 150,
-      render: (_: any, record: any) => renderFormattedNumber(record.free_share),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.free_share),
     },
     {
       title: '总市值（万元）',
       dataIndex: 'total_mv',
       width: 130,
-      render: (_: any, record: any) => renderFormattedNumber(record.total_mv),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.total_mv),
     },
     {
       title: '流通市值（万元）',
       dataIndex: 'circ_mv',
       width: 140,
-      render: (_: any, record: any) => renderFormattedNumber(record.circ_mv),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.circ_mv),
     },
     {
       title: '创建人',
       dataIndex: 'created_by',
       width: 120,
-      render: (_: any, record: any) => record.created_by || '-',
+      render: (_: any, record: any) => record.is_missing ? '-' : (record.created_by || '-'),
     },
     {
       title: '创建时间',
       dataIndex: 'created_time',
       width: 180,
-      render: (_: any, record: any) => renderDateTime(record.created_time),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderDateTime(record.created_time),
     },
     {
       title: '修改人',
       dataIndex: 'updated_by',
       width: 120,
-      render: (_: any, record: any) => record.updated_by || '-',
+      render: (_: any, record: any) => record.is_missing ? '-' : (record.updated_by || '-'),
     },
     {
       title: '修改时间',
       dataIndex: 'updated_time',
       width: 180,
-      render: (_: any, record: any) => renderDateTime(record.updated_time),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderDateTime(record.updated_time),
     },
   ];
 
@@ -546,10 +554,13 @@ const DailyBasic: React.FC = () => {
         return;
       }
     }
+
+    const exchange = getExchangeFromTsCode(parsedTsCode);
     
     const parsedValues = {
       ...values,
       ts_code: parsedTsCode,
+      exchange: exchange,
     };
     
     await handleQuery(parsedValues);
@@ -564,7 +575,9 @@ const DailyBasic: React.FC = () => {
         onValuesChange={handleFormValuesChange}
         initialValues={{
           ts_code: '000001.SZ,000002.SZ',
-          dateRange: [dayjs().subtract(30, 'day'), dayjs()],
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
+          trading_day_filter: 'all',
         }}
         submitter={{
           render: (props, doms) => {
@@ -608,10 +621,26 @@ const DailyBasic: React.FC = () => {
           placeholder="请输入TS代码，多个代码用逗号分隔，如：000001.SZ,000002.SZ，留空查询所有"
           width="sm"
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="日期范围"
-          rules={[{ required: true, message: '请选择日期范围' }]}
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+          rules={[{ required: true, message: '请选择开始日期' }]}
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
+          rules={[{ required: true, message: '请选择结束日期' }]}
+        />
+        <ProFormSelect
+          name="trading_day_filter"
+          label="匹配交易日"
+          initialValue="all"
+          options={[
+            { label: '全交易日', value: 'all' },
+            { label: '有交易日', value: 'has_data' },
+            { label: '无交易日', value: 'no_data' },
+          ]}
+          width="xs"
         />
       </ProForm>
 
@@ -620,6 +649,12 @@ const DailyBasic: React.FC = () => {
         dataSource={dataSource}
         loading={loading}
         scrollX={2000}
+        rowClassName={(record: any) => {
+          if (record.is_missing) {
+            return 'row-missing-data';
+          }
+          return '';
+        }}
       />
 
       {/* 接口数据获取结果弹窗 */}
@@ -767,6 +802,12 @@ const DailyBasic: React.FC = () => {
           background-color: #fff1f0 !important;
         }
         .row-difference:hover {
+          background-color: #ffccc7 !important;
+        }
+        .row-missing-data {
+          background-color: #fff2f0 !important;
+        }
+        .row-missing-data:hover {
           background-color: #ffccc7 !important;
         }
       `}</style>

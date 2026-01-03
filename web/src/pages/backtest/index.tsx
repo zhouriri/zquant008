@@ -64,7 +64,7 @@ const BacktestList: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       sorter: true,
       render: (text) => dayjs(text).format('YYYY-MM-DD HH:mm:ss'),

@@ -38,7 +38,7 @@ class UserService:
     """用户服务类"""
 
     @staticmethod
-    def create_user(db: Session, user_data: UserCreate) -> User:
+    def create_user(db: Session, user_data: UserCreate, created_by: str | None = None) -> User:
         """创建用户（管理员操作）"""
         # 检查角色是否存在
         role = db.query(Role).filter(Role.id == user_data.role_id).first()
@@ -68,6 +68,8 @@ class UserService:
             hashed_password=hashed_password,
             role_id=user_data.role_id,
             is_active=True,
+            created_by=created_by,
+            updated_by=created_by,  # 创建时 updated_by 和 created_by 一致
         )
 
         try:
@@ -90,11 +92,14 @@ class UserService:
         return db.query(User).filter(User.username == username).first()
 
     @staticmethod
-    def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
+    def update_user(db: Session, user_id: int, user_data: UserUpdate, updated_by: str | None = None) -> User:
         """更新用户"""
         user = UserService.get_user_by_id(db, user_id)
         if not user:
             raise NotFoundError(f"用户ID {user_id} 不存在")
+
+        if updated_by is not None:
+            user.updated_by = updated_by
 
         if user_data.email is not None:
             # 检查邮箱是否被其他用户使用
@@ -172,8 +177,8 @@ class UserService:
                 "username": User.username,
                 "email": User.email,
                 "is_active": User.is_active,
-                "created_at": User.created_at,
-                "updated_at": User.updated_at,
+                "created_time": User.created_time,
+                "updated_time": User.updated_time,
             }
 
             if order_by in sortable_fields:
@@ -183,9 +188,9 @@ class UserService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(User.created_at))
+                query = query.order_by(desc(User.created_time))
         else:
-            query = query.order_by(desc(User.created_at))
+            query = query.order_by(desc(User.created_time))
 
         return query.offset(skip).limit(limit).all()
 

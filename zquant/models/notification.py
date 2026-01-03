@@ -31,7 +31,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from zquant.database import Base
+from zquant.database import AuditMixin, Base
 
 
 class NotificationType(str, enum.Enum):
@@ -44,7 +44,7 @@ class NotificationType(str, enum.Enum):
     WARNING = "warning"  # 警告
 
 
-class Notification(Base):
+class Notification(Base, AuditMixin):
     """通知表"""
 
     __tablename__ = "zq_app_notifications"
@@ -56,8 +56,6 @@ class Notification(Base):
     content = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False, nullable=False, index=True)
     extra_data = Column(Text, nullable=True)  # 额外数据（JSON格式）
-    created_at = Column(DateTime, default=func.now(), nullable=False, index=True)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     # 关系
     user = relationship("User", back_populates="notifications")
@@ -65,5 +63,5 @@ class Notification(Base):
     # 索引
     __table_args__ = (
         Index("idx_zq_app_notifications_user_read", "user_id", "is_read"),
-        Index("idx_zq_app_notifications_user_created", "user_id", "created_at"),
+        Index("idx_zq_app_notifications_user_created", "user_id", "created_time"),
     )

@@ -152,14 +152,73 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         - /docs
         - /redoc
         - /openapi.json
+        
+        对登录接口使用更严格的限制（每分钟5次）
         """
         # 跳过健康检查和文档路径
         skip_paths = ["/health", "/docs", "/redoc", "/openapi.json"]
         if any(request.url.path.startswith(path) for path in skip_paths):
             return await call_next(request)
+        
+        # 跳过 OPTIONS 请求（CORS 预检请求，由 CORS 中间件处理）
+        if request.method == "OPTIONS":
+            return await call_next(request)
 
         client_id = self._get_client_id(request)
+        
+        # 对登录接口使用更严格的速率限制
+        is_login_endpoint = request.url.path == "/api/v1/auth/login"
+        if is_login_endpoint:
+            # 登录接口：每分钟5次，每小时20次
+            login_requests_per_minute = 5
+            login_requests_per_hour = 20
+            
+            # 检查每分钟限制
+            allowed_minute, remaining_minute = self._check_rate_limit(
+                client_id, "minute", login_requests_per_minute
+            )
+            
+            if not allowed_minute:
+                logger.warning(f"登录速率限制：{client_id} 超过每分钟限制 ({login_requests_per_minute})")
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"登录请求过于频繁，请稍后再试。每分钟最多{login_requests_per_minute}次登录尝试。",
+                    headers={
+                        "X-RateLimit-Limit": str(login_requests_per_minute),
+                        "X-RateLimit-Remaining": "0",
+                        "Retry-After": "60",
+                    },
+                )
+            
+            # 检查每小时限制
+            allowed_hour, remaining_hour = self._check_rate_limit(
+                client_id, "hour", login_requests_per_hour
+            )
+            
+            if not allowed_hour:
+                logger.warning(f"登录速率限制：{client_id} 超过每小时限制 ({login_requests_per_hour})")
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"登录请求过于频繁，请稍后再试。每小时最多{login_requests_per_hour}次登录尝试。",
+                    headers={
+                        "X-RateLimit-Limit": str(login_requests_per_hour),
+                        "X-RateLimit-Remaining": "0",
+                        "Retry-After": "3600",
+                    },
+                )
+            
+            # 处理请求
+            response = await call_next(request)
+            
+            # 添加速率限制响应头
+            response.headers["X-RateLimit-Limit-Minute"] = str(login_requests_per_minute)
+            response.headers["X-RateLimit-Remaining-Minute"] = str(remaining_minute)
+            response.headers["X-RateLimit-Limit-Hour"] = str(login_requests_per_hour)
+            response.headers["X-RateLimit-Remaining-Hour"] = str(remaining_hour)
+            
+            return response
 
+        # 其他接口使用常规速率限制
         # 检查每分钟限制
         allowed_minute, remaining_minute = self._check_rate_limit(client_id, "minute", self.requests_per_minute)
 

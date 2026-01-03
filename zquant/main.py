@@ -27,18 +27,36 @@ FastAPI应用入口
 import logging
 import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from loguru import logger
 
-from zquant.api.v1 import auth, backtest, config, dashboard, data, factor, favorites, notifications, permissions, positions, roles, scheduler, users
+from zquant.api.v1 import (
+    auth,
+    backtest,
+    config,
+    dashboard,
+    data,
+    factor,
+    favorites,
+    notifications,
+    permissions,
+    positions,
+    roles,
+    scheduler,
+    stock_filter,
+    users,
+    hsl_choice,
+)
 from zquant.config import settings
 from zquant.database import SessionLocal
 from zquant.middleware.audit import AuditMiddleware
 from zquant.middleware.logging import LoggingMiddleware
 from zquant.middleware.rate_limit import RateLimitMiddleware
-from zquant.middleware.security import SecurityHeadersMiddleware, XSSProtectionMiddleware
+from zquant.middleware.security import CSRFProtectionMiddleware, SecurityHeadersMiddleware, XSSProtectionMiddleware
 from zquant.models.scheduler import ScheduledTask
+from zquant.schemas.response import ErrorResponse
 from zquant.scheduler.manager import get_scheduler_manager
 
 # 配置日志
@@ -121,30 +139,99 @@ app = FastAPI(
 )
 
 # 配置CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应限制具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 生产环境必须配置CORS_ORIGINS环境变量，不能使用 "*"
+# 强制设为 ["*"] 以排除配置干扰，解决 400 错误
+cors_origins = ["*"]
+logger.info(f"当前 CORS 允许的域名 (强制): {cors_origins}")
+
+if "*" in cors_origins and not settings.DEBUG:
+    logger.warning("警告: 生产环境不应使用 '*' 作为CORS来源，请配置CORS_ORIGINS环境变量")
 
 # 添加中间件（注意顺序：后添加的中间件先执行）
 # 1. 安全响应头中间件（最外层）
 app.add_middleware(SecurityHeadersMiddleware)
-# 2. XSS防护中间件
+# 2. CSRF防护中间件
+app.add_middleware(CSRFProtectionMiddleware)
+# 3. XSS防护中间件
 app.add_middleware(XSSProtectionMiddleware)
-# 3. 速率限制中间件（如果启用）
+# 4. 速率限制中间件（如果启用）
 if settings.RATE_LIMIT_ENABLED:
     app.add_middleware(
         RateLimitMiddleware,
         requests_per_minute=settings.RATE_LIMIT_PER_MINUTE,
         requests_per_hour=settings.RATE_LIMIT_PER_HOUR,
     )
-# 4. 审计日志中间件
+# 5. 审计日志中间件
 app.add_middleware(AuditMiddleware)
-# 5. 请求日志中间件
+# 6. 请求日志中间件
 app.add_middleware(LoggingMiddleware)
+# 7. CORS中间件（最后添加，确保最先执行，优先处理OPTIONS请求）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
+    max_age=3600,  # 预检请求缓存时间（秒）
+)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """全局异常处理：捕获未处理的异常，记录日志并返回脱敏后的错误信息"""
+    logger.exception(f"未捕获的全局异常: {exc}")
+    
+    # 生产环境不泄露详细错误信息
+    detail = str(exc) if settings.DEBUG else "系统内部错误，请稍后重试或联系管理员"
+    
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            success=False,
+            message="操作失败",
+            code=500,
+            error_code="INTERNAL_SERVER_ERROR",
+            error_detail={"detail": detail} if settings.DEBUG else None
+        ).model_dump()
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """HTTP异常处理：统一错误响应格式"""
+    # 如果是 500 及以上的错误，记录错误日志
+    if exc.status_code >= 500:
+        logger.error(f"HTTP {exc.status_code} 错误: {exc.detail}")
+    
+    # 构造响应内容
+    message = exc.detail if isinstance(exc.detail, str) else "操作失败"
+    error_detail = exc.detail if not isinstance(exc.detail, str) else None
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            success=False,
+            message=message,
+            code=exc.status_code,
+            error_code=None,
+            error_detail=error_detail
+        ).model_dump()
+    )
+
+
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """处理所有未被中间件拦截的 OPTIONS 请求（CORS 预检兜底）"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
 
 
 @app.on_event("startup")
@@ -227,6 +314,8 @@ app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["系统大盘"])
 app.include_router(favorites.router, prefix="/api/v1/favorites", tags=["我的自选"])
 app.include_router(positions.router, prefix="/api/v1/positions", tags=["我的持仓"])
+app.include_router(stock_filter.router, prefix="/api/v1/stock-filter", tags=["量化选股"])
+app.include_router(hsl_choice.router, prefix="/api/v1/hsl-choice", tags=["ZQ精选数据"])
 app.include_router(factor.router, prefix="/api/v1/factor", tags=["因子管理"])
 
 

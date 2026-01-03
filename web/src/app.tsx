@@ -59,21 +59,16 @@ export async function getInitialState(): Promise<{
 }> {
   const fetchUserInfo = async () => {
     try {
-      console.log('[App] fetchUserInfo: 开始获取用户信息');
       const token = localStorage.getItem('access_token');
-      console.log('[App] fetchUserInfo: token存在?', !!token);
       
       if (!token) {
-        console.log('[App] fetchUserInfo: 无token，返回undefined');
         return undefined;
       }
       
       const userInfo = await getCurrentUser();
-      console.log('[App] fetchUserInfo: 用户信息获取成功', userInfo);
       
       // 根据role_id判断是否为管理员
       const isAdmin = userInfo.role_id === ADMIN_ROLE_ID;
-      console.log('[App] fetchUserInfo: role_id', userInfo.role_id, 'isAdmin', isAdmin);
       
       // 转换用户信息格式以适配ProLayout
       return {
@@ -85,22 +80,13 @@ export async function getInitialState(): Promise<{
         role_id: userInfo.role_id, // 保存role_id以便后续使用
       };
     } catch (_error: any) {
-      console.error('[App] fetchUserInfo: 获取用户信息失败', _error);
       // 获取用户信息失败时，不立即清除token和跳转
       // 可能是网络问题或token刚保存还没生效
       // 让onPageChange来处理跳转逻辑
       const { location } = history;
-      console.log('[App] fetchUserInfo: 当前路径', location.pathname);
-      
-      // 记录错误详情以便调试
-      if (_error?.response) {
-        console.log('[App] fetchUserInfo: 错误状态码', _error.response.status);
-        console.log('[App] fetchUserInfo: 错误详情', _error.response.data);
-      }
       
       // 只有在非登录页面且错误是401时才清除token
       if (location.pathname !== loginPath && _error?.response?.status === 401) {
-        console.log('[App] fetchUserInfo: 401错误，清除token');
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
       }
@@ -109,7 +95,6 @@ export async function getInitialState(): Promise<{
   };
   // 如果不是登录页面，执行
   const { location } = history;
-  console.log('[App] getInitialState: 当前路径', location.pathname);
   
   // 检查是否有token，如果有token，尝试获取用户信息
   const hasToken = localStorage.getItem('access_token');
@@ -124,13 +109,9 @@ export async function getInitialState(): Promise<{
   ];
   
   if (!publicPaths.includes(location.pathname)) {
-    console.log('[App] getInitialState: 非登录页面，token存在?', !!hasToken);
-    
     // 如果有token，尝试获取用户信息
     if (hasToken) {
-      console.log('[App] getInitialState: 有token，获取用户信息');
       const currentUser = await fetchUserInfo();
-      console.log('[App] getInitialState: 用户信息', currentUser ? '存在' : '不存在');
       return {
         fetchUserInfo,
         currentUser: currentUser || undefined, // 即使获取失败也返回undefined，不跳转
@@ -138,7 +119,6 @@ export async function getInitialState(): Promise<{
       };
     } else {
       // 没有token，直接跳转登录
-      console.log('[App] getInitialState: 无token，跳转登录');
       history.push(loginPath);
       return {
         fetchUserInfo,
@@ -146,7 +126,6 @@ export async function getInitialState(): Promise<{
       };
     }
   }
-  console.log('[App] getInitialState: 登录页面，跳过用户信息获取');
   return {
     fetchUserInfo,
     settings: defaultSettings as Partial<LayoutSettings>,
@@ -344,8 +323,6 @@ export const layout: RunTimeLayoutConfig = ({
     },
     onPageChange: () => {
       const { location } = history;
-      console.log('[App] onPageChange: 路径变化', location.pathname);
-      console.log('[App] onPageChange: currentUser', initialState?.currentUser ? '存在' : '不存在');
       
       // 无需登录即可访问的页面路径
       const publicPaths = [
@@ -358,24 +335,16 @@ export const layout: RunTimeLayoutConfig = ({
       
       // 如果是公开页面，不检查用户状态
       if (publicPaths.includes(location.pathname)) {
-        console.log('[App] onPageChange: 公开页面，跳过检查');
         return;
       }
       
       // 检查是否有token
       const hasToken = localStorage.getItem('access_token');
-      console.log('[App] onPageChange: token存在?', !!hasToken);
       
       // 如果有token，即使没有currentUser也允许访问（可能是正在加载）
       // 只有在既没有token也没有currentUser时才跳转登录
       if (!initialState?.currentUser && !hasToken) {
-        console.log('[App] onPageChange: 无用户且无token，跳转登录');
         history.push(loginPath);
-      } else {
-        console.log('[App] onPageChange: 允许访问', {
-          hasUser: !!initialState?.currentUser,
-          hasToken: !!hasToken,
-        });
       }
     },
     bgLayoutImgList: [
@@ -446,7 +415,5 @@ export const request: RequestConfig = {
   ...errorConfig,
 };
 
-// 打印请求配置（仅在开发环境）
-if (process.env.NODE_ENV === 'development') {
-  console.log('[Request Config] baseURL:', API_CONFIG.baseURL);
-}
+// 注意：生产环境不应输出敏感配置信息
+// 如需调试，请使用开发环境的调试工具

@@ -24,6 +24,8 @@
 数据相关数据库模型
 """
 
+from functools import lru_cache
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -44,7 +46,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.mysql import DOUBLE as Double
 from sqlalchemy.sql import func
 
-from zquant.database import Base
+from zquant.database import AuditMixin, Base
 
 # 数据库建表规范
 # 数据表：zq_data_* (如 zq_data_tustock_stockbasic, zq_data_fundamentals, zq_data_tustock_tradecal)
@@ -58,7 +60,7 @@ from zquant.database import Base
 # stock、ts_code、trade_date
 
 
-class Tustock(Base):
+class Tustock(Base, AuditMixin):
     """股票基础信息表（对应TABLE_CN_TUSTOCK）"""
 
     __database__ = "zquant"  # 数据库名称
@@ -101,15 +103,9 @@ class Tustock(Base):
     )
     act_name = Column(String(100), nullable=True, info={"name": "实控人名称"}, comment="实控人名称")
     act_ent_type = Column(String(50), nullable=True, info={"name": "实控人企业性质"}, comment="实控人企业性质")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_time = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False, info={"name": "修改时间"}, comment="修改时间"
-    )
 
 
-class Fundamental(Base):
+class Fundamental(Base, AuditMixin):
     """财务数据表"""
 
     __tablename__ = "zq_data_fundamentals"
@@ -121,8 +117,6 @@ class Fundamental(Base):
     report_date = Column(Date, nullable=False, index=True)  # 报告期
     statement_type = Column(String(20), nullable=False, index=True)  # 报表类型：income, balance, cashflow
     data_json = Column(Text, nullable=False)  # JSON格式存储财务数据
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     # 唯一约束
     __table_args__ = (
@@ -131,7 +125,7 @@ class Fundamental(Base):
     )
 
 
-class TustockTradecal(Base):
+class TustockTradecal(Base, AuditMixin):
     """交易日历表（对应TABLE_CN_TUSTOCK_TRADECAL）"""
 
     __database__ = "zquant"  # 数据库名称
@@ -158,12 +152,6 @@ class TustockTradecal(Base):
     cal_date = Column(Date, nullable=False, index=True, info={"name": "日历日期"}, comment="日历日期")
     is_open = Column(SmallInteger, nullable=True, info={"name": "是否交易"}, comment="是否交易，1=交易日，0=非交易日")
     pretrade_date = Column(Date, nullable=True, info={"name": "上一交易日"}, comment="上一交易日")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_time = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False, info={"name": "修改时间"}, comment="修改时间"
-    )
 
     # 唯一约束：同一交易所同一日期只能有一条记录
     __table_args__ = (
@@ -181,7 +169,14 @@ def get_daily_table_name(ts_code: str) -> str:
 
     Returns:
         表名，如：zq_data_tustock_daily_000001
+    
+    Raises:
+        ValueError: 如果 ts_code 格式不安全
     """
+    # 验证 ts_code 安全性
+    if not _validate_ts_code(ts_code):
+        raise ValueError(f"无效的 ts_code 格式: {ts_code}")
+    
     # 提取股票代码部分（去掉交易所后缀）
     # 例如：000001.SZ -> 000001
     if "." in ts_code:
@@ -190,9 +185,14 @@ def get_daily_table_name(ts_code: str) -> str:
         code_part = ts_code
     # 将特殊字符替换为下划线并转小写
     table_suffix = code_part.replace("-", "_").lower()
+    # 再次验证生成的表后缀（只允许字母、数字、下划线）
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]{1,20}$', table_suffix):
+        raise ValueError(f"生成的表后缀不安全: {table_suffix}")
     return f"zq_data_tustock_daily_{table_suffix}"
 
 
+@lru_cache(maxsize=None)
 def create_tustock_daily_class(ts_code: str):
     """
     动态创建 TustockDaily 模型类（按 ts_code 分表）
@@ -215,7 +215,7 @@ def create_tustock_daily_class(ts_code: str):
     constraint_name = f"uq_tustock_daily_{table_suffix}_ts_code_date"
     index_name = f"idx_tustock_daily_{table_suffix}_ts_code_date"
 
-    class TustockDaily(Base):
+    class TustockDaily(Base, AuditMixin):
         """股票日线数据表（按 ts_code 分表，对应 TABLE_ZQ_DATA_TUSTOCK_DAILY_TEMPLATE）"""
 
         __database__ = "zquant"  # 数据库名称
@@ -249,19 +249,6 @@ def create_tustock_daily_class(ts_code: str):
         pct_chg = Column(Double, nullable=True, info={"name": "涨跌幅"}, comment="涨跌幅")
         vol = Column(Double, nullable=False, default=0, info={"name": "成交量（手）"}, comment="成交量（手）")
         amount = Column(Double, nullable=False, default=0, info={"name": "成交额（千元）"}, comment="成交额（千元）")
-        created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-        created_time = Column(
-            DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间"
-        )
-        updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-        updated_time = Column(
-            DateTime,
-            default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-            info={"name": "修改时间"},
-            comment="修改时间",
-        )
 
         # 唯一约束：同一股票同一日期只能有一条记录
         __table_args__ = (
@@ -276,6 +263,19 @@ def create_tustock_daily_class(ts_code: str):
 TUSTOCK_DAILY_VIEW_NAME = "zq_data_tustock_daily_view"
 
 
+def _validate_ts_code(ts_code: str) -> bool:
+    """
+    验证 ts_code 格式是否安全（防止SQL注入）
+    
+    只允许字母、数字、点号、下划线、连字符
+    """
+    if not ts_code or not isinstance(ts_code, str):
+        return False
+    import re
+    # 允许格式：000001.SZ, 000001-SZ, 000001_SZ 等
+    return bool(re.match(r'^[a-zA-Z0-9._-]{1,20}$', ts_code))
+
+
 def get_daily_basic_table_name(ts_code: str) -> str:
     """
     根据 ts_code 生成每日指标分表名称
@@ -285,7 +285,14 @@ def get_daily_basic_table_name(ts_code: str) -> str:
 
     Returns:
         表名，如：zq_data_tustock_daily_basic_000001
+    
+    Raises:
+        ValueError: 如果 ts_code 格式不安全
     """
+    # 验证 ts_code 安全性
+    if not _validate_ts_code(ts_code):
+        raise ValueError(f"无效的 ts_code 格式: {ts_code}")
+    
     # 提取股票代码部分（去掉交易所后缀）
     # 例如：000001.SZ -> 000001
     if "." in ts_code:
@@ -294,9 +301,14 @@ def get_daily_basic_table_name(ts_code: str) -> str:
         code_part = ts_code
     # 将特殊字符替换为下划线并转小写
     table_suffix = code_part.replace("-", "_").lower()
+    # 再次验证生成的表后缀（只允许字母、数字、下划线）
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]{1,20}$', table_suffix):
+        raise ValueError(f"生成的表后缀不安全: {table_suffix}")
     return f"zq_data_tustock_daily_basic_{table_suffix}"
 
 
+@lru_cache(maxsize=None)
 def create_tustock_daily_basic_class(ts_code: str):
     """
     动态创建 TustockDailyBasic 模型类（按 ts_code 分表）
@@ -319,7 +331,7 @@ def create_tustock_daily_basic_class(ts_code: str):
     constraint_name = f"uq_tustock_daily_basic_{table_suffix}_ts_code_date"
     index_name = f"idx_tustock_daily_basic_{table_suffix}_ts_code_date"
 
-    class TustockDailyBasic(Base):
+    class TustockDailyBasic(Base, AuditMixin):
         """股票每日指标表（按 ts_code 分表，对应 TABLE_CN_TUSTOCK_DAILY_BASIC_TEMPLATE）"""
 
         __database__ = "zquant"  # 数据库名称
@@ -362,19 +374,6 @@ def create_tustock_daily_basic_class(ts_code: str):
         free_share = Column(Double, nullable=True, info={"name": "自由流通股本（万）"}, comment="自由流通股本（万）")
         total_mv = Column(Double, nullable=True, info={"name": "总市值（万元）"}, comment="总市值（万元）")
         circ_mv = Column(Double, nullable=True, info={"name": "流通市值（万元）"}, comment="流通市值（万元）")
-        created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-        created_time = Column(
-            DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间"
-        )
-        updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-        updated_time = Column(
-            DateTime,
-            default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-            info={"name": "修改时间"},
-            comment="修改时间",
-        )
 
         # 唯一约束：同一股票同一日期只能有一条记录
         __table_args__ = (
@@ -397,8 +396,15 @@ def get_factor_table_name(ts_code: str) -> str:
         ts_code: TS代码，如：000001.SZ
 
     Returns:
-        表名，如：cn_tustock_factor_000001
+        表名，如：zq_data_tustock_factor_000001
+    
+    Raises:
+        ValueError: 如果 ts_code 格式不安全
     """
+    # 验证 ts_code 安全性
+    if not _validate_ts_code(ts_code):
+        raise ValueError(f"无效的 ts_code 格式: {ts_code}")
+    
     # 提取股票代码部分（去掉交易所后缀）
     # 例如：000001.SZ -> 000001
     if "." in ts_code:
@@ -407,9 +413,14 @@ def get_factor_table_name(ts_code: str) -> str:
         code_part = ts_code
     # 将特殊字符替换为下划线并转小写
     table_suffix = code_part.replace("-", "_").lower()
+    # 再次验证生成的表后缀（只允许字母、数字、下划线）
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]{1,20}$', table_suffix):
+        raise ValueError(f"生成的表后缀不安全: {table_suffix}")
     return f"zq_data_tustock_factor_{table_suffix}"
 
 
+@lru_cache(maxsize=None)
 def create_tustock_factor_class(ts_code: str):
     """
     动态创建 TustockFactor 模型类（按 ts_code 分表）
@@ -432,7 +443,7 @@ def create_tustock_factor_class(ts_code: str):
     constraint_name = f"uq_tustock_factor_{table_suffix}_ts_code_date"
     index_name = f"idx_tustock_factor_{table_suffix}_ts_code_date"
 
-    class TustockFactor(Base):
+    class TustockFactor(Base, AuditMixin):
         """股票技术因子表（按 ts_code 分表，对应 TABLE_CN_TUSTOCK_FACTOR_TEMPLATE）"""
 
         __database__ = "zquant"  # 数据库名称
@@ -490,19 +501,6 @@ def create_tustock_factor_class(ts_code: str):
         boll_mid = Column(Double, nullable=True, info={"name": "BOLL_MID"}, comment="BOLL_MID")
         boll_lower = Column(Double, nullable=True, info={"name": "BOLL_LOWER"}, comment="BOLL_LOWER")
         cci = Column(Double, nullable=True, info={"name": "CCI"}, comment="CCI")
-        created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-        created_time = Column(
-            DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间"
-        )
-        updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-        updated_time = Column(
-            DateTime,
-            default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-            info={"name": "修改时间"},
-            comment="修改时间",
-        )
 
         # 唯一约束：同一股票同一日期只能有一条记录
         __table_args__ = (
@@ -526,7 +524,14 @@ def get_stkfactorpro_table_name(ts_code: str) -> str:
 
     Returns:
         表名，如：zq_data_tustock_stkfactorpro_000001
+    
+    Raises:
+        ValueError: 如果 ts_code 格式不安全
     """
+    # 验证 ts_code 安全性
+    if not _validate_ts_code(ts_code):
+        raise ValueError(f"无效的 ts_code 格式: {ts_code}")
+    
     # 提取股票代码部分（去掉交易所后缀）
     # 例如：000001.SZ -> 000001
     if "." in ts_code:
@@ -535,9 +540,14 @@ def get_stkfactorpro_table_name(ts_code: str) -> str:
         code_part = ts_code
     # 将特殊字符替换为下划线并转小写
     table_suffix = code_part.replace("-", "_").lower()
+    # 再次验证生成的表后缀（只允许字母、数字、下划线）
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]{1,20}$', table_suffix):
+        raise ValueError(f"生成的表后缀不安全: {table_suffix}")
     return f"zq_data_tustock_stkfactorpro_{table_suffix}"
 
 
+@lru_cache(maxsize=None)
 def create_tustock_stkfactorpro_class(ts_code: str):
     """
     动态创建 TustockStkFactorPro 模型类（按 ts_code 分表）
@@ -560,7 +570,7 @@ def create_tustock_stkfactorpro_class(ts_code: str):
     constraint_name = f"uq_tustock_stkfactorpro_{table_suffix}_ts_code_date"
     index_name = f"idx_tustock_stkfactorpro_{table_suffix}_ts_code_date"
 
-    class TustockStkFactorPro(Base):
+    class TustockStkFactorPro(Base, AuditMixin):
         """股票技术因子（专业版）表（按 ts_code 分表，对应 TABLE_CN_TUSTOCK_STKFACTORPRO_TEMPLATE）"""
 
         __database__ = "zquant"  # 数据库名称
@@ -911,19 +921,6 @@ def create_tustock_stkfactorpro_class(ts_code: str):
         xsii_td4_qfq = Column(
             Double, nullable=True, info={"name": "薛斯通道II_TD4(前复权)"}, comment="薛斯通道II_TD4(前复权)"
         )
-        created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-        created_time = Column(
-            DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间"
-        )
-        updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-        updated_time = Column(
-            DateTime,
-            default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-            info={"name": "修改时间"},
-            comment="修改时间",
-        )
 
         # 唯一约束：同一股票同一日期只能有一条记录
         __table_args__ = (
@@ -937,6 +934,9 @@ def create_tustock_stkfactorpro_class(ts_code: str):
 # 专业版因子视图表名称
 TUSTOCK_STKFACTORPRO_VIEW_NAME = "zq_data_tustock_stkfactorpro_view"
 
+# 自定义量化因子结果视图表名称
+SPACEX_FACTOR_VIEW_NAME = "zq_quant_factor_spacex_view"
+
 
 # ==================== 自定义量化因子结果表（zq_quant_factor_spacex_*） ====================
 
@@ -949,7 +949,14 @@ def get_spacex_factor_table_name(code: str) -> str:
 
     Returns:
         表名，如：zq_quant_factor_spacex_000001
+    
+    Raises:
+        ValueError: 如果 code 格式不安全
     """
+    # 验证 code 安全性
+    if not _validate_ts_code(code):
+        raise ValueError(f"无效的 code 格式: {code}")
+    
     # 提取股票代码部分（去掉交易所后缀）
     # 例如：000001.SZ -> 000001
     if "." in code:
@@ -958,6 +965,10 @@ def get_spacex_factor_table_name(code: str) -> str:
         code_part = code
     # 将特殊字符替换为下划线并转小写
     table_suffix = code_part.replace("-", "_").lower()
+    # 再次验证生成的表后缀（只允许字母、数字、下划线）
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]{1,20}$', table_suffix):
+        raise ValueError(f"生成的表后缀不安全: {table_suffix}")
     return f"zq_quant_factor_spacex_{table_suffix}"
 
 
@@ -997,7 +1008,7 @@ def create_spacex_factor_class(code: str):
     constraint_name = f"uq_spacex_factor_{table_suffix}_ts_code_date"
     index_name = f"idx_spacex_factor_{table_suffix}_trade_date_code"
 
-    class SpacexFactor(Base):
+    class SpacexFactor(Base, AuditMixin):
         """自定义量化因子结果表"""
 
         __database__ = "zquant"  # 数据库名称
@@ -1020,19 +1031,6 @@ def create_spacex_factor_class(code: str):
             String(10), nullable=False, index=True, info={"name": "TS代码"}, comment="TS代码，如：000001.SZ"
         )
         trade_date = Column(Date, nullable=False, index=True, info={"name": "交易日期"}, comment="交易日期")
-        created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-        created_time = Column(
-            DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间"
-        )
-        updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-        updated_time = Column(
-            DateTime,
-            default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-            info={"name": "修改时间"},
-            comment="修改时间",
-        )
 
         # 唯一约束：同一股票同一日期只能有一条记录
         __table_args__ = (
@@ -1044,7 +1042,7 @@ def create_spacex_factor_class(code: str):
 
 
 # zq_stats_
-class DataOperationLog(Base):
+class DataOperationLog(Base, AuditMixin):
     """数据操作日志表（API接口数据同步日志）"""
 
     __tablename__ = "zq_stats_apisync"
@@ -1053,6 +1051,9 @@ class DataOperationLog(Base):
     __datasource__ = "流水数据"  # 数据源
 
     id = Column(BigInteger, primary_key=True, index=True, autoincrement=True, info={"name": "日志ID"}, comment="日志ID")
+    data_source = Column(String(50), nullable=True, info={"name": "数据源"}, comment="数据源")
+    api_interface = Column(String(100), nullable=True, info={"name": "API接口"}, comment="API接口")
+    api_data_count = Column(BigInteger, nullable=True, default=0, info={"name": "API接口数据条数"}, comment="API接口数据条数")
     table_name = Column(String(100), nullable=True, index=True, info={"name": "数据表名"}, comment="数据表名")
     operation_type = Column(
         String(20),
@@ -1075,13 +1076,9 @@ class DataOperationLog(Base):
     start_time = Column(DateTime, nullable=True, index=True, info={"name": "开始时间"}, comment="开始时间")
     end_time = Column(DateTime, nullable=True, info={"name": "结束时间"}, comment="结束时间")
     duration_seconds = Column(Float, nullable=True, info={"name": "耗时(秒)"}, comment="耗时(秒)")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(
-        DateTime, default=func.now(), nullable=False, index=True, info={"name": "创建时间"}, comment="创建时间"
-    )
 
 
-class TableStatistics(Base):
+class TableStatistics(Base, AuditMixin):
     """数据表统计表（每日数据表统计）"""
 
     __tablename__ = "zq_stats_statistics"
@@ -1105,12 +1102,6 @@ class TableStatistics(Base):
     daily_update_count = Column(
         BigInteger, nullable=True, default=0, info={"name": "日更新记录数"}, comment="日更新记录数"
     )
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_time = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False, info={"name": "修改时间"}, comment="修改时间"
-    )
 
     # 唯一约束：同一日期同一表名只能有一条记录
     __table_args__ = (
@@ -1120,7 +1111,7 @@ class TableStatistics(Base):
     )
 
 
-class Config(Base):
+class Config(Base, AuditMixin):
     """ZQuant配置表（对应 TABLE_CN_TUSTOCK_CONFIG）"""
 
     __tablename__ = "zq_app_configs"
@@ -1131,17 +1122,11 @@ class Config(Base):
     config_key = Column(String(100), primary_key=True, index=True, info={"name": "配置项键值"}, comment="配置项键值")
     config_value = Column(String(2000), nullable=True, info={"name": "配置项值"}, comment="配置项值（加密存储）")
     comment = Column(String(2000), nullable=True, info={"name": "配置说明"}, comment="配置说明")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_time = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False, info={"name": "修改时间"}, comment="修改时间"
-    )
 
     __table_args__ = (Index("idx_config_key", "config_key"),)
 
 
-class StockFavorite(Base):
+class StockFavorite(Base, AuditMixin):
     """我的自选表（对应TABLE_CN_STOCK_ATTENTION）"""
 
     __database__ = "zquant"  # 数据库名称
@@ -1156,12 +1141,6 @@ class StockFavorite(Base):
     fav_datettime = Column(DateTime, nullable=True, index=True, info={"name": "自选日期"}, comment="自选日期")
     code = Column(String(6), nullable=False, index=True, info={"name": "代码"}, comment="股票代码（6位数字），如：000001")
     comment = Column(String(2000), nullable=True, info={"name": "关注理由"}, comment="关注理由")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_time = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False, info={"name": "修改时间"}, comment="修改时间"
-    )
 
     # 唯一约束：同一用户同一股票代码只能有一条记录
     __table_args__ = (
@@ -1175,7 +1154,7 @@ class StockFavorite(Base):
         from_attributes = True
 
 
-class StockPosition(Base):
+class StockPosition(Base, AuditMixin):
     """我的持仓表（对应TABLE_CN_STOCK_POSITION）"""
 
     __database__ = "zquant"  # 数据库名称
@@ -1208,12 +1187,6 @@ class StockPosition(Base):
         Numeric(10, 4), nullable=True, info={"name": "盈亏比例"}, comment="盈亏比例（%），(current_price - avg_cost) / avg_cost * 100"
     )
     comment = Column(String(2000), nullable=True, info={"name": "备注"}, comment="备注")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_time = Column(DateTime, default=func.now(), nullable=False, info={"name": "创建时间"}, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_time = Column(
-        DateTime, default=func.now(), onupdate=func.now(), nullable=False, info={"name": "修改时间"}, comment="修改时间"
-    )
 
     # 唯一约束：同一用户同一股票代码只能有一条记录
     __table_args__ = (
@@ -1221,6 +1194,158 @@ class StockPosition(Base):
         Index("idx_stock_position_user_id", "user_id"),
         Index("idx_stock_position_code", "code"),
         Index("idx_stock_position_buy_date", "buy_date"),
+    )
+
+    class Config:
+        from_attributes = True
+
+
+class StockFilterStrategy(Base, AuditMixin):
+    """量化选股策略表"""
+
+    __database__ = "zquant"  # 数据库名称
+    __tablename__ = "zq_quant_stock_filter_strategy"  # 数据表名称
+    __cnname__ = "量化选股策略"  # 数据表中文名称
+    __datasource__ = "二次加工"  # 数据源
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(
+        Integer, ForeignKey("zq_app_users.id"), nullable=False, index=True, info={"name": "用户ID"}, comment="用户ID"
+    )
+    name = Column(String(100), nullable=False, info={"name": "策略名称"}, comment="策略名称")
+    description = Column(String(500), nullable=True, info={"name": "策略描述"}, comment="策略描述")
+    filter_conditions = Column(Text, nullable=True, info={"name": "筛选条件"}, comment="筛选条件（JSON格式）")
+    selected_columns = Column(Text, nullable=True, info={"name": "选中列"}, comment="选中的列（JSON数组）")
+    sort_config = Column(Text, nullable=True, info={"name": "排序配置"}, comment="排序配置（JSON格式，支持多列）")
+
+    # 唯一约束：同一用户同一策略名称只能有一条记录
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_stock_filter_strategy_user_name"),
+        Index("idx_stock_filter_strategy_user_id", "user_id"),
+    )
+
+    class Config:
+        from_attributes = True
+
+
+class StockFilterResult(Base, AuditMixin):
+    """量化选股结果表"""
+
+    __database__ = "zquant"  # 数据库名称
+    __tablename__ = "zq_quant_stock_filter_result"  # 数据表名称
+    __cnname__ = "量化选股结果"  # 数据表中文名称
+    __datasource__ = "二次加工"  # 数据源
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    trade_date = Column(Date, nullable=False, index=True, info={"name": "交易日期"}, comment="交易日期")
+    ts_code = Column(String(20), nullable=False, index=True, info={"name": "TS代码"}, comment="TS代码")
+    strategy_id = Column(
+        Integer, ForeignKey("zq_quant_stock_filter_strategy.id"), nullable=False, index=True, info={"name": "策略ID"}, comment="策略ID"
+    )
+    strategy_name = Column(String(100), nullable=False, info={"name": "策略名称"}, comment="策略名称")
+    
+    # Denormalized columns from zq_data_tustock_stockbasic
+    symbol = Column(String(6), nullable=True, info={"name": "股票代码"}, comment="股票代码（6位数字）")
+    name = Column(String(50), nullable=True, info={"name": "股票名称"}, comment="股票名称")
+    industry = Column(String(30), nullable=True, info={"name": "所属行业"}, comment="所属行业")
+    area = Column(String(20), nullable=True, info={"name": "地域"}, comment="地域")
+    market = Column(String(20), nullable=True, info={"name": "市场类型"}, comment="市场类型")
+    exchange = Column(String(10), nullable=True, info={"name": "交易所代码"}, comment="交易所代码")
+    fullname = Column(String(100), nullable=True, info={"name": "股票全称"}, comment="股票全称")
+    enname = Column(String(200), nullable=True, info={"name": "英文全称"}, comment="英文全称")
+    cnspell = Column(String(50), nullable=True, info={"name": "拼音缩写"}, comment="拼音缩写")
+    curr_type = Column(String(10), nullable=True, info={"name": "交易货币"}, comment="交易货币")
+    list_status = Column(String(1), nullable=True, info={"name": "上市状态"}, comment="上市状态（L=上市，D=退市，P=暂停）")
+    list_date = Column(Date, nullable=True, info={"name": "上市日期"}, comment="上市日期")
+    delist_date = Column(Date, nullable=True, info={"name": "退市日期"}, comment="退市日期")
+    is_hs = Column(String(1), nullable=True, info={"name": "是否沪深港通标的"}, comment="是否沪深港通标的")
+    act_name = Column(String(100), nullable=True, info={"name": "实控人名称"}, comment="实控人名称")
+    act_ent_type = Column(String(50), nullable=True, info={"name": "实控人企业性质"}, comment="实控人企业性质")
+    
+    # Denormalized columns from TUSTOCK_DAILY_BASIC_VIEW
+    db_close = Column(Double, nullable=True, info={"name": "收盘价(指标)"}, comment="收盘价(指标)")
+    turnover_rate = Column(Double, nullable=True, info={"name": "换手率"}, comment="换手率")
+    turnover_rate_f = Column(Double, nullable=True, info={"name": "换手率（自由流通股）"}, comment="换手率（自由流通股）")
+    volume_ratio = Column(Double, nullable=True, info={"name": "量比"}, comment="量比")
+    pe = Column(Double, nullable=True, info={"name": "市盈率"}, comment="市盈率")
+    pe_ttm = Column(Double, nullable=True, info={"name": "市盈率TTM"}, comment="市盈率TTM")
+    pb = Column(Double, nullable=True, info={"name": "市净率"}, comment="市净率")
+    ps = Column(Double, nullable=True, info={"name": "市销率"}, comment="市销率")
+    ps_ttm = Column(Double, nullable=True, info={"name": "市销率TTM"}, comment="市销率TTM")
+    dv_ratio = Column(Double, nullable=True, info={"name": "股息率"}, comment="股息率")
+    dv_ttm = Column(Double, nullable=True, info={"name": "股息率TTM"}, comment="股息率TTM")
+    total_share = Column(Double, nullable=True, info={"name": "总股本（万股）"}, comment="总股本（万股）")
+    float_share = Column(Double, nullable=True, info={"name": "流通股本（万股）"}, comment="流通股本（万股）")
+    free_share = Column(Double, nullable=True, info={"name": "自由流通股本（万）"}, comment="自由流通股本（万）")
+    total_mv = Column(Double, nullable=True, info={"name": "总市值(万元)"}, comment="总市值(万元)")
+    circ_mv = Column(Double, nullable=True, info={"name": "流通市值(万元)"}, comment="流通市值(万元)")
+    
+    # Denormalized columns from TUSTOCK_DAILY_VIEW
+    dd_open = Column(Double, nullable=True, info={"name": "开盘价"}, comment="开盘价")
+    dd_high = Column(Double, nullable=True, info={"name": "最高价"}, comment="最高价")
+    dd_low = Column(Double, nullable=True, info={"name": "最低价"}, comment="最低价")
+    dd_close = Column(Double, nullable=True, info={"name": "收盘价"}, comment="收盘价")
+    dd_pre_close = Column(Double, nullable=True, info={"name": "昨收价"}, comment="昨收价")
+    dd_change = Column(Double, nullable=True, info={"name": "涨跌额"}, comment="涨跌额")
+    pct_chg = Column(Double, nullable=True, info={"name": "涨跌幅"}, comment="涨跌幅")
+    dd_vol = Column(Double, nullable=True, info={"name": "成交量（手）"}, comment="成交量（手）")
+    amount = Column(Double, nullable=True, info={"name": "成交额(千元)"}, comment="成交额(千元)")
+
+    # Denormalized columns from TUSTOCK_FACTOR_VIEW
+    adj_factor = Column(Double, nullable=True, info={"name": "复权因子"}, comment="复权因子")
+    open_hfq = Column(Double, nullable=True, info={"name": "开盘价后复权"}, comment="开盘价后复权")
+    open_qfq = Column(Double, nullable=True, info={"name": "开盘价前复权"}, comment="开盘价前复权")
+    close_hfq = Column(Double, nullable=True, info={"name": "收盘价后复权"}, comment="收盘价后复权")
+    close_qfq = Column(Double, nullable=True, info={"name": "收盘价前复权"}, comment="收盘价前复权")
+    high_hfq = Column(Double, nullable=True, info={"name": "最高价后复权"}, comment="最高价后复权")
+    high_qfq = Column(Double, nullable=True, info={"name": "最高价前复权"}, comment="最高价前复权")
+    low_hfq = Column(Double, nullable=True, info={"name": "最低价后复权"}, comment="最低价后复权")
+    low_qfq = Column(Double, nullable=True, info={"name": "最低价前复权"}, comment="最低价前复权")
+    pre_close_hfq = Column(Double, nullable=True, info={"name": "昨收价后复权"}, comment="昨收价后复权")
+    pre_close_qfq = Column(Double, nullable=True, info={"name": "昨收价前复权"}, comment="昨收价前复权")
+    macd_dif = Column(Double, nullable=True, info={"name": "MACD_DIF"}, comment="MACD_DIF")
+    macd_dea = Column(Double, nullable=True, info={"name": "MACD_DEA"}, comment="MACD_DEA")
+    macd = Column(Double, nullable=True, info={"name": "MACD"}, comment="MACD")
+    kdj_k = Column(Double, nullable=True, info={"name": "KDJ_K"}, comment="KDJ_K")
+    kdj_d = Column(Double, nullable=True, info={"name": "KDJ_D"}, comment="KDJ_D")
+    kdj_j = Column(Double, nullable=True, info={"name": "KDJ_J"}, comment="KDJ_J")
+    rsi_6 = Column(Double, nullable=True, info={"name": "RSI_6"}, comment="RSI_6")
+    rsi_12 = Column(Double, nullable=True, info={"name": "RSI_12"}, comment="RSI_12")
+    rsi_24 = Column(Double, nullable=True, info={"name": "RSI_24"}, comment="RSI_24")
+    boll_upper = Column(Double, nullable=True, info={"name": "BOLL_UPPER"}, comment="BOLL_UPPER")
+    boll_mid = Column(Double, nullable=True, info={"name": "BOLL_MID"}, comment="BOLL_MID")
+    boll_lower = Column(Double, nullable=True, info={"name": "BOLL_LOWER"}, comment="BOLL_LOWER")
+    cci = Column(Double, nullable=True, info={"name": "CCI"}, comment="CCI")
+
+    # 关系
+    strategy = relationship("StockFilterStrategy", foreign_keys=[strategy_id])
+
+    # 唯一约束：同一交易日期同一策略同一股票只能有一条记录
+    __table_args__ = (
+        UniqueConstraint("trade_date", "ts_code", "strategy_id", name="uq_stock_filter_result_date_code_strategy"),
+        Index("idx_stock_filter_result_date_strategy", "trade_date", "strategy_id"),
+    )
+
+    class Config:
+        from_attributes = True
+
+class HslChoice(Base, AuditMixin):
+    """ZQ精选数据表"""
+
+    __database__ = "zquant"  # 数据库名称
+    __tablename__ = "zq_data_hsl_choice"  # 数据表名称
+    __cnname__ = "ZQ精选数据"  # 数据表中文名称
+    __datasource__ = "手工录入"  # 数据源
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    trade_date = Column(Date, nullable=False, index=True, info={"name": "交易日期"}, comment="交易日期")
+    ts_code = Column(String(20), nullable=False, index=True, info={"name": "TS代码"}, comment="TS代码")
+    code = Column(String(6), nullable=False, info={"name": "股票代码"}, comment="股票代码（6位数字）")
+    name = Column(String(50), nullable=True, info={"name": "股票名称"}, comment="股票名称")
+
+    # 唯一约束：同一交易日期同一股票只能有一条记录
+    __table_args__ = (
+        UniqueConstraint("trade_date", "ts_code", name="uq_hsl_choice_date_code"),
     )
 
     class Config:

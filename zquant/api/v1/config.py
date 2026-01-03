@@ -34,8 +34,11 @@ from zquant.models.data import Config
 from zquant.models.user import User
 from zquant.schemas.config import (
     ConfigCreateRequest,
+    ConfigDeleteRequest,
     ConfigItem,
+    ConfigListRequest,
     ConfigListResponse,
+    ConfigRequest,
     ConfigResponse,
     ConfigUpdateRequest,
     TushareTokenTestRequest,
@@ -55,9 +58,9 @@ def require_admin(user: User, db: Session) -> None:
         raise HTTPException(status_code=403, detail="需要管理员权限")
 
 
-@router.get("/config", response_model=ConfigListResponse, summary="获取所有配置列表")
+@router.post("/config/query", response_model=ConfigListResponse, summary="获取所有配置列表")
 def get_all_configs(
-    include_sensitive: bool = False,
+    request: ConfigListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -70,17 +73,17 @@ def get_all_configs(
     require_admin(current_user, db)
 
     try:
-        configs = ConfigService.get_all_configs(db, include_sensitive=include_sensitive)
+        configs = ConfigService.get_all_configs(db, include_sensitive=request.include_sensitive)
         items = [ConfigItem(**config) for config in configs]
         return ConfigListResponse(items=items, total=len(items))
     except Exception as e:
         logger.error(f"获取配置列表失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取配置列表失败: {e!s}")
+        raise HTTPException(status_code=500, detail="获取配置列表失败")
 
 
-@router.get("/config/{config_key}", response_model=ConfigResponse, summary="获取配置")
+@router.post("/config/get", response_model=ConfigResponse, summary="获取配置")
 def get_config(
-    config_key: str = Path(..., description="配置键"),
+    request: ConfigRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -92,14 +95,14 @@ def get_config(
     require_admin(current_user, db)
 
     try:
-        config_value = ConfigService.get_config(db, config_key, decrypt=True)
+        config_value = ConfigService.get_config(db, request.config_key, decrypt=True)
         if config_value is None:
-            raise HTTPException(status_code=404, detail=f"配置 {config_key} 不存在")
+            raise HTTPException(status_code=404, detail=f"配置 {request.config_key} 不存在")
 
         # 使用服务获取配置对象
-        config_obj = db.query(Config).filter(Config.config_key == config_key).first()
+        config_obj = db.query(Config).filter(Config.config_key == request.config_key).first()
         if not config_obj:
-            raise HTTPException(status_code=404, detail=f"配置 {config_key} 不存在")
+            raise HTTPException(status_code=404, detail=f"配置 {request.config_key} 不存在")
 
         return ConfigResponse(
             config_key=config_obj.config_key,
@@ -113,11 +116,11 @@ def get_config(
     except HTTPException:
         raise
     except EncryptionError as e:
-        logger.error(f"解密配置 {config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"解密配置失败: {e!s}")
+        logger.error(f"解密配置 {request.config_key} 失败: {e}")
+        raise HTTPException(status_code=500, detail="解密配置失败")
     except Exception as e:
-        logger.error(f"获取配置 {config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取配置失败: {e!s}")
+        logger.error(f"获取配置 {request.config_key} 失败: {e}")
+        raise HTTPException(status_code=500, detail="获取配置失败")
 
 
 @router.post("/config", response_model=ConfigResponse, summary="创建/更新配置")
@@ -169,16 +172,15 @@ def set_config(
         )
     except EncryptionError as e:
         logger.error(f"加密配置 {request.config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"加密配置失败: {e!s}")
+        raise HTTPException(status_code=500, detail="加密配置失败")
     except Exception as e:
         logger.error(f"设置配置 {request.config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"设置配置失败: {e!s}")
+        raise HTTPException(status_code=500, detail="设置配置失败")
 
 
-@router.put("/config/{config_key}", response_model=ConfigResponse, summary="更新配置")
+@router.post("/config/update", response_model=ConfigResponse, summary="更新配置")
 def update_config(
-    config_key: str = Path(..., description="配置键"),
-    request: ConfigUpdateRequest = ...,
+    request: ConfigUpdateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -192,14 +194,14 @@ def update_config(
     try:
         config = ConfigService.update_config(
             db=db,
-            config_key=config_key,
+            config_key=request.config_key,
             config_value=request.config_value,
             comment=request.comment,
             updated_by=current_user.username,
         )
 
         # 获取解密后的值用于返回
-        decrypted_value = ConfigService.get_config(db, config_key, decrypt=True)
+        decrypted_value = ConfigService.get_config(db, request.config_key, decrypt=True)
 
         return ConfigResponse(
             config_key=config.config_key,
@@ -213,16 +215,16 @@ def update_config(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except EncryptionError as e:
-        logger.error(f"加密配置 {config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"加密配置失败: {e!s}")
+        logger.error(f"加密配置 {request.config_key} 失败: {e}")
+        raise HTTPException(status_code=500, detail="加密配置失败")
     except Exception as e:
-        logger.error(f"更新配置 {config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"更新配置失败: {e!s}")
+        logger.error(f"更新配置 {request.config_key} 失败: {e}")
+        raise HTTPException(status_code=500, detail="更新配置失败")
 
 
-@router.delete("/config/{config_key}", summary="删除配置")
+@router.post("/config/delete", summary="删除配置")
 def delete_config(
-    config_key: str = Path(..., description="配置键"),
+    request: ConfigDeleteRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -234,15 +236,15 @@ def delete_config(
     require_admin(current_user, db)
 
     try:
-        success = ConfigService.delete_config(db, config_key)
+        success = ConfigService.delete_config(db, request.config_key)
         if not success:
-            raise HTTPException(status_code=404, detail=f"配置 {config_key} 不存在")
-        return {"success": True, "message": f"配置 {config_key} 已删除"}
+            raise HTTPException(status_code=404, detail=f"配置 {request.config_key} 不存在")
+        return {"success": True, "message": f"配置 {request.config_key} 已删除"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"删除配置 {config_key} 失败: {e}")
-        raise HTTPException(status_code=500, detail=f"删除配置失败: {e!s}")
+        logger.error(f"删除配置 {request.config_key} 失败: {e}")
+        raise HTTPException(status_code=500, detail="删除配置失败")
 
 
 @router.post("/config/tushare-token/test", response_model=TushareTokenTestResponse, summary="测试 Tushare Token 有效性")
@@ -297,9 +299,9 @@ def test_tushare_token(
         return TushareTokenTestResponse(success=False, message=f"Token 测试失败：{str(e)}")
     except Exception as e:
         # Tushare API 调用失败
-        error_msg = str(e)
         logger.error(f"Tushare Token 测试失败: {e}")
-
+        
+        error_msg = str(e)
         # 解析常见的错误信息
         if "token" in error_msg.lower() or "认证" in error_msg or "401" in error_msg:
             message = "Token 无效或已过期，请检查 Token 是否正确"
@@ -308,6 +310,6 @@ def test_tushare_token(
         elif "限流" in error_msg or "rate limit" in error_msg.lower():
             message = "请求过于频繁，请稍后再试"
         else:
-            message = f"Token 测试失败：{error_msg}"
+            message = "Token 测试失败：接口调用异常"
 
         return TushareTokenTestResponse(success=False, message=message)

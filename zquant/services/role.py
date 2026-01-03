@@ -81,7 +81,7 @@ class RoleService:
                 "id": Role.id,
                 "name": Role.name,
                 "description": Role.description,
-                "created_at": Role.created_at,
+                "created_time": Role.created_time,
             }
 
             if order_by in sortable_fields:
@@ -91,9 +91,9 @@ class RoleService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(Role.created_at))
+                query = query.order_by(desc(Role.created_time))
         else:
-            query = query.order_by(desc(Role.created_at))
+            query = query.order_by(desc(Role.created_time))
 
         return query.offset(skip).limit(limit).all()
 

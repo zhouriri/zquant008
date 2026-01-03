@@ -26,7 +26,7 @@ import { request } from '@umijs/max';
 
 /**
  * 查询角色列表
- * GET /api/v1/roles
+ * POST /api/v1/roles
  */
 export async function getRoles(params?: {
   skip?: number;
@@ -35,18 +35,25 @@ export async function getRoles(params?: {
   order?: 'asc' | 'desc';
 }) {
   return request<ZQuant.PageResponse<ZQuant.RoleResponse>>('/api/v1/roles', {
-    method: 'GET',
-    params,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 查询角色详情
- * GET /api/v1/roles/{role_id}
+ * POST /api/v1/roles/get
  */
 export async function getRole(roleId: number) {
-  return request<ZQuant.RoleWithPermissions>(`/api/v1/roles/${roleId}`, {
-    method: 'GET',
+  return request<ZQuant.RoleWithPermissions>('/api/v1/roles/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { role_id: roleId },
   });
 }
 
@@ -66,69 +73,85 @@ export async function createRole(body: ZQuant.RoleCreate) {
 
 /**
  * 更新角色
- * PUT /api/v1/roles/{role_id}
+ * POST /api/v1/roles/update
  */
 export async function updateRole(roleId: number, body: ZQuant.RoleUpdate) {
-  return request<ZQuant.RoleResponse>(`/api/v1/roles/${roleId}`, {
-    method: 'PUT',
+  return request<ZQuant.RoleResponse>('/api/v1/roles/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, role_id: roleId },
   });
 }
 
 /**
  * 删除角色
- * DELETE /api/v1/roles/{role_id}
+ * POST /api/v1/roles/delete
  */
 export async function deleteRole(roleId: number) {
-  return request<{ message: string }>(`/api/v1/roles/${roleId}`, {
-    method: 'DELETE',
+  return request<{ message: string }>('/api/v1/roles/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { role_id: roleId },
   });
 }
 
 /**
  * 查询角色的权限列表
- * GET /api/v1/roles/{role_id}/permissions
+ * POST /api/v1/roles/permissions/list
  */
 export async function getRolePermissions(roleId: number) {
-  return request<ZQuant.PermissionResponse[]>(`/api/v1/roles/${roleId}/permissions`, {
-    method: 'GET',
+  return request<ZQuant.PermissionResponse[]>('/api/v1/roles/permissions/list', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { role_id: roleId },
   });
 }
 
 /**
  * 为角色分配权限
- * POST /api/v1/roles/{role_id}/permissions
+ * POST /api/v1/roles/permissions/assign
  */
 export async function assignPermissions(roleId: number, body: ZQuant.AssignPermissionsRequest) {
-  return request<ZQuant.RoleResponse>(`/api/v1/roles/${roleId}/permissions`, {
+  return request<ZQuant.RoleResponse>('/api/v1/roles/permissions/assign', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, role_id: roleId },
   });
 }
 
 /**
  * 为角色添加单个权限
- * POST /api/v1/roles/{role_id}/permissions/{permission_id}
+ * POST /api/v1/roles/permissions/add
  */
 export async function addPermission(roleId: number, permissionId: number) {
-  return request<{ message: string }>(`/api/v1/roles/${roleId}/permissions/${permissionId}`, {
+  return request<{ message: string }>('/api/v1/roles/permissions/add', {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { role_id: roleId, permission_id: permissionId },
   });
 }
 
 /**
  * 移除角色的单个权限
- * DELETE /api/v1/roles/{role_id}/permissions/{permission_id}
+ * POST /api/v1/roles/permissions/remove
  */
 export async function removePermission(roleId: number, permissionId: number) {
-  return request<{ message: string }>(`/api/v1/roles/${roleId}/permissions/${permissionId}`, {
-    method: 'DELETE',
+  return request<{ message: string }>('/api/v1/roles/permissions/remove', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { role_id: roleId, permission_id: permissionId },
   });
 }
 

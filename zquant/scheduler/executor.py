@@ -81,7 +81,7 @@ class DataSyncExecutor(TaskExecutor):
             from zquant.services.sync_strategies.factory import SyncStrategyFactory
 
             strategy = SyncStrategyFactory.create_strategy(task_action)
-            return strategy.sync(db, config, extra_info)
+            return strategy.sync(db, config, extra_info, execution)
         except ValueError as e:
             # 策略工厂抛出的ValueError，直接抛出
             raise

@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 
 from zquant.models.scheduler import TaskExecution, TaskType
 from zquant.scheduler.base import TaskExecutor
+from zquant.utils.date_helper import DateHelper
 
 
 class ScriptExecutor(TaskExecutor):
@@ -126,6 +127,9 @@ class ScriptExecutor(TaskExecutor):
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUTF8"] = "1"
+        # 传递执行记录ID，以便脚本可以更新进度
+        if execution:
+            env["ZQUANT_EXECUTION_ID"] = str(execution.id)
 
         # 用于存储输出的列表
         stdout_lines = []
@@ -189,17 +193,50 @@ class ScriptExecutor(TaskExecutor):
             stdout_thread.start()
             stderr_thread.start()
 
-            # 等待进程完成，带超时
-            try:
-                returncode = process.wait(timeout=timeout_seconds)
-            except subprocess.TimeoutExpired:
-                # 超时，终止进程
-                process.kill()
-                process.wait()
-                duration_seconds = int(time.time() - start_time)
-                error_msg = f"命令执行超时（超过 {timeout_seconds} 秒）"
-                logger.error(f"[脚本执行] {error_msg}")
-                raise Exception(error_msg)
+            # 等待进程完成，带轮询检查终止请求
+            poll_interval = 2  # 秒
+            returncode = None
+            while returncode is None:
+                try:
+                    returncode = process.wait(timeout=poll_interval)
+                except subprocess.TimeoutExpired:
+                    # 检查是否总超时
+                    elapsed = time.time() - start_time
+                    if elapsed > timeout_seconds:
+                        process.kill()
+                        process.wait()
+                        error_msg = f"命令执行超时（超过 {timeout_seconds} 秒）"
+                        logger.error(f"[脚本执行] {error_msg}")
+                        raise Exception(error_msg)
+
+                    # 检查是否有终止请求
+                    if execution:
+                        try:
+                            # 强制刷新以获取最新终止标志
+                            if db.dirty or db.new or db.deleted:
+                                db.commit()
+                            else:
+                                db.rollback()
+                            db.refresh(execution)
+                        except Exception as refresh_error:
+                            logger.warning(f"[脚本执行] 刷新执行记录失败: {refresh_error}")
+                            
+                        if getattr(execution, "terminate_requested", False):
+                            logger.info(f"[脚本执行] 收到终止请求，正在杀掉进程 (PID: {process.pid})")
+                            process.kill()
+                            process.wait()
+                            from zquant.models.scheduler import TaskStatus
+                            from datetime import datetime
+
+                            execution.status = TaskStatus.TERMINATED
+                            execution.end_time = datetime.now()
+                            execution.error_message = "用户请求终止任务"
+                            db.commit()
+                            raise Exception("Task terminated by user request")
+
+                        # 更新执行时长
+                        execution.duration_seconds = int(elapsed)
+                        db.commit()
 
             # 等待输出线程完成
             stdout_thread.join(timeout=1)
@@ -224,7 +261,7 @@ class ScriptExecutor(TaskExecutor):
             }
 
             if returncode == 0:
-                logger.info(f"[脚本执行] 执行成功，退出码: {returncode}，耗时: {duration_seconds} 秒")
+                logger.info(f"[脚本执行] 执行成功，退出码: {returncode}，耗时: {DateHelper.format_duration(duration_seconds)} ({duration_seconds} 秒)")
             else:
                 error_msg = f"命令执行失败，退出码: {returncode}"
                 logger.warning(f"[脚本执行] {error_msg}")

@@ -25,41 +25,57 @@ import { request } from '@umijs/max';
 
 /**
  * 获取数据同步状态
- * GET /api/v1/dashboard/sync-status
+ * POST /api/v1/dashboard/sync-status
  */
 export async function getSyncStatus() {
   return request<ZQuant.SyncStatusResponse>('/api/v1/dashboard/sync-status', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
 /**
  * 获取定时任务统计
- * GET /api/v1/dashboard/task-stats
+ * POST /api/v1/dashboard/task-stats
  */
 export async function getTaskStats() {
   return request<ZQuant.TaskStatsResponse>('/api/v1/dashboard/task-stats', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
 /**
  * 获取本地数据最新信息
- * GET /api/v1/dashboard/latest-data
+ * POST /api/v1/dashboard/latest-data
  */
 export async function getLatestData() {
   return request<ZQuant.LatestDataResponse>('/api/v1/dashboard/latest-data', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
 /**
  * 获取本地数据统计
- * GET /api/v1/dashboard/local-data-stats
+ * POST /api/v1/dashboard/local-data-stats
  */
 export async function getLocalDataStats() {
   return request<ZQuant.LocalDataStatsResponse>('/api/v1/dashboard/local-data-stats', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 

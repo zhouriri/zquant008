@@ -27,6 +27,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
  */
 export interface PageCache {
   dataSource?: any[];           // 表格数据
+  total?: number;                // 数据总数
   formValues?: any;              // 表单值
   rawData?: any[];               // 原始数据
   modalStates?: Record<string, boolean>; // 弹窗状态

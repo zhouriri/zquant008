@@ -37,6 +37,8 @@ from zquant.data.storage_base import ensure_table_exists
 from zquant.factor.calculators.factory import create_calculator
 from zquant.models.data import Tustock, TustockTradecal, create_spacex_factor_class, get_spacex_factor_table_name
 from zquant.models.factor import FactorConfig, FactorDefinition, FactorModel
+from zquant.models.scheduler import TaskExecution
+from zquant.scheduler.utils import update_execution_progress
 from zquant.services.dashboard import DashboardService
 from zquant.services.factor import FactorService
 
@@ -88,10 +90,9 @@ class FactorCalculationCache:
             self.default_models[model.factor_id] = model
             self.models[model.id] = model
         
-        # 3. 批量加载所有因子配置
+        # 3. 批量加载所有因子配置（不再过滤 enabled=True，以便在计算时识别禁用状态）
         configs = db.query(FactorConfig).filter(
-            FactorConfig.factor_id.in_(factor_ids),
-            FactorConfig.enabled == True
+            FactorConfig.factor_id.in_(factor_ids)
         ).all()
         for config in configs:
             self.configs[config.factor_id] = config
@@ -266,6 +267,8 @@ class FactorCalculationService:
     def ensure_factor_result_table(db: Session, code: str, factor_name: str) -> str:
         """
         确保因子结果表存在（如果不存在则创建基础结构，然后添加因子列）
+        
+        对于组合因子，此方法只创建基础表结构，具体的列会在保存时动态添加。
 
         Args:
             db: 数据库会话
@@ -278,29 +281,31 @@ class FactorCalculationService:
         # 使用统一的表名生成函数
         table_name = get_spacex_factor_table_name(code)
 
-        # 获取因子定义，确定列名
+        # 获取因子定义
         factor_def = FactorService.get_factor_definition_by_name(db, factor_name)
         if not factor_def:
             raise ValueError(f"因子定义不存在: {factor_name}")
 
-        column_name = factor_def.column_name
-
         # 检查表是否存在
         inspector = sql_inspect(engine)
         if table_name in inspector.get_table_names():
-            # 表已存在，检查列是否存在
-            existing_columns = [col["name"] for col in inspector.get_columns(table_name)]
-            if column_name not in existing_columns:
-                # 添加缺失的列
-                try:
-                    alter_sql = text(
-                        f"ALTER TABLE `{table_name}` ADD COLUMN `{column_name}` DOUBLE COMMENT '{factor_def.cn_name}因子值'"
-                    )
-                    db.execute(alter_sql)
-                    db.commit()
-                    logger.info(f"已添加列 {column_name} 到表 {table_name}")
-                except Exception as e:
-                    logger.warning(f"添加列 {column_name} 到表 {table_name} 失败: {e}")
+            # 表已存在
+            # 如果是单因子，检查列是否存在
+            if factor_def.factor_type != "组合因子":
+                existing_columns = [col["name"] for col in inspector.get_columns(table_name)]
+                column_name = factor_def.column_name
+                if column_name not in existing_columns:
+                    # 添加缺失的列
+                    try:
+                        alter_sql = text(
+                            f"ALTER TABLE `{table_name}` ADD COLUMN `{column_name}` DOUBLE COMMENT '{factor_def.cn_name}因子值'"
+                        )
+                        db.execute(alter_sql)
+                        db.commit()
+                        logger.info(f"已添加列 {column_name} 到表 {table_name}")
+                    except Exception as e:
+                        logger.warning(f"添加列 {column_name} 到表 {table_name} 失败: {e}")
+            # 组合因子的列会在保存时动态添加
             return table_name
 
         # 表不存在，使用 create_spacex_factor_class 创建模型类，然后创建表
@@ -314,16 +319,19 @@ class FactorCalculationService:
             else:
                 raise RuntimeError(f"创建因子结果表 {table_name} 失败")
 
-            # 创建表后，添加因子列
-            try:
-                alter_sql = text(
-                    f"ALTER TABLE `{table_name}` ADD COLUMN `{column_name}` DOUBLE COMMENT '{factor_def.cn_name}因子值'"
-                )
-                db.execute(alter_sql)
-                db.commit()
-                logger.info(f"已添加列 {column_name} 到新创建的表 {table_name}")
-            except Exception as e:
-                logger.warning(f"添加列 {column_name} 到新创建的表 {table_name} 失败: {e}")
+            # 如果是单因子，创建表后添加因子列
+            if factor_def.factor_type != "组合因子":
+                try:
+                    column_name = factor_def.column_name
+                    alter_sql = text(
+                        f"ALTER TABLE `{table_name}` ADD COLUMN `{column_name}` DOUBLE COMMENT '{factor_def.cn_name}因子值'"
+                    )
+                    db.execute(alter_sql)
+                    db.commit()
+                    logger.info(f"已添加列 {column_name} 到新创建的表 {table_name}")
+                except Exception as e:
+                    logger.warning(f"添加列 {column_name} 到新创建的表 {table_name} 失败: {e}")
+            # 组合因子的列会在保存时动态添加
 
         except Exception as e:
             db.rollback()
@@ -468,6 +476,130 @@ class FactorCalculationService:
         }
 
     @staticmethod
+    def save_combined_factor_result(
+        db: Session,
+        table_name: str,
+        trade_date: date,
+        factor_values: dict[str, Any],
+        code: str | None = None,
+        extra_info: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        保存组合因子计算结果（多个字段）
+
+        Args:
+            db: 数据库会话
+            table_name: 表名（如：zq_quant_factor_spacex_000001）
+            trade_date: 交易日期
+            factor_values: 因子值字典，键为列名，值为因子值
+            code: 股票代码（完整的TS代码，如：000001.SZ，或6位数字如：000001）。如果为None，从table_name中提取
+            extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+
+        Returns:
+            是否成功
+        """
+        try:
+            # 从表名中提取code（如果未提供）
+            if code is None:
+                if table_name.startswith("zq_quant_factor_spacex_"):
+                    code = table_name.replace("zq_quant_factor_spacex_", "")
+                else:
+                    logger.error(f"无法从表名 {table_name} 中提取code")
+                    return False
+
+            # 转换为完整的TS代码格式
+            from zquant.utils.code_converter import CodeConverter
+
+            ts_code = CodeConverter.to_ts_code(code, db)
+            if not ts_code:
+                logger.warning(f"无法转换代码 {code} 的TS代码格式，使用原始代码")
+                ts_code = code
+
+            # 设置 created_by 和 updated_by 的默认值
+            created_by_value = "system"
+            updated_by_value = "system"
+            if extra_info:
+                if "created_by" in extra_info:
+                    created_by_value = extra_info["created_by"]
+                if "updated_by" in extra_info:
+                    updated_by_value = extra_info["updated_by"]
+
+            # 确保所有字段的列都存在
+            inspector = sql_inspect(engine)
+            existing_columns = [col["name"] for col in inspector.get_columns(table_name)]
+            
+            for column_name in factor_values.keys():
+                if column_name not in existing_columns:
+                    # 添加缺失的列
+                    try:
+                        alter_sql = text(
+                            f"ALTER TABLE `{table_name}` ADD COLUMN `{column_name}` DOUBLE COMMENT '组合因子字段: {column_name}'"
+                        )
+                        db.execute(alter_sql)
+                        db.commit()
+                        logger.info(f"已添加列 {column_name} 到表 {table_name}")
+                    except Exception as e:
+                        logger.warning(f"添加列 {column_name} 到表 {table_name} 失败: {e}")
+                        db.rollback()
+
+            # 检查是否已存在该日期和代码的记录
+            check_sql = text(f"SELECT id FROM `{table_name}` WHERE trade_date = :trade_date AND ts_code = :ts_code")
+            existing = db.execute(check_sql, {"trade_date": trade_date, "ts_code": ts_code}).fetchone()
+
+            # 构建更新/插入的字段列表
+            column_names = list(factor_values.keys())
+            set_clauses = [f"`{col}` = :{col}" for col in column_names]
+            set_clauses.append("updated_time = :updated_time")
+            set_clauses.append("updated_by = :updated_by")
+
+            if existing:
+                # 更新现有记录
+                update_sql = text(
+                    f"UPDATE `{table_name}` SET {', '.join(set_clauses)} WHERE trade_date = :trade_date AND ts_code = :ts_code"
+                )
+                params = {col: factor_values.get(col) for col in column_names}
+                params.update({
+                    "updated_time": datetime.now(),
+                    "updated_by": updated_by_value,
+                    "trade_date": trade_date,
+                    "ts_code": ts_code,
+                })
+                db.execute(update_sql, params)
+                db.commit()
+                logger.debug(
+                    f"更新组合因子结果: table={table_name}, ts_code={ts_code}, trade_date={trade_date}, 字段数={len(column_names)}"
+                )
+            else:
+                # 插入新记录
+                insert_columns = ["trade_date", "ts_code"] + column_names + ["created_time", "updated_time", "created_by", "updated_by"]
+                insert_values = [f":{col}" for col in ["trade_date", "ts_code"]] + [f":{col}" for col in column_names] + [":created_time", ":updated_time", ":created_by", ":updated_by"]
+                insert_sql = text(
+                    f"INSERT INTO `{table_name}` ({', '.join(insert_columns)}) VALUES ({', '.join(insert_values)})"
+                )
+                params = {
+                    "trade_date": trade_date,
+                    "ts_code": ts_code,
+                }
+                params.update({col: factor_values.get(col) for col in column_names})
+                params.update({
+                    "created_time": datetime.now(),
+                    "updated_time": datetime.now(),
+                    "created_by": created_by_value,
+                    "updated_by": updated_by_value,
+                })
+                db.execute(insert_sql, params)
+                db.commit()
+                logger.debug(
+                    f"插入组合因子结果: table={table_name}, ts_code={ts_code}, trade_date={trade_date}, 字段数={len(column_names)}"
+                )
+
+            return True
+        except Exception as e:
+            db.rollback()
+            logger.error(f"保存组合因子结果失败: table={table_name}, trade_date={trade_date}, code={code}, error={e}")
+            return False
+
+    @staticmethod
     def save_factor_result(
         db: Session,
         table_name: str,
@@ -580,6 +712,7 @@ class FactorCalculationService:
         start_date: date | None = None,
         end_date: date | None = None,
         extra_info: dict[str, Any] | None = None,
+        execution: TaskExecution | None = None,
     ) -> dict[str, Any]:
         """
         计算因子
@@ -591,14 +724,9 @@ class FactorCalculationService:
             start_date: 开始日期（可选，参考日线数据处理逻辑）
             end_date: 结束日期（可选，参考日线数据处理逻辑）
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
-
-        Returns:
-            计算结果字典
-
-        日期处理规则（参考日线数据同步逻辑）：
-            - 规则一（所有参数均未传入）：start_date 和 end_date 都默认为最后一个交易日
-            - 规则二（至少有一个参数传入）：
-              start_date 默认为 "2025-01-01"，end_date 默认为最后一个交易日
+            execution: 执行记录对象（可选）
+        
+        # ... (rest of docstring)
         """
         # 判断是否所有日期参数都未传入
         all_params_empty = not start_date and not end_date
@@ -678,17 +806,6 @@ class FactorCalculationService:
         else:
             logger.info(f"日期范围模式：从 {start_date} 到 {end_date}，共 {len(trading_dates)} 个交易日")
 
-        # 检查数据是否准备就绪
-        # is_ready, message = FactorCalculationService.check_data_ready(db, trade_date)
-        # if not is_ready:
-        #     return {
-        #         "success": False,
-        #         "message": message,
-        #         "calculated_count": 0,
-        #         "failed_count": 0,
-        #         "details": [],
-        #     }
-
         # 获取需要计算的因子列表
         if factor_id:
             factor_defs = [FactorService.get_factor_definition(db, factor_id)]
@@ -710,31 +827,71 @@ class FactorCalculationService:
             f"日期范围={start_date} 到 {end_date}"
         )
 
+        # 估算总处理项数 (交易日 * 因子数 * 股票数)
+        # 这里先获取一次股票总数用于进度估算
+        from zquant.models.data import Tustock
+        stocks_count = len(codes) if codes else db.query(Tustock.ts_code).count()
+        total_items = len(trading_dates) * len(factor_defs) * stocks_count
+        processed_items = 0
+        
+        update_execution_progress(db, execution, total_items=total_items, processed_items=0, message="开始计算因子...")
+
         # 对每个交易日循环计算
         for trade_date_idx, current_trade_date in enumerate(trading_dates, 1):
             for factor_def in factor_defs:
                 if not factor_def.enabled:
                     continue
+                
+                # 获取因子配置（从缓存）
+                config_obj = cache.get_config(factor_def.id)
+                
+                # 核心判断：如果配置存在且被禁用，则彻底跳过该因子的计算
+                if config_obj and not config_obj.enabled:
+                    logger.info(f"因子 {factor_def.factor_name} 的配置已禁用，跳过计算")
+                    # 跳过该因子的所有股票项，更新进度条
+                    if codes:
+                        processed_items += len(codes)
+                    else:
+                        processed_items += stocks_count
+                    
+                    update_execution_progress(
+                        db, 
+                        execution, 
+                        processed_items=processed_items,
+                        total_items=total_items,
+                        current_item=f"跳过禁用因子: {factor_def.factor_name}",
+                        message=f"跳过禁用因子: {factor_def.factor_name} - {current_trade_date}"
+                    )
+                    continue
 
+                configs = [config_obj] if config_obj else []
+
+                # 获取所有股票代码
+                if codes:
+                    codes_to_calc = codes
+                else:
+                    stocks = db.query(Tustock.ts_code).filter().all()
+                    codes_to_calc = [stock.ts_code for stock in stocks]
+                
+                # 如果实际股票数与估算不符，动态调整 total_items (可选，这里先简单累加 processed_items)
+                
                 # 1. 检查因子是否有默认且启用的模型（必须条件）
                 default_model = cache.get_default_model(factor_def.id)
                 if not default_model:
                     logger.warning(f"因子 {factor_def.factor_name} 没有默认且启用的模型，跳过")
+                    # 跳过该因子的所有股票
+                    processed_items += len(codes_to_calc)
+                    update_execution_progress(
+                        db, 
+                        execution, 
+                        processed_items=processed_items,
+                        total_items=total_items,
+                        current_item=f"跳过因子: {factor_def.factor_name}",
+                        message=f"跳过因子: {factor_def.factor_name} - {current_trade_date} (无默认模型)"
+                    )
                     continue
 
-                # 获取因子配置（从缓存）
-                config = cache.get_config(factor_def.id)
-                configs = [config] if config else []
-
                 if not configs:
-                    # 如果没有配置，使用默认模型计算所有股票
-                    # 获取所有股票代码
-                    if codes:
-                        codes_to_calc = codes
-                    else:
-                        stocks = db.query(Tustock.ts_code).filter().all()
-                        codes_to_calc = [stock.ts_code for stock in stocks]
-
                     logger.info(
                         f"开始计算因子: {factor_def.factor_name} - {current_trade_date} ({trade_date_idx}/{len(trading_dates)}), "
                         f"股票数={len(codes_to_calc)}, model_code={default_model.model_code}"
@@ -742,7 +899,26 @@ class FactorCalculationService:
 
                     # 计算因子
                     for code_idx, code in enumerate(codes_to_calc, 1):
-                        try:
+                        processed_items += 1
+                        try:                            
+                            # 每10个股票记录一次详细日志
+                            if code_idx % 10 == 0:
+                                # 每次循环都更新当前处理项，每10个股票更新一次完整进度
+                                update_execution_progress(
+                                    db, 
+                                    execution, 
+                                    processed_items=processed_items,
+                                    total_items=total_items,
+                                    current_item=f"{code} ({factor_def.cn_name})",
+                                    message=f"正在计算: {factor_def.cn_name} - {current_trade_date} - {code} ({code_idx}/{len(codes_to_calc)})"
+                                )
+
+                                logger.info(
+                                    f"因子计算进度: {factor_def.factor_name} - {current_trade_date} - "
+                                    f"已处理 {code_idx}/{len(codes_to_calc)} 个股票 "
+                                    f"(总进度: {processed_items}/{total_items}, 成功={calculated_count}, 数据不完整={invalid_count}, 失败={failed_count})"
+                                )
+                            
                             result = FactorCalculationService._calculate_single_factor(
                                 db, factor_def, default_model, code, current_trade_date, extra_info
                             )
@@ -762,6 +938,8 @@ class FactorCalculationService:
                                     f"(成功={calculated_count}, 数据不完整={invalid_count}, 失败={failed_count})"
                                 )
                         except Exception as e:
+                            if "Task terminated" in str(e):
+                                raise
                             failed_count += 1
                             details.append(
                                 {
@@ -822,6 +1000,7 @@ class FactorCalculationService:
 
                     # 对每个代码，查找对应的模型并计算
                     for code_idx, code in enumerate(codes_to_calc, 1):
+                        processed_items += 1
                         # 根据代码查找对应的模型（从缓存获取）
                         model = cache.get_model_for_code(factor_def.id, code)
                         if not model:
@@ -834,10 +1013,37 @@ class FactorCalculationService:
                                 "trade_date": str(current_trade_date),
                                 "error": "没有找到对应的模型",
                             })
+                            # 即使跳过，也要更新进度
+                            update_execution_progress(
+                                db, 
+                                execution, 
+                                processed_items=processed_items,
+                                total_items=total_items,
+                                current_item=f"{code} ({factor_def.cn_name})",
+                                message=f"正在计算: {factor_def.cn_name} - {current_trade_date} - {code} ({code_idx}/{len(codes_to_calc)}) - 跳过(无模型)"
+                            )
                             continue
 
                         # 计算因子
                         try:
+                            # 每次循环都更新当前处理项，每10个股票更新一次完整进度
+                            update_execution_progress(
+                                db, 
+                                execution, 
+                                processed_items=processed_items,
+                                total_items=total_items,
+                                current_item=f"{code} ({factor_def.cn_name})",
+                                message=f"正在计算: {factor_def.cn_name} - {current_trade_date} - {code} ({code_idx}/{len(codes_to_calc)})"
+                            )
+                            
+                            # 每10个股票记录一次详细日志
+                            if code_idx % 10 == 0:
+                                logger.info(
+                                    f"因子计算进度: {factor_def.factor_name} - {current_trade_date} - "
+                                    f"已处理 {code_idx}/{len(codes_to_calc)} 个股票 "
+                                    f"(总进度: {processed_items}/{total_items}, 成功={calculated_count}, 数据不完整={invalid_count}, 失败={failed_count})"
+                                )
+                            
                             result = FactorCalculationService._calculate_single_factor(
                                 db, factor_def, model, code, current_trade_date, extra_info
                             )
@@ -857,6 +1063,8 @@ class FactorCalculationService:
                                     f"(成功={calculated_count}, 数据不完整={invalid_count}, 失败={failed_count})"
                                 )
                         except Exception as e:
+                            if "Task terminated" in str(e):
+                                raise
                             failed_count += 1
                             details.append(
                                 {
@@ -867,6 +1075,14 @@ class FactorCalculationService:
                                     "error": str(e),
                                 }
                             )
+        
+        update_execution_progress(
+            db, 
+            execution, 
+            processed_items=processed_items,
+            total_items=total_items,
+            message="因子计算完成"
+        )
 
         # 构建返回消息
         message_parts = [f"成功: {calculated_count}"]
@@ -919,10 +1135,13 @@ class FactorCalculationService:
             calculator = create_calculator(model.model_code, model.get_config())
 
             # 计算因子值
-            factor_value = calculator.calculate(db, code, trade_date)
+            factor_result = calculator.calculate(db, code, trade_date)
 
-            # 处理数据不完整的情况（返回-1）
-            if factor_value == -1:
+            # 检查是否为组合因子（返回字典）
+            is_combined_factor = isinstance(factor_result, dict)
+            
+            # 处理数据不完整的情况（返回-1，仅适用于单因子）
+            if not is_combined_factor and factor_result == -1:
                 # 确保结果表存在
                 table_name = FactorCalculationService.ensure_factor_result_table(db, code, factor_def.factor_name)
                 # 保存-1值，表示当日因子无效（数据不完整）
@@ -949,7 +1168,7 @@ class FactorCalculationService:
                         "error": "保存-1值失败",
                     }
 
-            if factor_value is None:
+            if factor_result is None:
                 return {
                     "success": False,
                     "factor_name": factor_def.factor_name,
@@ -961,29 +1180,56 @@ class FactorCalculationService:
             # 确保结果表存在
             table_name = FactorCalculationService.ensure_factor_result_table(db, code, factor_def.factor_name)
 
-            # 保存结果
-            success = FactorCalculationService.save_factor_result(db, table_name, trade_date, factor_value, factor_def.column_name, code, extra_info)
-
-            if success:
-                logger.debug(
-                    f"因子入库成功: {factor_def.factor_name} - {code} - {trade_date} - 值={factor_value:.4f}"
+            # 根据因子类型保存结果
+            if is_combined_factor:
+                # 组合因子：保存多个字段
+                success = FactorCalculationService.save_combined_factor_result(
+                    db, table_name, trade_date, factor_result, code, extra_info
                 )
-                return {
-                    "success": True,
-                    "invalid": False,
-                    "factor_name": factor_def.factor_name,
-                    "code": code,
-                    "trade_date": str(trade_date),
-                    "factor_value": factor_value,
-                }
+                if success:
+                    logger.debug(
+                        f"组合因子入库成功: {factor_def.factor_name} - {code} - {trade_date} - 字段数={len(factor_result)}"
+                    )
+                    return {
+                        "success": True,
+                        "invalid": False,
+                        "factor_name": factor_def.factor_name,
+                        "code": code,
+                        "trade_date": str(trade_date),
+                        "factor_value": "combined",  # 组合因子不返回单个值
+                        "field_count": len(factor_result),
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "factor_name": factor_def.factor_name,
+                        "code": code,
+                        "trade_date": str(trade_date),
+                        "error": "保存组合因子结果失败",
+                    }
             else:
-                return {
-                    "success": False,
-                    "factor_name": factor_def.factor_name,
-                    "code": code,
-                    "trade_date": str(trade_date),
-                    "error": "保存结果失败",
-                }
+                # 单因子：保存单个字段
+                success = FactorCalculationService.save_factor_result(db, table_name, trade_date, factor_result, factor_def.column_name, code, extra_info)
+                if success:
+                    logger.debug(
+                        f"因子入库成功: {factor_def.factor_name} - {code} - {trade_date} - 值={factor_result:.4f}"
+                    )
+                    return {
+                        "success": True,
+                        "invalid": False,
+                        "factor_name": factor_def.factor_name,
+                        "code": code,
+                        "trade_date": str(trade_date),
+                        "factor_value": factor_result,
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "factor_name": factor_def.factor_name,
+                        "code": code,
+                        "trade_date": str(trade_date),
+                        "error": "保存结果失败",
+                    }
 
         except Exception as e:
             logger.error(f"计算因子失败: factor={factor_def.factor_name}, code={code}, trade_date={trade_date}, error={e}")
@@ -1000,8 +1246,7 @@ class FactorCalculationService:
         db: Session,
         code: str,
         factor_name: str | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        trade_date: date | None = None,
     ) -> list[dict[str, Any]]:
         """
         获取因子计算结果
@@ -1010,8 +1255,7 @@ class FactorCalculationService:
             db: 数据库会话
             code: 股票代码
             factor_name: 因子名称（None表示查询所有因子）
-            start_date: 开始日期
-            end_date: 结束日期
+            trade_date: 交易日期
 
         Returns:
             因子结果列表
@@ -1035,12 +1279,9 @@ class FactorCalculationService:
         query_sql = f"SELECT * FROM `{table_name}` WHERE 1=1"
         params = {}
 
-        if start_date:
-            query_sql += " AND trade_date >= :start_date"
-            params["start_date"] = start_date
-        if end_date:
-            query_sql += " AND trade_date <= :end_date"
-            params["end_date"] = end_date
+        if trade_date:
+            query_sql += " AND trade_date = :trade_date"
+            params["trade_date"] = trade_date
 
         query_sql += " ORDER BY trade_date DESC"
 
@@ -1055,8 +1296,8 @@ class FactorCalculationService:
                 # 转换日期和时间为字符串
                 if "trade_date" in item and item["trade_date"]:
                     item["trade_date"] = item["trade_date"].strftime("%Y-%m-%d") if hasattr(item["trade_date"], "strftime") else str(item["trade_date"])
-                if "created_at" in item and item["created_at"]:
-                    item["created_at"] = item["created_at"].strftime("%Y-%m-%d %H:%M:%S") if hasattr(item["created_at"], "strftime") else str(item["created_at"])
+                if "created_time" in item and item["created_time"]:
+                    item["created_time"] = item["created_time"].strftime("%Y-%m-%d %H:%M:%S") if hasattr(item["created_time"], "strftime") else str(item["created_time"])
                 items.append(item)
 
             return items

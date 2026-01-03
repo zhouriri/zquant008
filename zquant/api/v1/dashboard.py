@@ -36,7 +36,7 @@ from zquant.services.dashboard import DashboardService
 router = APIRouter()
 
 
-@router.get("/sync-status", response_model=SyncStatusResponse, summary="获取数据同步状态")
+@router.post("/sync-status", response_model=SyncStatusResponse, summary="获取数据同步状态")
 def get_sync_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -55,7 +55,7 @@ def get_sync_status(
     return SyncStatusResponse(**status)
 
 
-@router.get("/task-stats", response_model=TaskStatsResponse, summary="获取定时任务统计")
+@router.post("/task-stats", response_model=TaskStatsResponse, summary="获取定时任务统计")
 def get_task_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -74,7 +74,7 @@ def get_task_stats(
     return TaskStatsResponse(**stats)
 
 
-@router.get("/latest-data", response_model=LatestDataResponse, summary="获取本地数据最新信息")
+@router.post("/latest-data", response_model=LatestDataResponse, summary="获取本地数据最新信息")
 def get_latest_data(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -100,7 +100,7 @@ def get_latest_data(
     )
 
 
-@router.get("/local-data-stats", response_model=LocalDataStatsResponse, summary="获取本地数据统计")
+@router.post("/local-data-stats", response_model=LocalDataStatsResponse, summary="获取本地数据统计")
 def get_local_data_stats(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),

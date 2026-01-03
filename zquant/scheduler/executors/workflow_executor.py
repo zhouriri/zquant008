@@ -57,6 +57,7 @@ class WorkflowExecutor(TaskExecutor):
                 - workflow_type: "serial" 或 "parallel"
                 - tasks: 任务列表，每个任务包含 task_id, name, dependencies
                 - on_failure: "stop" 或 "continue"
+                - resume_from_execution_id: 恢复来源执行记录ID（可选）
             execution: 执行记录对象（可选），用于更新执行进度
 
         Returns:
@@ -65,6 +66,7 @@ class WorkflowExecutor(TaskExecutor):
         workflow_type = config.get("workflow_type", "serial")
         tasks_config = config.get("tasks", [])
         on_failure = config.get("on_failure", "stop")
+        resume_from_id = config.get("resume_from_execution_id")
 
         if not tasks_config:
             raise ValueError("编排任务配置中必须包含至少一个任务")
@@ -78,11 +80,23 @@ class WorkflowExecutor(TaskExecutor):
         # 构建依赖图
         dependency_graph = self._build_dependency_graph(tasks_config)
 
+        # 如果是恢复执行，获取已成功的任务
+        successful_tasks = set()
+        if resume_from_id:
+            old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+            if old_execution:
+                old_result = old_execution.get_result()
+                task_results = old_result.get("task_results", {})
+                for tid_str, res in task_results.items():
+                    if res.get("status") == "success":
+                        successful_tasks.add(int(tid_str))
+                logger.info(f"[编排任务] 从执行记录 {resume_from_id} 恢复，将跳过 {len(successful_tasks)} 个已成功任务")
+
         # 根据执行模式执行
         if workflow_type == "serial":
-            return self._execute_serial(db, task_objects, tasks_config, dependency_graph, on_failure, execution)
+            return self._execute_serial(db, task_objects, tasks_config, dependency_graph, on_failure, execution, successful_tasks)
         if workflow_type == "parallel":
-            return self._execute_parallel(db, task_objects, tasks_config, dependency_graph, on_failure, execution)
+            return self._execute_parallel(db, task_objects, tasks_config, dependency_graph, on_failure, execution, successful_tasks)
         raise ValueError(f"不支持的执行模式: {workflow_type}，支持的模式：serial, parallel")
 
     def _load_tasks(self, db: Session, tasks_config: list[dict[str, Any]]) -> dict[int, ScheduledTask]:
@@ -157,8 +171,12 @@ class WorkflowExecutor(TaskExecutor):
         dependency_graph: dict[int, set[int]],
         on_failure: str,
         execution: TaskExecution | None,
+        successful_tasks: set[int] = None,
     ) -> dict[str, Any]:
         """串行执行任务"""
+        if successful_tasks is None:
+            successful_tasks = set()
+
         # 拓扑排序确定执行顺序
         execution_order = self._topological_sort(tasks_config, dependency_graph)
 
@@ -172,21 +190,29 @@ class WorkflowExecutor(TaskExecutor):
             task = task_objects[task_id]
             task_config = next(t for t in tasks_config if t["task_id"] == task_id)
 
+            # 跳过已成功的任务
+            if task_id in successful_tasks:
+                logger.info(f"[编排任务-串行] 跳过已成功任务: {task.name} (ID: {task_id})")
+                task_results[task_id] = {
+                    "task_id": task_id,
+                    "task_name": task.name,
+                    "status": "success",
+                    "result": {"message": "跳过已成功任务（恢复模式）"},
+                    "skipped": True,
+                }
+                continue
+
             try:
                 # 更新进度
                 if execution:
-                    progress = {
-                        "workflow_type": "serial",
-                        "current_task_id": task_id,
-                        "current_task_name": task.name,
-                        "completed_tasks": len(task_results),
-                        "total_tasks": total_tasks,
-                        "progress_percent": int((len(task_results) / total_tasks) * 100),
-                        "status": "running",
-                        "message": f"正在执行任务: {task.name} ({idx + 1}/{total_tasks})",
-                        "task_results": task_results,
-                    }
-                    self.update_progress(execution, progress, db)
+                    self.update_progress(
+                        db=db,
+                        execution=execution,
+                        processed_items=len(task_results),
+                        total_items=total_tasks,
+                        current_item=task.name,
+                        message=f"正在执行任务: {task.name} ({idx + 1}/{total_tasks})",
+                    )
 
                 logger.info(f"[编排任务-串行] 开始执行任务: {task.name} (ID: {task_id})")
 
@@ -247,11 +273,26 @@ class WorkflowExecutor(TaskExecutor):
         dependency_graph: dict[int, set[int]],
         on_failure: str,
         execution: TaskExecution | None,
+        successful_tasks: set[int] = None,
     ) -> dict[str, Any]:
         """并行执行任务"""
+        if successful_tasks is None:
+            successful_tasks = set()
+
         task_results = {}
-        completed_tasks = set()
+        completed_tasks = set(successful_tasks)
         total_tasks = len(tasks_config)
+
+        # 记录已跳过的任务结果
+        for task_id in successful_tasks:
+            task = task_objects[task_id]
+            task_results[task_id] = {
+                "task_id": task_id,
+                "task_name": task.name,
+                "status": "success",
+                "result": {"message": "跳过已成功任务（恢复模式）"},
+                "skipped": True,
+            }
 
         # 使用线程池执行任务
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -275,17 +316,13 @@ class WorkflowExecutor(TaskExecutor):
 
                 # 更新进度
                 if execution:
-                    progress = {
-                        "workflow_type": "parallel",
-                        "completed_tasks": len(completed_tasks),
-                        "total_tasks": total_tasks,
-                        "progress_percent": int((len(completed_tasks) / total_tasks) * 100),
-                        "running_tasks": ready_tasks,
-                        "status": "running",
-                        "message": f"并行执行中: 已完成 {len(completed_tasks)}/{total_tasks}，正在执行 {len(ready_tasks)} 个任务",
-                        "task_results": task_results,
-                    }
-                    self.update_progress(execution, progress, db)
+                    self.update_progress(
+                        db=db,
+                        execution=execution,
+                        processed_items=len(completed_tasks),
+                        total_items=total_tasks,
+                        message=f"并行执行中: 已完成 {len(completed_tasks)}/{total_tasks}，正在执行 {len(ready_tasks)} 个任务",
+                    )
 
                 # 并行执行这一批任务
                 futures = {}

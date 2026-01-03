@@ -21,8 +21,8 @@
 //     - Repository: https://github.com/yoyoung/zquant
 
 import { ProTable } from '@ant-design/pro-components';
-import { Button, Modal, message, Popconfirm, Tag, Space, Drawer, Descriptions, Table, Tooltip, Dropdown, Collapse } from 'antd';
-import { QuestionCircleOutlined, MoreOutlined } from '@ant-design/icons';
+import { Button, Modal, message, Popconfirm, Tag, Space, Drawer, Descriptions, Table, Tooltip, Dropdown, Collapse, Progress } from 'antd';
+import { QuestionCircleOutlined, MoreOutlined, PauseCircleOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import type { ActionType, ProColumns, ProFormInstance } from '@ant-design/pro-components';
 import { ProForm, ProFormText, ProFormSelect, ProFormSwitch, ProFormTextArea, ProFormDigit } from '@ant-design/pro-components';
@@ -43,8 +43,12 @@ import {
   getExecution,
   getTaskStats,
   getWorkflowTasks,
+  pauseExecution,
+  resumeExecution,
+  terminateExecution,
 } from '@/services/zquant/scheduler';
 import dayjs from 'dayjs';
+import { formatDuration } from '@/utils/format';
 
 // Cron表达式帮助提示内容
 const cronExpressionHelp = (
@@ -171,8 +175,8 @@ const LabelWithHelp: React.FC<{ label: string; help: React.ReactNode }> = ({ lab
 const Scheduler: React.FC = () => {
   const location = useLocation();
   const actionRef = useRef<ActionType>(null);
-  const searchFormRef = useRef<ProFormInstance>();
-  const createFormRef = useRef<ProFormInstance>();
+  const searchFormRef = useRef<ProFormInstance | undefined>(undefined);
+  const createFormRef = useRef<ProFormInstance | undefined>(undefined);
   const pageCache = usePageCache();
   
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -181,11 +185,12 @@ const Scheduler: React.FC = () => {
   const [statsDrawerVisible, setStatsDrawerVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<ZQuant.TaskResponse | null>(null);
   const [copyingTask, setCopyingTask] = useState<ZQuant.TaskResponse | null>(null);
+  const [selectedTask, setSelectedTask] = useState<ZQuant.TaskResponse | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [executions, setExecutions] = useState<ZQuant.ExecutionResponse[]>([]);
   const [stats, setStats] = useState<ZQuant.TaskStatsResponse | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(5000); // 5秒刷新一次
+  const [refreshInterval, setRefreshInterval] = useState(15000); // 15秒刷新一次
   const [executionAutoRefresh, setExecutionAutoRefresh] = useState(false); // 执行历史自动刷新
   const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
   const [childTasksMap, setChildTasksMap] = useState<Map<number, ZQuant.TaskResponse[]>>(new Map());
@@ -242,6 +247,11 @@ const Scheduler: React.FC = () => {
     const cachedSelectedTaskId = pageCache.get()?.selectedTaskId;
     if (cachedSelectedTaskId !== undefined) {
       setSelectedTaskId(cachedSelectedTaskId);
+    }
+
+    const cachedSelectedTask = pageCache.get()?.selectedTask;
+    if (cachedSelectedTask) {
+      setSelectedTask(cachedSelectedTask);
     }
 
     const cachedExecutions = pageCache.get()?.executions;
@@ -472,22 +482,24 @@ const Scheduler: React.FC = () => {
     }
   };
 
-  const handleViewExecutions = async (taskId: number) => {
+  const handleViewExecutions = async (record: ZQuant.TaskResponse) => {
     try {
-      const response = await getTaskExecutions(taskId, { limit: 100 });
+      const response = await getTaskExecutions(record.id, { limit: 100 });
       setExecutions(response.executions);
-      setSelectedTaskId(taskId);
+      setSelectedTaskId(record.id);
+      setSelectedTask(record);
       setExecutionDrawerVisible(true);
       
       // 保存到缓存
       pageCache.saveModalState('executionDrawer', true);
       pageCache.update({ 
         executions: response.executions,
-        selectedTaskId: taskId,
+        selectedTaskId: record.id,
+        selectedTask: record,
       });
       
-      // 检查是否有运行中的任务，如果有则开启自动刷新
-      const hasRunning = response.executions.some((e: ZQuant.ExecutionResponse) => e.status === 'running');
+      // 检查是否有运行中或暂停的任务，如果有则开启自动刷新
+      const hasRunning = response.executions.some((e: ZQuant.ExecutionResponse) => e.status === 'running' || e.status === 'paused');
       setExecutionAutoRefresh(hasRunning);
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '获取执行历史失败');
@@ -503,31 +515,35 @@ const Scheduler: React.FC = () => {
         const response = await getTaskExecutions(selectedTaskId, { limit: 100 });
         setExecutions(response.executions);
         
-        // 检查是否还有运行中的任务，如果没有则停止自动刷新
-        const hasRunning = response.executions.some((e: ZQuant.ExecutionResponse) => e.status === 'running');
-        if (!hasRunning) {
+        // 检查是否还有运行中或暂停的任务，如果没有则停止自动刷新
+        const hasRunningOrPaused = response.executions.some(
+          (e: ZQuant.ExecutionResponse) => e.status === 'running' || e.status === 'paused'
+        );
+        if (!hasRunningOrPaused) {
           setExecutionAutoRefresh(false);
         }
       } catch (error: any) {
         console.error('刷新执行历史失败:', error);
       }
-    }, 2000); // 每2秒刷新一次
+    }, 15000); // 每15秒刷新一次
     
     return () => clearInterval(interval);
   }, [executionAutoRefresh, executionDrawerVisible, selectedTaskId]);
 
-  const handleViewStats = async (taskId?: number) => {
+  const handleViewStats = async (record?: ZQuant.TaskResponse) => {
     try {
-      const response = await getTaskStats(taskId);
+      const response = await getTaskStats(record?.id);
       setStats(response);
-      setSelectedTaskId(taskId || null);
+      setSelectedTaskId(record?.id || null);
+      setSelectedTask(record || null);
       setStatsDrawerVisible(true);
       
       // 保存到缓存
       pageCache.saveModalState('statsDrawer', true);
       pageCache.update({ 
         stats: response,
-        selectedTaskId: taskId || null,
+        selectedTaskId: record?.id || null,
+        selectedTask: record || null,
       });
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '获取统计信息失败');
@@ -580,12 +596,53 @@ const Scheduler: React.FC = () => {
     }
   };
 
+  const handlePauseExecution = async (executionId: number) => {
+    try {
+      await pauseExecution(executionId);
+      message.success('已请求暂停');
+      if (selectedTaskId) {
+        const response = await getTaskExecutions(selectedTaskId, { limit: 100 });
+        setExecutions(response.executions);
+      }
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '暂停失败');
+    }
+  };
+
+  const handleResumeExecution = async (executionId: number) => {
+    try {
+      await resumeExecution(executionId);
+      message.success('已请求恢复');
+      if (selectedTaskId) {
+        const response = await getTaskExecutions(selectedTaskId, { limit: 100 });
+        setExecutions(response.executions);
+      }
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '恢复失败');
+    }
+  };
+
+  const handleTerminateExecution = async (executionId: number) => {
+    try {
+      await terminateExecution(executionId);
+      message.success('已请求终止');
+      if (selectedTaskId) {
+        const response = await getTaskExecutions(selectedTaskId, { limit: 100 });
+        setExecutions(response.executions);
+      }
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '终止失败');
+    }
+  };
+
   const getExecutionStatusTag = (status: string) => {
     const statusMap: Record<string, { color: string; text: string }> = {
       pending: { color: 'default', text: '等待中' },
       running: { color: 'processing', text: '运行中' },
       success: { color: 'success', text: '成功' },
       failed: { color: 'error', text: '失败' },
+      paused: { color: 'warning', text: '已暂停' },
+      terminated: { color: 'default', text: '已终止' },
     };
     const config = statusMap[status] || { color: 'default', text: status };
     return <Tag color={config.color}>{config.text}</Tag>;
@@ -619,7 +676,7 @@ const Scheduler: React.FC = () => {
       title: '执行时长',
       dataIndex: 'duration_seconds',
       width: 120,
-      render: (text: number) => text ? `${text}秒` : '-',
+      render: (text: number) => formatDuration(text),
     },
     {
       title: '重试次数',
@@ -627,44 +684,109 @@ const Scheduler: React.FC = () => {
       width: 100,
     },
     {
-      title: '错误信息',
-      dataIndex: 'error_message',
-      ellipsis: true,
+      title: '进度/详情',
+      dataIndex: 'progress',
+      width: 350,
+      render: (_: any, record: ZQuant.ExecutionResponse) => {
+        const isRunning = record.status === 'running' || record.status === 'paused';
+        const progress = record.progress_percent ?? 0;
+        const hasProgress = progress > 0 || (record.total_items ?? 0) > 0;
+        
+        return (
+          <div style={{ padding: '4px 0' }}>
+            {hasProgress && (
+              <div style={{ marginBottom: '8px' }}>
+                <Progress 
+                  percent={progress} 
+                  size="small" 
+                  status={
+                    !isRunning 
+                      ? (record.status === 'success' ? 'success' : (record.status === 'failed' ? 'exception' : 'normal'))
+                      : (record.status === 'paused' ? 'normal' : 'active')
+                  }
+                  strokeColor={isRunning && record.status === 'paused' ? '#faad14' : undefined}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                  <span>
+                    {record.processed_items !== undefined && record.total_items !== undefined && record.total_items > 0
+                      ? `${record.processed_items} / ${record.total_items}`
+                      : `${progress.toFixed(1)}%`
+                    }
+                  </span>
+                  {isRunning && record.estimated_end_time && (
+                    <span>
+                      预计完成: {dayjs(record.estimated_end_time).format('HH:mm:ss')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {record.current_item && (
+              <div style={{ fontSize: '12px', color: '#1890ff', marginBottom: '4px' }}>
+                最后处理: {record.current_item}
+              </div>
+            )}
+            
+            {record.result?.message && (
+              <div style={{ fontSize: '12px', color: '#666', wordBreak: 'break-all' }}>
+                {record.result.message}
+              </div>
+            )}
+            
+            {record.error_message && (
+              <div style={{ fontSize: '12px', color: '#ff4d4f', wordBreak: 'break-all' }}>
+                错误: {record.error_message}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
-      title: '执行结果',
-      dataIndex: 'result',
-      width: 300,
-      ellipsis: true,
-      render: (result: any, record: ZQuant.ExecutionResponse) => {
-        if (!result || typeof result !== 'object') return '-';
-        try {
-          // 如果任务正在运行，显示进度信息
-          if (record.status === 'running' && result.progress_percent !== undefined) {
-            return (
-              <div style={{ fontSize: '12px' }}>
-                <div style={{ marginBottom: '4px' }}>
-                  {result.message || `进度: ${result.progress_percent}%`}
-                </div>
-                {result.current_step !== undefined && result.total_steps !== undefined && (
-                  <div style={{ color: '#666', fontSize: '11px' }}>
-                    步骤 {result.current_step}/{result.total_steps}
-                  </div>
-                )}
-              </div>
-            );
-          }
-          
-          // 已完成的任务，显示结果摘要
-          const resultStr = JSON.stringify(result, null, 2);
-          return (
-            <span title={resultStr} style={{ fontSize: '12px' }}>
-              {result.message || resultStr.substring(0, 50) + '...'}
-            </span>
-          );
-        } catch {
-          return '-';
-        }
+      title: '操作',
+      valueType: 'option',
+      width: 120,
+      render: (_: any, record: ZQuant.ExecutionResponse) => {
+        const canPause = record.status === 'running' && !record.is_paused;
+        const canResume = record.status === 'paused' || record.is_paused || record.status === 'failed';
+        const canTerminate = ['pending', 'running', 'paused'].includes(record.status);
+
+        return (
+          <Space>
+            {canPause && (
+              <Tooltip title="暂停">
+                <Button 
+                  type="text" 
+                  icon={<PauseCircleOutlined style={{ color: '#faad14' }} />} 
+                  onClick={() => handlePauseExecution(record.id)}
+                />
+              </Tooltip>
+            )}
+            {canResume && (
+              <Tooltip title="恢复">
+                <Button 
+                  type="text" 
+                  icon={<PlayCircleOutlined style={{ color: '#52c41a' }} />} 
+                  onClick={() => handleResumeExecution(record.id)}
+                />
+              </Tooltip>
+            )}
+            {canTerminate && (
+              <Popconfirm
+                title="确定要终止该执行任务吗？"
+                onConfirm={() => handleTerminateExecution(record.id)}
+              >
+                <Tooltip title="终止">
+                  <Button 
+                    type="text" 
+                    icon={<StopOutlined style={{ color: '#ff4d4f' }} />} 
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
+          </Space>
+        );
       },
     },
   ];
@@ -741,7 +863,36 @@ const Scheduler: React.FC = () => {
         failed: { text: '失败', status: 'Error' },
       },
       render: (_: any, record: ZQuant.TaskResponse) => {
-        return getScheduleStatusTag(record.schedule_status);
+        const statusTag = getScheduleStatusTag(record.schedule_status);
+        const isRunning = record.schedule_status === 'running' || record.latest_execution_status === 'running';
+        
+        if (isRunning) {
+          return (
+            <Space direction="vertical" size={0}>
+              {statusTag}
+              {record.latest_execution_progress !== undefined && record.latest_execution_progress > 0 && (
+                <div style={{ fontSize: '11px', color: '#1890ff', marginTop: '2px' }}>
+                  进度: {record.latest_execution_progress.toFixed(1)}%
+                </div>
+              )}
+              {record.latest_execution_current_item && (
+                <Tooltip title={record.latest_execution_current_item}>
+                  <div style={{ 
+                    fontSize: '11px', 
+                    color: '#666', 
+                    maxWidth: '100px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    当前: {record.latest_execution_current_item}
+                  </div>
+                </Tooltip>
+              )}
+            </Space>
+          );
+        }
+        return statusTag;
       },
     },
     {
@@ -753,7 +904,7 @@ const Scheduler: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       search: false,
       sorter: true,
@@ -818,7 +969,7 @@ const Scheduler: React.FC = () => {
           {
             key: 'stats',
             label: '统计',
-            onClick: () => handleViewStats(record.id),
+            onClick: () => handleViewStats(record),
           },
           {
             type: 'divider',
@@ -843,14 +994,17 @@ const Scheduler: React.FC = () => {
         const isPaused = record.schedule_status === 'paused' || (record.paused && record.enabled);
         
         return [
-          <Button
-            key="trigger"
-            type="link"
-            size="small"
-            onClick={() => handleTrigger(record.id)}
-          >
-            触发
-          </Button>,
+          <Tooltip key="trigger-tip" title={isRunning ? "任务正在运行中，不可重复触发" : ""}>
+            <Button
+              key="trigger"
+              type="link"
+              size="small"
+              disabled={isRunning}
+              onClick={() => handleTrigger(record.id)}
+            >
+              触发
+            </Button>
+          </Tooltip>,
           // 如果任务正在运行，显示暂停按钮
           isRunning && record.enabled && !record.paused ? (
             <Button
@@ -897,7 +1051,7 @@ const Scheduler: React.FC = () => {
             key="executions"
             type="link"
             size="small"
-            onClick={() => handleViewExecutions(record.id)}
+            onClick={() => handleViewExecutions(record)}
           >
             执行历史
           </Button>,
@@ -1322,7 +1476,7 @@ const Scheduler: React.FC = () => {
 
       {/* 编辑任务模态框 */}
       <Modal
-        title="编辑定时任务"
+        title={editingTask ? `编辑任务: ${editingTask.name}` : "编辑定时任务"}
         open={editModalVisible}
         onCancel={() => {
           // 标记正在关闭 Modal，防止缓存恢复逻辑重新打开
@@ -1492,7 +1646,7 @@ const Scheduler: React.FC = () => {
 
       {/* 执行历史抽屉 */}
       <Drawer
-        title="任务执行历史"
+        title={selectedTask ? `任务执行历史: ${selectedTask.name}` : "任务执行历史"}
         placement="right"
         width={900}
         open={executionDrawerVisible}
@@ -1510,11 +1664,13 @@ const Scheduler: React.FC = () => {
           setExecutionDrawerVisible(false);
           // 清理状态
           setSelectedTaskId(null);
+          setSelectedTask(null);
           setExecutions([]);
           // 更新缓存中的其他状态
           pageCache.update({ 
             executions: [],
             selectedTaskId: null,
+            selectedTask: null,
           });
           
           // 延迟重置关闭标记，确保状态更新完成
@@ -1552,7 +1708,7 @@ const Scheduler: React.FC = () => {
 
       {/* 统计信息抽屉 */}
       <Drawer
-        title={selectedTaskId ? "任务统计信息" : "全局统计信息"}
+        title={selectedTask ? `任务统计信息: ${selectedTask.name}` : "全局统计信息"}
         placement="right"
         width={600}
         open={statsDrawerVisible}
@@ -1568,11 +1724,13 @@ const Scheduler: React.FC = () => {
           setStatsDrawerVisible(false);
           // 清理状态
           setSelectedTaskId(null);
+          setSelectedTask(null);
           setStats(null);
           // 更新缓存中的其他状态
           pageCache.update({ 
             stats: null,
             selectedTaskId: null,
+            selectedTask: null,
           });
           
           // 延迟重置关闭标记，确保状态更新完成
@@ -1599,7 +1757,7 @@ const Scheduler: React.FC = () => {
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="平均执行时长">
-              {stats.avg_duration_seconds.toFixed(2)}秒
+              {formatDuration(stats.avg_duration_seconds)}
             </Descriptions.Item>
             <Descriptions.Item label="最近执行时间">
               {stats.latest_execution_time

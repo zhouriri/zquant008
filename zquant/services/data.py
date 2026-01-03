@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 from zquant.data.fundamental_fields import get_fundamental_field_descriptions
 from zquant.data.processor import DataProcessor
 from zquant.models.data import DataOperationLog, Fundamental, TableStatistics, Tustock
+from zquant.models.scheduler import TaskExecution
 from zquant.utils.cache import get_cache
 from zquant.utils.data_utils import clean_nan_values
 from zquant.utils.query_optimizer import paginate_query, optimize_query_with_relationships
@@ -194,8 +195,9 @@ class DataService:
         records = trading_date_repo.get_trading_calendar_records(start_date, end_date, query_exchange)
 
         # 缓存结果（24小时）
+        # 使用 default=str 处理 date/datetime 对象的序列化
         if records:
-            cache.set(cache_key, json.dumps(records), ex=86400)
+            cache.set(cache_key, json.dumps(records, default=str), ex=86400)
 
         return records
 
@@ -217,22 +219,19 @@ class DataService:
         stock_repo = StockRepository(db)
         stocks = stock_repo.get_stock_list(exchange=exchange, symbol=symbol, name=name)
         
-        # Repository已经返回字典列表，但需要按上市日期排序
-        # 由于Repository返回的是字典，需要在这里排序
-        from datetime import datetime
-        stocks.sort(
-            key=lambda x: (
-                datetime.fromisoformat(x["list_date"]) if x.get("list_date") else datetime.min,
-                x.get("list_date") is None
-            ),
-            reverse=True
-        )
+        # 默认按TS代码升序排序
+        stocks.sort(key=lambda x: x.get("ts_code", ""))
         
         return stocks
 
     @staticmethod
     def get_daily_data(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session,
+        ts_code: str | list[str] | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        trading_day_filter: str | None = "all",
+        exchange: str | None = None,
     ) -> list[dict]:
         """
         获取日线数据（返回完整记录）
@@ -241,6 +240,8 @@ class DataService:
             ts_code: TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有
             start_date: 开始日期
             end_date: 结束日期
+            trading_day_filter: 交易日过滤模式：all=全交易日, has_data=有交易日, no_data=无交易日
+            exchange: 交易所代码，用于全交易日对齐
         """
         cache = get_cache()
 
@@ -255,6 +256,10 @@ class DataService:
             cache_key_parts.append(str(start_date))
         if end_date:
             cache_key_parts.append(str(end_date))
+        if trading_day_filter:
+            cache_key_parts.append(trading_day_filter)
+        if exchange:
+            cache_key_parts.append(exchange)
         cache_key = ":".join(cache_key_parts)
 
         # 尝试从缓存获取
@@ -265,18 +270,128 @@ class DataService:
             except:
                 pass
 
-        # 从数据库获取完整记录
+        # 从数据库获取原始记录
         records = DataProcessor.get_daily_data_records(db, ts_code, start_date, end_date)
+
+        # 定义占位行生成器
+        def placeholder_factory(code, t_date_str):
+            return {
+                "ts_code": code,
+                "trade_date": t_date_str,
+                "is_missing": True,
+                "open": None, "high": None, "low": None, "close": None,
+                "pre_close": None, "change": None, "pct_chg": None,
+                "vol": None, "amount": None,
+            }
+
+        # 执行对齐逻辑
+        records = DataService._align_records_with_calendar(
+            db, records, ts_code, start_date, end_date, trading_day_filter, exchange, placeholder_factory
+        )
 
         # 缓存结果（1小时）
         if records:
-            cache.set(cache_key, json.dumps(records), ex=3600)
+            cache.set(cache_key, json.dumps(records, default=str), ex=3600)
 
         return records
 
     @staticmethod
+    def _align_records_with_calendar(
+        db: Session,
+        records: list[dict],
+        ts_code: str | list[str] | None,
+        start_date: date | None,
+        end_date: date | None,
+        trading_day_filter: str | None,
+        exchange: str | None,
+        placeholder_factory: callable,
+    ) -> list[dict]:
+        """
+        通用的交易日对齐逻辑
+
+        Args:
+            records: 原始记录列表
+            ts_code: TS代码
+            start_date: 开始日期
+            end_date: 结束日期
+            trading_day_filter: 过滤模式
+            exchange: 交易所代码
+            placeholder_factory: 生成缺失数据占位行的工厂函数
+        """
+        # 如果不需要对齐或者是查询所有(None)，则直接返回并确保 is_missing 字段存在
+        if trading_day_filter not in ["all", "no_data"] or not ts_code or not start_date or not end_date:
+            for r in records:
+                if "is_missing" not in r:
+                    r["is_missing"] = False
+            # 统一按交易日期倒序排序
+            records.sort(key=lambda x: (x.get("trade_date") or "", x.get("ts_code") or ""), reverse=True)
+            return records
+
+        # 1. 确定交易所
+        if not exchange:
+            # 尝试从 ts_code 中推断交易所
+            codes = [ts_code] if isinstance(ts_code, str) else ts_code
+            if codes:
+                exchange = "SZSE" if codes[0].endswith(".SZ") else "SSE"
+            else:
+                exchange = "SSE"
+
+        # 2. 获取交易日列表
+        trading_dates = DataProcessor.get_trading_dates(db, start_date, end_date, exchange)
+        if not trading_dates:
+            for r in records:
+                if "is_missing" not in r:
+                    r["is_missing"] = False
+            records.sort(key=lambda x: (x.get("trade_date") or "", x.get("ts_code") or ""), reverse=True)
+            return records
+
+        # 转换日期为字符串格式以方便匹配
+        trading_date_strs = [d.isoformat() for d in trading_dates]
+        
+        # 3. 建立现有数据的索引：ts_code -> trade_date -> record
+        data_map = {}
+        for r in records:
+            code = r.get("ts_code")
+            t_date = r.get("trade_date")
+            if code and t_date:
+                if code not in data_map:
+                    data_map[code] = {}
+                data_map[code][t_date] = r
+
+        # 4. 对每个 ts_code 进行对齐
+        ts_codes = [ts_code] if isinstance(ts_code, str) else ts_code
+        aligned_records = []
+        
+        for code in ts_codes:
+            code_data = data_map.get(code, {})
+            for t_date_str in trading_date_strs:
+                has_data = t_date_str in code_data
+                
+                if trading_day_filter == "all":
+                    if has_data:
+                        record = code_data[t_date_str]
+                        record["is_missing"] = False
+                        aligned_records.append(record)
+                    else:
+                        # 创建占位行
+                        aligned_records.append(placeholder_factory(code, t_date_str))
+                elif trading_day_filter == "no_data":
+                    if not has_data:
+                        # 仅添加缺失的占位行
+                        aligned_records.append(placeholder_factory(code, t_date_str))
+        
+        # 5. 统一按交易日期倒序排序
+        aligned_records.sort(key=lambda x: (x.get("trade_date") or "", x.get("ts_code") or ""), reverse=True)
+        return aligned_records
+
+    @staticmethod
     def get_daily_basic_data(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session,
+        ts_code: str | list[str] | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        trading_day_filter: str | None = "all",
+        exchange: str | None = None,
     ) -> list[dict]:
         """
         获取每日指标数据（返回完整记录）
@@ -285,6 +400,8 @@ class DataService:
             ts_code: TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有
             start_date: 开始日期
             end_date: 结束日期
+            trading_day_filter: 交易日过滤模式
+            exchange: 交易所代码
         """
         cache = get_cache()
 
@@ -299,6 +416,10 @@ class DataService:
             cache_key_parts.append(str(start_date))
         if end_date:
             cache_key_parts.append(str(end_date))
+        if trading_day_filter:
+            cache_key_parts.append(trading_day_filter)
+        if exchange:
+            cache_key_parts.append(exchange)
         cache_key = ":".join(cache_key_parts)
 
         # 尝试从缓存获取
@@ -309,18 +430,42 @@ class DataService:
             except:
                 pass
 
-        # 从数据库获取完整记录
+        # 从数据库获取原始记录
         records = DataProcessor.get_daily_basic_data_records(db, ts_code, start_date, end_date)
+
+        # 定义占位行生成器
+        def placeholder_factory(code, t_date_str):
+            return {
+                "ts_code": code,
+                "trade_date": t_date_str,
+                "is_missing": True,
+                "close": None, "turnover_rate": None, "turnover_rate_f": None,
+                "volume_ratio": None, "pe": None, "pe_ttm": None,
+                "pb": None, "ps": None, "ps_ttm": None,
+                "dv_ratio": None, "dv_ttm": None, "total_share": None,
+                "float_share": None, "free_share": None, "total_mv": None,
+                "circ_mv": None,
+            }
+
+        # 执行对齐逻辑
+        records = DataService._align_records_with_calendar(
+            db, records, ts_code, start_date, end_date, trading_day_filter, exchange, placeholder_factory
+        )
 
         # 缓存结果（1小时）
         if records:
-            cache.set(cache_key, json.dumps(records), ex=3600)
+            cache.set(cache_key, json.dumps(records, default=str), ex=3600)
 
         return records
 
     @staticmethod
     def get_factor_data(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session,
+        ts_code: str | list[str] | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        trading_day_filter: str | None = "all",
+        exchange: str | None = None,
     ) -> list[dict]:
         """
         获取因子数据（返回完整记录）
@@ -329,6 +474,8 @@ class DataService:
             ts_code: TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有
             start_date: 开始日期
             end_date: 结束日期
+            trading_day_filter: 交易日过滤模式
+            exchange: 交易所代码
         """
         cache = get_cache()
 
@@ -343,6 +490,10 @@ class DataService:
             cache_key_parts.append(str(start_date))
         if end_date:
             cache_key_parts.append(str(end_date))
+        if trading_day_filter:
+            cache_key_parts.append(trading_day_filter)
+        if exchange:
+            cache_key_parts.append(exchange)
         cache_key = ":".join(cache_key_parts)
 
         # 尝试从缓存获取
@@ -356,15 +507,41 @@ class DataService:
         # 从数据库获取完整记录
         records = DataProcessor.get_factor_data_records(db, ts_code, start_date, end_date)
 
+        # 定义占位行生成器
+        def placeholder_factory(code, t_date_str):
+            return {
+                "ts_code": code,
+                "trade_date": t_date_str,
+                "is_missing": True,
+                "close": None, "open": None, "high": None, "low": None,
+                "pre_close": None, "change": None, "pct_change": None,
+                "vol": None, "amount": None, "adj_factor": None,
+                "macd_dif": None, "macd_dea": None, "macd": None,
+                "kdj_k": None, "kdj_d": None, "kdj_j": None,
+                "rsi_6": None, "rsi_12": None, "rsi_24": None,
+                "boll_upper": None, "boll_mid": None, "boll_lower": None,
+                "cci": None,
+            }
+
+        # 执行对齐逻辑
+        records = DataService._align_records_with_calendar(
+            db, records, ts_code, start_date, end_date, trading_day_filter, exchange, placeholder_factory
+        )
+
         # 缓存结果（1小时）
         if records:
-            cache.set(cache_key, json.dumps(records), ex=3600)
+            cache.set(cache_key, json.dumps(records, default=str), ex=3600)
 
         return records
 
     @staticmethod
     def get_stkfactorpro_data(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session,
+        ts_code: str | list[str] | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        trading_day_filter: str | None = "all",
+        exchange: str | None = None,
     ) -> list[dict]:
         """
         获取专业版因子数据（返回完整记录）
@@ -373,6 +550,8 @@ class DataService:
             ts_code: TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有
             start_date: 开始日期
             end_date: 结束日期
+            trading_day_filter: 交易日过滤模式
+            exchange: 交易所代码
         """
         cache = get_cache()
 
@@ -387,6 +566,10 @@ class DataService:
             cache_key_parts.append(str(start_date))
         if end_date:
             cache_key_parts.append(str(end_date))
+        if trading_day_filter:
+            cache_key_parts.append(trading_day_filter)
+        if exchange:
+            cache_key_parts.append(exchange)
         cache_key = ":".join(cache_key_parts)
 
         # 尝试从缓存获取
@@ -400,9 +583,30 @@ class DataService:
         # 从数据库获取完整记录
         records = DataProcessor.get_stkfactorpro_data_records(db, ts_code, start_date, end_date)
 
+        # 定义占位行生成器
+        def placeholder_factory(code, t_date_str):
+            return {
+                "ts_code": code,
+                "trade_date": t_date_str,
+                "is_missing": True,
+                "open": None, "close": None, "high": None, "low": None,
+                "pre_close": None, "change": None, "pct_chg": None,
+                "vol": None, "amount": None,
+                "turnover_rate": None, "turnover_rate_f": None, "volume_ratio": None,
+                "pe": None, "pe_ttm": None, "pb": None, "ps": None, "ps_ttm": None,
+                "dv_ratio": None, "dv_ttm": None, "total_share": None,
+                "float_share": None, "free_share": None, "total_mv": None,
+                "circ_mv": None, "adj_factor": None,
+            }
+
+        # 执行对齐逻辑
+        records = DataService._align_records_with_calendar(
+            db, records, ts_code, start_date, end_date, trading_day_filter, exchange, placeholder_factory
+        )
+
         # 缓存结果（1小时）
         if records:
-            cache.set(cache_key, json.dumps(records), ex=3600)
+            cache.set(cache_key, json.dumps(records, default=str), ex=3600)
 
         return records
 
@@ -460,6 +664,9 @@ class DataService:
         delete_count: int = 0,
         error_message: str | None = None,
         created_by: str | None = None,
+        data_source: str | None = None,
+        api_interface: str | None = None,
+        api_data_count: int = 0,
     ) -> DataOperationLog:
         """
         创建数据操作日志
@@ -476,6 +683,9 @@ class DataService:
             delete_count: 删除记录数
             error_message: 错误信息
             created_by: 创建人
+            data_source: 数据源
+            api_interface: API接口
+            api_data_count: API接口数据条数
 
         Returns:
             DataOperationLog: 创建的日志对象
@@ -499,6 +709,10 @@ class DataService:
             duration_seconds=duration_seconds,
             created_by=created_by,
             created_time=datetime.now(),
+            updated_by=created_by,
+            data_source=data_source,
+            api_interface=api_interface,
+            api_data_count=api_data_count,
         )
         db.add(log_entry)
         db.commit()
@@ -691,7 +905,9 @@ class DataService:
             return None
 
     @staticmethod
-    def statistics_table_data(db: Session, stat_date: date, created_by: str | None = None) -> list[TableStatistics]:
+    def statistics_table_data(
+        db: Session, stat_date: date, created_by: str | None = None, execution: TaskExecution | None = None
+    ) -> list[TableStatistics]:
         """
         统计指定日期的数据表入库情况
 
@@ -699,12 +915,14 @@ class DataService:
             db: 数据库会话
             stat_date: 统计日期
             created_by: 创建人
+            execution: 执行记录对象（可选）
 
         Returns:
             统计结果列表
         """
         # 确保表存在
         from zquant.data.storage_base import ensure_table_exists
+        from zquant.scheduler.utils import update_execution_progress
 
         ensure_table_exists(db, TableStatistics)
 
@@ -727,8 +945,8 @@ class DataService:
         results = []
         inspector = inspect(engine)
         all_tables = inspector.get_table_names()
-        all_views = inspector.get_view_names() if hasattr(inspector, 'get_view_names') else []
-        
+        all_views = inspector.get_view_names() if hasattr(inspector, "get_view_names") else []
+
         # 辅助函数：检查视图是否存在
         def view_exists(view_name: str) -> bool:
             """检查视图是否存在"""
@@ -741,11 +959,7 @@ class DataService:
         stkfactorpro_tables = get_all_stkfactorpro_tables(db)
 
         # 自动发现所有 zq_data_ 开头的表
-        zq_data_tables = [
-            t for t in all_tables 
-            if t.startswith("zq_data_") 
-            and not t.endswith("_view")  # 排除视图表
-        ]
+        zq_data_tables = [t for t in all_tables if t.startswith("zq_data_") and not t.endswith("_view")]  # 排除视图表
 
         # 定义已通过分表统计的表名（这些表会通过视图或遍历分表的方式统计，不需要单独统计）
         excluded_split_table_names = [
@@ -764,18 +978,37 @@ class DataService:
         excluded_tables.update(stkfactorpro_tables)
 
         # 过滤出需要统计的表（排除已通过分表统计的表）
-        tables_to_statistics = [
-            t for t in zq_data_tables 
-            if t not in excluded_tables
-        ]
+        tables_to_statistics = [t for t in zq_data_tables if t not in excluded_tables]
+
+        # 统计进度
+        # 加上分表大类的统计
+        total_items = len(tables_to_statistics) + 4
+        processed_items = 0
+
+        logger.info(f"开始统计数据表入库情况，统计日期: {stat_date}, 总表数: {total_items}")
+        update_execution_progress(db, execution, total_items=total_items, processed_items=0, message=f"开始统计数据表: {stat_date}")
 
         # 统计所有 zq_data_ 开头的表
         for table_name in tables_to_statistics:
+            processed_items += 1
+            update_execution_progress(
+                db, 
+                execution, 
+                processed_items=processed_items-1, 
+                total_items=total_items, 
+                current_item=table_name,
+                message=f"正在统计表: {table_name}..."
+            )
+            
             stat = DataService._statistics_single_table(db, inspector, table_name, stat_date, created_by)
             if stat:
                 results.append(stat)
 
         # 统计分表（日线数据分表）
+        processed_items += 1
+        update_execution_progress(
+            db, execution, processed_items=processed_items-1, current_item="zq_data_tustock_daily", message="正在统计日线数据汇总..."
+        )
         if daily_tables:
             try:
                 total_records = 0
@@ -880,7 +1113,15 @@ class DataService:
                 logger.error(f"统计日线数据分表失败: {e}")
 
         # 统计分表（每日指标数据分表）
-        daily_basic_tables = get_all_daily_basic_tables(db)
+        processed_items += 1
+        update_execution_progress(
+            db,
+            execution,
+            processed_items=processed_items - 1,
+            total_items=total_items,
+            current_item="zq_data_tustock_daily_basic",
+            message="正在统计每日指标汇总...",
+        )
         if daily_basic_tables:
             try:
                 total_records = 0
@@ -987,7 +1228,15 @@ class DataService:
                 logger.error(f"统计每日指标数据分表失败: {e}")
 
         # 统计分表（因子数据分表）
-        factor_tables = get_all_factor_tables(db)
+        processed_items += 1
+        update_execution_progress(
+            db,
+            execution,
+            processed_items=processed_items - 1,
+            total_items=total_items,
+            current_item="zq_data_tustock_factor",
+            message="正在统计因子数据汇总...",
+        )
         if factor_tables:
             try:
                 total_records = 0
@@ -1088,7 +1337,15 @@ class DataService:
                 logger.error(f"统计因子数据分表失败: {e}")
 
         # 统计分表（专业版因子数据分表）
-        stkfactorpro_tables = get_all_stkfactorpro_tables(db)
+        processed_items += 1
+        update_execution_progress(
+            db,
+            execution,
+            processed_items=processed_items - 1,
+            total_items=total_items,
+            current_item="zq_data_tustock_stkfactorpro",
+            message="正在统计专业版因子数据汇总...",
+        )
         if stkfactorpro_tables:
             try:
                 total_records = 0
@@ -1192,6 +1449,7 @@ class DataService:
             except Exception as e:
                 logger.error(f"统计专业版因子数据分表失败: {e}")
 
+        update_execution_progress(db, execution, processed_items=total_items, message=f"数据表统计完成: 共统计 {len(results)} 个表")
         db.commit()
         return results
 

@@ -29,6 +29,8 @@ from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from zquant.schemas.common import QueryRequest
+
 
 class UserBase(BaseModel):
     """用户基础模型"""
@@ -57,14 +59,26 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """更新用户模型"""
 
+    user_id: int = Field(..., description="用户ID")
     email: EmailStr | None = Field(None, description="邮箱地址")
     is_active: bool | None = Field(None, description="是否激活")
     role_id: int | None = Field(None, description="角色ID")
 
 
+class UserGetRequest(BaseModel):
+    """获取用户详情请求模型"""
+    user_id: int = Field(..., description="用户ID")
+
+
+class UserDeleteRequest(BaseModel):
+    """删除用户请求模型"""
+    user_id: int = Field(..., description="用户ID")
+
+
 class PasswordReset(BaseModel):
     """密码重置模型"""
 
+    user_id: int = Field(..., description="用户ID")
     password: str = Field(
         ..., min_length=8, max_length=128, description="新密码（至少8位，包含大小写字母、数字和特殊字符）"
     )
@@ -84,8 +98,10 @@ class UserInDB(UserBase):
     id: int = Field(..., description="用户ID")
     role_id: int = Field(..., description="角色ID")
     is_active: bool = Field(..., description="是否激活")
-    created_at: datetime = Field(..., description="创建时间")
-    updated_at: datetime = Field(..., description="更新时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime = Field(..., description="更新时间")
 
     class Config:
         from_attributes = True
@@ -97,7 +113,10 @@ class UserResponse(UserBase):
     id: int = Field(..., description="用户ID")
     role_id: int = Field(..., description="角色ID")
     is_active: bool = Field(..., description="是否激活")
-    created_at: datetime = Field(..., description="创建时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime | None = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -117,15 +136,53 @@ class RoleCreate(RoleBase):
 class RoleUpdate(BaseModel):
     """更新角色模型"""
 
+    role_id: int = Field(..., description="角色ID")
     name: str | None = Field(None, description="角色名称")
     description: str | None = Field(None, description="角色描述")
+
+
+class RoleGetRequest(BaseModel):
+    """获取角色详情请求模型"""
+    role_id: int = Field(..., description="角色ID")
+
+
+class RoleDeleteRequest(BaseModel):
+    """删除角色请求模型"""
+    role_id: int = Field(..., description="角色ID")
+
+
+class RolePermissionsListRequest(BaseModel):
+    """查询角色权限列表请求模型"""
+    role_id: int = Field(..., description="角色ID")
+
+
+class AssignPermissionsRequest(BaseModel):
+    """分配权限请求模型"""
+
+    role_id: int = Field(..., description="角色ID")
+    permission_ids: list[int] = Field(..., description="权限ID列表")
+
+
+class RolePermissionAddRequest(BaseModel):
+    """为角色添加权限请求模型"""
+    role_id: int = Field(..., description="角色ID")
+    permission_id: int = Field(..., description="权限ID")
+
+
+class RolePermissionRemoveRequest(BaseModel):
+    """移除角色权限请求模型"""
+    role_id: int = Field(..., description="角色ID")
+    permission_id: int = Field(..., description="权限ID")
 
 
 class RoleResponse(RoleBase):
     """角色响应模型"""
 
     id: int = Field(..., description="角色ID")
-    created_at: datetime = Field(..., description="创建时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime | None = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -147,17 +204,31 @@ class PermissionCreate(PermissionBase):
 class PermissionUpdate(BaseModel):
     """更新权限模型"""
 
+    id: int = Field(..., description="权限ID")
     name: str | None = Field(None, description="权限名称")
     resource: str | None = Field(None, description="资源类型")
     action: str | None = Field(None, description="操作类型")
     description: str | None = Field(None, description="权限描述")
 
 
+class PermissionGetRequest(BaseModel):
+    """获取权限详情请求模型"""
+    permission_id: int = Field(..., description="权限ID")
+
+
+class PermissionDeleteRequest(BaseModel):
+    """删除权限请求模型"""
+    permission_id: int = Field(..., description="权限ID")
+
+
 class PermissionResponse(PermissionBase):
     """权限响应模型"""
 
     id: int = Field(..., description="权限ID")
-    created_at: datetime = Field(..., description="创建时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime | None = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -191,6 +262,11 @@ class APIKeyCreate(BaseModel):
     name: str | None = Field(None, max_length=100, description="密钥名称/描述")
 
 
+class APIKeyDeleteRequest(BaseModel):
+    """删除API密钥请求模型"""
+    key_id: int = Field(..., description="密钥ID")
+
+
 class APIKeyResponse(BaseModel):
     """API密钥响应模型"""
 
@@ -199,7 +275,7 @@ class APIKeyResponse(BaseModel):
     name: str | None = Field(None, description="密钥名称/描述")
     is_active: bool = Field(..., description="是否激活")
     last_used_at: datetime | None = Field(None, description="最后使用时间")
-    created_at: datetime = Field(..., description="创建时间")
+    created_time: datetime = Field(..., description="创建时间")
     expires_at: datetime | None = Field(None, description="过期时间，None表示永不过期")
 
     class Config:
@@ -213,9 +289,30 @@ class APIKeyCreateResponse(BaseModel):
     access_key: str = Field(..., description="访问密钥")
     secret_key: str = Field(..., description="密钥（仅返回一次，请妥善保管）")
     name: str | None = Field(None, description="密钥名称/描述")
-    created_at: datetime = Field(..., description="创建时间")
+    created_time: datetime = Field(..., description="创建时间")
     expires_at: datetime | None = Field(None, description="过期时间，None表示永不过期")
     message: str = Field("请妥善保管secret_key，系统不会再次显示", description="提示消息")
+
+
+class UserListRequest(QueryRequest):
+    """用户列表查询请求模型"""
+    is_active: bool | None = Field(None, description="是否激活")
+    role_id: int | None = Field(None, description="角色ID")
+    username: str | None = Field(None, description="用户名（模糊搜索）")
+    order_by: str | None = Field(
+        None, description="排序字段：id, username, email, is_active, created_time, updated_time"
+    )
+
+
+class RoleListRequest(QueryRequest):
+    """角色列表查询请求模型"""
+    order_by: str | None = Field(None, description="排序字段：id, name, description, created_time")
+
+
+class PermissionListRequest(QueryRequest):
+    """权限列表查询请求模型"""
+    resource: str | None = Field(None, description="资源类型筛选")
+    order_by: str | None = Field(None, description="排序字段：id, name, resource, action, created_time")
 
 
 class PageResponse(BaseModel):
@@ -239,12 +336,6 @@ class RoleWithPermissions(RoleResponse):
         from_attributes = True
 
 
-class AssignPermissionsRequest(BaseModel):
-    """分配权限请求模型"""
-
-    permission_ids: list[int] = Field(..., description="权限ID列表")
-
-
 # ============ 我的自选相关 Schema ============
 
 
@@ -259,8 +350,19 @@ class FavoriteCreate(BaseModel):
 class FavoriteUpdate(BaseModel):
     """更新自选请求模型"""
 
+    favorite_id: int = Field(..., description="自选ID")
     comment: str | None = Field(None, max_length=2000, description="关注理由")
     fav_datettime: datetime | None = Field(None, description="自选日期")
+
+
+class FavoriteGetRequest(BaseModel):
+    """获取自选详情请求模型"""
+    favorite_id: int = Field(..., description="自选ID")
+
+
+class FavoriteDeleteRequest(BaseModel):
+    """删除自选请求模型"""
+    favorite_id: int = Field(..., description="自选ID")
 
 
 class FavoriteResponse(BaseModel):
@@ -321,11 +423,22 @@ class PositionCreate(BaseModel):
 class PositionUpdate(BaseModel):
     """更新持仓请求模型"""
 
+    position_id: int = Field(..., description="持仓ID")
     quantity: float | None = Field(None, gt=0, description="持仓数量（股数），必须大于0")
     avg_cost: float | None = Field(None, gt=0, description="平均成本价（元），必须大于0")
     buy_date: date | None = Field(None, description="买入日期")
     current_price: float | None = Field(None, gt=0, description="当前价格（元），可选")
     comment: str | None = Field(None, max_length=2000, description="备注")
+
+
+class PositionGetRequest(BaseModel):
+    """获取持仓详情请求模型"""
+    position_id: int = Field(..., description="持仓ID")
+
+
+class PositionDeleteRequest(BaseModel):
+    """删除持仓请求模型"""
+    position_id: int = Field(..., description="持仓ID")
 
 
 class PositionResponse(BaseModel):

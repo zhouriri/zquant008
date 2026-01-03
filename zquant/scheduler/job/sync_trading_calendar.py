@@ -39,6 +39,7 @@
 """
 
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -55,6 +56,7 @@ from loguru import logger
 
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.scheduler.job.base import BaseSyncJob
+from zquant.models.scheduler import TaskExecution
 
 __job_name__ = "sync_trading_calendar"
 
@@ -64,6 +66,28 @@ class SyncTradingCalendarJob(BaseSyncJob):
 
     def __init__(self):
         super().__init__(__job_name__, "交易日历同步任务")
+
+    def get_execution(self, db) -> TaskExecution | None:
+        """
+        从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+        """
+        execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+        if not execution_id_str:
+            logger.debug("环境变量 ZQUANT_EXECUTION_ID 未设置，无法更新进度")
+            return None
+
+        try:
+            execution_id = int(execution_id_str)
+            execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+            if execution:
+                logger.debug(f"获取到执行记录: {execution_id}")
+                return execution
+            else:
+                logger.warning(f"执行记录 {execution_id} 不存在")
+                return None
+        except (ValueError, Exception) as e:
+            logger.warning(f"获取执行记录失败: {e}")
+            return None
 
     def execute(self, args: argparse.Namespace) -> int:
         scheduler = DataScheduler()
@@ -80,6 +104,9 @@ class SyncTradingCalendarJob(BaseSyncJob):
                 logger.error(f"日期参数验证失败: {e}")
                 return 1
 
+            # 获取执行记录（用于进度更新）
+            execution = self.get_execution(db)
+
             # 打印开始信息
             start_date_obj = datetime.strptime(start_date, "%Y%m%d").date()
             end_date_obj = datetime.strptime(end_date, "%Y%m%d").date()
@@ -88,7 +115,7 @@ class SyncTradingCalendarJob(BaseSyncJob):
                 结束日期=f"{end_date} ({end_date_obj.strftime('%Y-%m-%d')})",
             )
             logger.info("开始同步交易日历...")
-            count = scheduler.sync_trading_calendar(db, start_date, end_date, extra_info=extra_info)
+            count = scheduler.sync_trading_calendar(db, start_date, end_date, extra_info=extra_info, execution=execution)
 
             self.print_end_info(同步记录数=str(count))
 

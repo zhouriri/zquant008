@@ -72,14 +72,14 @@ class APIKeyService:
             access_key=api_key.access_key,
             secret_key=secret_key,  # 仅返回一次
             name=api_key.name,
-            created_at=api_key.created_at,
+            created_time=api_key.created_time,
             expires_at=api_key.expires_at,
         )
 
     @staticmethod
     def get_user_api_keys(db: Session, user_id: int) -> list[APIKey]:
         """获取用户的所有API密钥"""
-        return db.query(APIKey).filter(APIKey.user_id == user_id).order_by(APIKey.created_at.desc()).all()
+        return db.query(APIKey).filter(APIKey.user_id == user_id).order_by(APIKey.created_time.desc()).all()
 
     @staticmethod
     def get_api_key_by_access_key(db: Session, access_key: str) -> APIKey | None:

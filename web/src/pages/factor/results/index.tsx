@@ -28,9 +28,10 @@ import { getFactorResults, getFactorDefinitions } from '@/services/zquant/factor
 import dayjs from 'dayjs';
 
 const FactorResults: React.FC = () => {
-  const actionRef = useRef<ActionType>();
+  const actionRef = useRef<ActionType>(null);
   const [form] = Form.useForm();
   const [factorDefinitions, setFactorDefinitions] = useState<ZQuant.FactorDefinitionResponse[]>([]);
+  const [selectedFactorName, setSelectedFactorName] = useState('');
 
   useEffect(() => {
     getFactorDefinitions({ limit: 1000 }).then((res) => {
@@ -57,6 +58,11 @@ const FactorResults: React.FC = () => {
       },
     },
     {
+      title: '因子名称',
+      dataIndex: 'factor_name',
+      width: 150,
+    },
+    {
       title: '因子值',
       dataIndex: 'factor_value',
       width: 150,
@@ -68,23 +74,12 @@ const FactorResults: React.FC = () => {
         return Number(record.factor_value).toFixed(4);
       },
     },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      width: 180,
-      render: (_, record) => {
-        if (!record.created_at) return '-';
-        if (typeof record.created_at === 'string') {
-          return record.created_at;
-        }
-        return dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss');
-      },
-    },
   ];
 
   const handleQuery = async () => {
     try {
       const values = await form.validateFields();
+      setSelectedFactorName(values.factor_name || '');
       actionRef.current?.reload();
     } catch (error: any) {
       if (error?.errorFields) {
@@ -100,23 +95,30 @@ const FactorResults: React.FC = () => {
         form={form}
         layout="inline"
         onFinish={handleQuery}
+        initialValues={{
+          code: '000001.SZ',
+          factor_name: '',
+          trade_date: dayjs(),
+        }}
         style={{ marginBottom: 16, padding: 16, background: '#fff' }}
       >
-        <Form.Item name="code" label="股票代码" rules={[{ required: true, message: '请输入股票代码' }]}>
+        <Form.Item name="code" label="TS代码" rules={[{ required: true, message: '请输入TS代码' }]}>
           <Input placeholder="例如：000001.SZ" style={{ width: 200 }} />
         </Form.Item>
         <Form.Item name="factor_name" label="因子名称">
           <Select
-            placeholder="选择因子（留空查询所有）"
-            allowClear
+            placeholder="选择因子"
             style={{ width: 200 }}
-            options={factorDefinitions.map((f) => ({ label: `${f.cn_name} (${f.factor_name})`, value: f.factor_name }))}
+            options={[
+              { label: '全部', value: '' },
+              ...factorDefinitions.map((f) => ({
+                label: `${f.cn_name} (${f.factor_name})`,
+                value: f.factor_name,
+              })),
+            ]}
           />
         </Form.Item>
-        <Form.Item name="start_date" label="开始日期">
-          <DatePicker style={{ width: 150 }} />
-        </Form.Item>
-        <Form.Item name="end_date" label="结束日期">
+        <Form.Item name="trade_date" label="交易日期">
           <DatePicker style={{ width: 150 }} />
         </Form.Item>
         <Form.Item>
@@ -140,8 +142,7 @@ const FactorResults: React.FC = () => {
             const response = await getFactorResults({
               code: values.code,
               factor_name: values.factor_name || undefined,
-              start_date: values.start_date ? dayjs(values.start_date).format('YYYY-MM-DD') : undefined,
-              end_date: values.end_date ? dayjs(values.end_date).format('YYYY-MM-DD') : undefined,
+              trade_date: values.trade_date ? dayjs(values.trade_date).format('YYYY-MM-DD') : undefined,
             });
             return {
               data: response.items,

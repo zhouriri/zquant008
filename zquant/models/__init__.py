@@ -25,7 +25,7 @@
 """
 
 from zquant.models.backtest import BacktestResult, BacktestStatus, BacktestTask, Strategy
-from zquant.models.data import Config, DataOperationLog, Fundamental, StockFavorite, StockPosition, TableStatistics, Tustock, TustockTradecal
+from zquant.models.data import Config, DataOperationLog, Fundamental, StockFavorite, StockPosition, StockFilterStrategy, TableStatistics, Tustock, TustockTradecal, HslChoice
 from zquant.models.factor import FactorConfig, FactorDefinition, FactorModel
 from zquant.models.notification import Notification, NotificationType
 from zquant.models.scheduler import ScheduledTask, TaskExecution, TaskScheduleStatus, TaskStatus, TaskType
@@ -51,6 +51,7 @@ __all__ = [
     "Strategy",
     "StockFavorite",
     "StockPosition",
+    "StockFilterStrategy",
     "TableStatistics",
     "TaskExecution",
     "TaskScheduleStatus",
@@ -59,4 +60,5 @@ __all__ = [
     "Tustock",
     "TustockTradecal",
     "User",
+    "HslChoice",
 ]

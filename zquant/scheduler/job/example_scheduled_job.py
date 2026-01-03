@@ -36,13 +36,38 @@
 
 import argparse
 from datetime import datetime
+import os
+from pathlib import Path
 import sys
 import time
+
+# 添加项目根目录到路径
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 # 设置UTF-8编码（Windows系统兼容，作为双重保障）
 from zquant.utils.encoding import setup_utf8_encoding
 
 setup_utf8_encoding()
+
+from zquant.database import SessionLocal
+from zquant.models.scheduler import TaskExecution
+from zquant.scheduler.utils import update_execution_progress
+
+
+def get_execution(db) -> TaskExecution | None:
+    """
+    从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+    """
+    execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+    if not execution_id_str:
+        return None
+
+    try:
+        execution_id = int(execution_id_str)
+        execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+        return execution
+    except (ValueError, Exception):
+        return None
 
 
 def main():
@@ -59,10 +84,23 @@ def main():
     print(f"配置参数: steps={args.steps}, delay={args.delay}秒")
     print("-" * 60)
 
+    db = SessionLocal()
+    execution = get_execution(db)
+
     try:
         # 模拟处理步骤
         processed_items = []
         for i in range(1, args.steps + 1):
+            # 更新进度
+            update_execution_progress(
+                db,
+                execution,
+                total_items=args.steps,
+                processed_items=i - 1,
+                current_item=f"step_{i}",
+                message=f"正在执行步骤 {i}/{args.steps}...",
+            )
+
             # 模拟处理过程
             print(f"[步骤 {i}/{args.steps}] 正在处理数据...")
             time.sleep(args.delay)
@@ -71,6 +109,9 @@ def main():
             item = {"id": i, "data": f"processed_item_{i}", "timestamp": datetime.now().isoformat()}
             processed_items.append(item)
             print(f"[步骤 {i}/{args.steps}] 处理完成: {item['data']}")
+
+        # 完成更新
+        update_execution_progress(db, execution, processed_items=args.steps, message="示例定时任务执行完成")
 
         # 输出处理结果摘要
         print("-" * 60)
@@ -93,7 +134,11 @@ def main():
 
     except Exception as e:
         print(f"\n[错误] 任务执行失败: {e!s}")
+        if "Task terminated" in str(e):
+            sys.exit(130)
         sys.exit(1)  # 1 表示执行失败
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

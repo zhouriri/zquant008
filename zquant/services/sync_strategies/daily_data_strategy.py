@@ -28,6 +28,7 @@ from typing import Any
 from loguru import logger
 from sqlalchemy.orm import Session
 
+from zquant.models.scheduler import TaskExecution
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.services.sync_strategies.base import DataSyncStrategy
 from zquant.repositories.trading_date_repository import TradingDateRepository
@@ -39,7 +40,9 @@ class DailyDataSyncStrategy(DataSyncStrategy):
     def __init__(self):
         self.data_scheduler = DataScheduler()
 
-    def sync(self, db: Session, config: dict[str, Any], extra_info: dict | None = None) -> dict[str, Any]:
+    def sync(
+        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+    ) -> dict[str, Any]:
         """
         同步单只股票的日线数据
 
@@ -47,6 +50,7 @@ class DailyDataSyncStrategy(DataSyncStrategy):
             db: 数据库会话
             config: 同步配置，必须包含 ts_code 或 symbol，可选 start_date, end_date
             extra_info: 额外信息字典
+            execution: 执行记录对象（可选）
 
         Returns:
             同步结果字典
@@ -57,13 +61,8 @@ class DailyDataSyncStrategy(DataSyncStrategy):
 
         start_date = config.get("start_date")
         end_date = config.get("end_date")
-        count = self.data_scheduler.sync_daily_data(db, ts_code, start_date, end_date, extra_info)
-        return {
-            "success": True,
-            "count": count,
-            "ts_code": ts_code,
-            "message": f"成功同步 {ts_code} 的 {count} 条日线数据"
-        }
+        count = self.data_scheduler.sync_daily_data(db, ts_code, start_date, end_date, extra_info, execution=execution)
+        return {"success": True, "count": count, "ts_code": ts_code, "message": f"成功同步 {ts_code} 的 {count} 条日线数据"}
 
     def get_strategy_name(self) -> str:
         return "sync_daily_data"
@@ -75,7 +74,9 @@ class AllDailyDataSyncStrategy(DataSyncStrategy):
     def __init__(self):
         self.data_scheduler = DataScheduler()
 
-    def sync(self, db: Session, config: dict[str, Any], extra_info: dict | None = None) -> dict[str, Any]:
+    def sync(
+        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+    ) -> dict[str, Any]:
         """
         同步所有股票的日线数据
 
@@ -83,6 +84,7 @@ class AllDailyDataSyncStrategy(DataSyncStrategy):
             db: 数据库会话
             config: 同步配置，可选 start_date, end_date, codelist
             extra_info: 额外信息字典
+            execution: 执行记录对象（可选）
 
         Returns:
             同步结果字典
@@ -130,14 +132,14 @@ class AllDailyDataSyncStrategy(DataSyncStrategy):
         if codelist:
             logger.info(f"指定股票列表，共 {len(codelist)} 只股票")
 
-        result = self.data_scheduler.sync_all_daily_data(db, start_date, end_date, extra_info, codelist)
+        result = self.data_scheduler.sync_all_daily_data(db, start_date, end_date, extra_info, codelist, execution)
         return {
             "success": True,
             "total": result.get("total", 0),
             "success_count": result.get("success", 0),
             "failed_count": len(result.get("failed", [])),
             "failed_symbols": result.get("failed", []),
-            "message": f"同步完成: 成功 {result.get('success', 0)}/{result.get('total', 0)}"
+            "message": f"同步完成: 成功 {result.get('success', 0)}/{result.get('total', 0)}",
         }
 
     def get_strategy_name(self) -> str:

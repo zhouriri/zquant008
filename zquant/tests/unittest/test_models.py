@@ -54,8 +54,8 @@ class TestUserModel(BaseTestCase):
         self.assertEqual(user.username, "modeluser")
         self.assertEqual(user.email, "model@example.com")
         self.assertTrue(user.is_active)
-        self.assertIsNotNone(user.created_at)
-        self.assertIsNotNone(user.updated_at)
+        self.assertIsNotNone(user.created_time)
+        self.assertIsNotNone(user.updated_time)
 
     def test_user_relationship_role(self):
         """测试用户与角色的关系"""
@@ -68,7 +68,7 @@ class TestUserModel(BaseTestCase):
         """测试用户更新时间戳"""
         import time
 
-        original_updated_at = self.test_user.updated_at
+        original_updated_time = self.test_user.updated_time
         # 更新用户
         self.test_user.email = "updated@example.com"
         # 等待一小段时间确保时间戳更新
@@ -76,10 +76,10 @@ class TestUserModel(BaseTestCase):
         self.db.commit()
         self.db.refresh(self.test_user)
 
-        # updated_at应该被更新（SQLite的CURRENT_TIMESTAMP可能不会立即更新，所以只检查不为None）
-        self.assertIsNotNone(self.test_user.updated_at)
+        # updated_time应该被更新（SQLite的CURRENT_TIMESTAMP可能不会立即更新，所以只检查不为None）
+        self.assertIsNotNone(self.test_user.updated_time)
         # 如果时间戳确实更新了，应该大于等于原来的时间
-        self.assertGreaterEqual(self.test_user.updated_at, original_updated_at)
+        self.assertGreaterEqual(self.test_user.updated_time, original_updated_time)
 
 
 class TestRoleModel(BaseTestCase):
@@ -95,8 +95,8 @@ class TestRoleModel(BaseTestCase):
         self.assertIsNotNone(role.id)
         self.assertEqual(role.name, "new_role")
         self.assertEqual(role.description, "新角色")
-        self.assertIsNotNone(role.created_at)
-        # Role模型没有updated_at字段
+        self.assertIsNotNone(role.created_time)
+        # Role模型没有updated_time字段
 
     def test_role_relationship_users(self):
         """测试角色与用户的关系"""
@@ -130,8 +130,8 @@ class TestNotificationModel(BaseTestCase):
         self.assertEqual(notification.title, "测试通知")
         self.assertEqual(notification.content, "测试内容")
         self.assertFalse(notification.is_read)
-        self.assertIsNotNone(notification.created_at)
-        self.assertIsNotNone(notification.updated_at)
+        self.assertIsNotNone(notification.created_time)
+        self.assertIsNotNone(notification.updated_time)
 
     def test_notification_relationship_user(self):
         """测试通知与用户的关系"""

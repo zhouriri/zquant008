@@ -93,6 +93,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         处理请求并记录审计日志
         """
         method = request.method
+        
+        # 跳过 OPTIONS 请求（CORS 预检请求）
+        if method == "OPTIONS":
+            return await call_next(request)
+        
         path = request.url.path
 
         # 判断是否需要审计

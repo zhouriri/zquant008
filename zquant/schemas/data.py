@@ -70,13 +70,13 @@ class CalendarItem(BaseModel):
 
     id: int | None = Field(None, description="记录ID")
     exchange: str | None = Field(None, description="交易所")
-    cal_date: str = Field(..., description="日历日期（ISO格式）")
+    cal_date: date | str = Field(..., description="日历日期（ISO格式）")
     is_open: int | None = Field(None, description="是否交易，1=交易日，0=非交易日")
-    pretrade_date: str | None = Field(None, description="上一交易日（ISO格式）")
+    pretrade_date: date | str | None = Field(None, description="上一交易日（ISO格式）")
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
     updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    updated_time: datetime | str | None = Field(None, description="修改时间（ISO格式）")
 
 
 class CalendarResponse(BaseModel):
@@ -105,6 +105,8 @@ class DailyDataRequest(BaseModel):
     ts_code: str | list[str] | None = Field(None, description="TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有")
     start_date: date | None = Field(None, description="开始日期")
     end_date: date | None = Field(None, description="结束日期")
+    trading_day_filter: str | None = Field("all", description="交易日过滤模式：all=全交易日, has_data=有交易日, no_data=无交易日")
+    exchange: str | None = Field(None, description="交易所代码，用于全交易日对齐")
 
 
 class DailyDataItem(BaseModel):
@@ -112,7 +114,7 @@ class DailyDataItem(BaseModel):
 
     id: int | None = Field(None, description="记录ID")
     ts_code: str | None = Field(None, description="TS代码")
-    trade_date: str | None = Field(None, description="交易日期（ISO格式）")
+    trade_date: date | str | None = Field(None, description="交易日期（ISO格式）")
     open: float | None = Field(None, description="开盘价")
     high: float | None = Field(None, description="最高价")
     low: float | None = Field(None, description="最低价")
@@ -122,10 +124,11 @@ class DailyDataItem(BaseModel):
     pct_chg: float | None = Field(None, description="涨跌幅")
     vol: float | None = Field(None, description="成交量（手）")
     amount: float | None = Field(None, description="成交额（千元）")
+    is_missing: bool | None = Field(False, description="是否缺失数据")
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
     updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    updated_time: datetime | str | None = Field(None, description="修改时间（ISO格式）")
 
 
 class DailyDataResponse(BaseModel):
@@ -140,6 +143,8 @@ class DailyBasicRequest(BaseModel):
     ts_code: str | list[str] | None = Field(None, description="TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有")
     start_date: date | None = Field(None, description="开始日期")
     end_date: date | None = Field(None, description="结束日期")
+    trading_day_filter: str | None = Field("all", description="交易日过滤模式：all=全交易日, has_data=有交易日, no_data=无交易日")
+    exchange: str | None = Field(None, description="交易所代码，用于全交易日对齐")
 
 
 class DailyBasicItem(BaseModel):
@@ -147,7 +152,7 @@ class DailyBasicItem(BaseModel):
 
     id: int | None = Field(None, description="记录ID")
     ts_code: str | None = Field(None, description="TS代码")
-    trade_date: str | None = Field(None, description="交易日期（ISO格式）")
+    trade_date: date | str | None = Field(None, description="交易日期（ISO格式）")
     close: float | None = Field(None, description="收盘价")
     turnover_rate: float | None = Field(None, description="换手率")
     turnover_rate_f: float | None = Field(None, description="换手率（自由流通股）")
@@ -164,10 +169,11 @@ class DailyBasicItem(BaseModel):
     free_share: float | None = Field(None, description="自由流通股本（万）")
     total_mv: float | None = Field(None, description="总市值（万元）")
     circ_mv: float | None = Field(None, description="流通市值（万元）")
+    is_missing: bool | None = Field(False, description="是否缺失数据")
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
     updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    updated_time: datetime | str | None = Field(None, description="修改时间（ISO格式）")
 
 
 class DailyBasicResponse(BaseModel):
@@ -180,6 +186,9 @@ class DataOperationLogItem(BaseModel):
     """数据操作日志项"""
 
     id: int | None = Field(None, description="日志ID")
+    data_source: str | None = Field(None, description="数据源")
+    api_interface: str | None = Field(None, description="API接口")
+    api_data_count: int | None = Field(None, description="API接口数据条数")
     table_name: str | None = Field(None, description="数据表名")
     operation_type: str | None = Field(None, description="操作类型：insert, update, delete, sync等")
     insert_count: int | None = Field(None, description="插入记录数")
@@ -192,6 +201,8 @@ class DataOperationLogItem(BaseModel):
     duration_seconds: float | None = Field(None, description="耗时(秒)")
     created_by: str | None = Field(None, description="创建人")
     created_time: datetime | None = Field(None, description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime | None = Field(None, description="修改时间")
 
     class Config:
         from_attributes = True
@@ -279,6 +290,8 @@ class FactorDataRequest(BaseModel):
     ts_code: str | list[str] | None = Field(None, description="TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有")
     start_date: date | None = Field(None, description="开始日期")
     end_date: date | None = Field(None, description="结束日期")
+    trading_day_filter: str | None = Field("all", description="交易日过滤模式：all=全交易日, has_data=有交易日, no_data=无交易日")
+    exchange: str | None = Field(None, description="交易所代码，用于全交易日对齐")
 
 
 class FactorDataItem(BaseModel):
@@ -286,7 +299,7 @@ class FactorDataItem(BaseModel):
 
     id: int | None = Field(None, description="记录ID")
     ts_code: str | None = Field(None, description="TS代码")
-    trade_date: str | None = Field(None, description="交易日期（ISO格式）")
+    trade_date: date | str | None = Field(None, description="交易日期（ISO格式）")
     # 基础价格字段
     close: float | None = Field(None, description="收盘价")
     open: float | None = Field(None, description="开盘价")
@@ -323,11 +336,12 @@ class FactorDataItem(BaseModel):
     boll_mid: float | None = Field(None, description="BOLL_MID")
     boll_lower: float | None = Field(None, description="BOLL_LOWER")
     cci: float | None = Field(None, description="CCI")
+    is_missing: bool | None = Field(False, description="是否缺失数据")
     # 审计字段
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
     updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    updated_time: datetime | str | None = Field(None, description="修改时间（ISO格式）")
 
     class Config:
         from_attributes = True
@@ -346,6 +360,8 @@ class StkFactorProDataRequest(BaseModel):
     ts_code: str | list[str] | None = Field(None, description="TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，None表示查询所有")
     start_date: date | None = Field(None, description="开始日期")
     end_date: date | None = Field(None, description="结束日期")
+    trading_day_filter: str | None = Field("all", description="交易日过滤模式：all=全交易日, has_data=有交易日, no_data=无交易日")
+    exchange: str | None = Field(None, description="交易所代码，用于全交易日对齐")
 
 
 class StkFactorProDataItem(BaseModel):
@@ -353,7 +369,7 @@ class StkFactorProDataItem(BaseModel):
 
     id: int | None = Field(None, description="记录ID")
     ts_code: str | None = Field(None, description="股票代码")
-    trade_date: str | None = Field(None, description="交易日期（ISO格式）")
+    trade_date: date | str | None = Field(None, description="交易日期（ISO格式）")
     # 基础价格字段
     open: float | None = Field(None, description="开盘价")
     open_hfq: float | None = Field(None, description="开盘价（后复权）")
@@ -390,11 +406,12 @@ class StkFactorProDataItem(BaseModel):
     circ_mv: float | None = Field(None, description="流通市值（万元）")
     adj_factor: float | None = Field(None, description="复权因子")
     # 技术指标字段（非常多，使用 extra = "allow" 允许额外字段）
+    is_missing: bool | None = Field(False, description="是否缺失数据")
     # 审计字段
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
     updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    updated_time: datetime | str | None = Field(None, description="修改时间（ISO格式）")
 
     class Config:
         from_attributes = True
@@ -441,7 +458,7 @@ class DataDifferenceItem(BaseModel):
     """数据差异项"""
 
     ts_code: str = Field(..., description="TS代码")
-    trade_date: str = Field(..., description="交易日期")
+    trade_date: date | str = Field(..., description="交易日期")
     difference_type: str = Field(
         ..., description="差异类型：missing_in_db=数据库缺失, missing_in_api=接口缺失, field_diff=字段不一致"
     )

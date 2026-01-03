@@ -120,7 +120,7 @@ const Strategies: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       sorter: true,
       render: (text) => dayjs(text).format('YYYY-MM-DD HH:mm:ss'),
@@ -128,7 +128,7 @@ const Strategies: React.FC = () => {
     },
     {
       title: '更新时间',
-      dataIndex: 'updated_at',
+      dataIndex: 'updated_time',
       width: 180,
       sorter: true,
       render: (text) => dayjs(text).format('YYYY-MM-DD HH:mm:ss'),
@@ -293,8 +293,8 @@ const Strategies: React.FC = () => {
             <p><strong>分类:</strong> {getCategoryTag(selectedStrategy.category)}</p>
             <p><strong>是否模板:</strong> {selectedStrategy.is_template ? '是' : '否'}</p>
             <p><strong>描述:</strong> {selectedStrategy.description || '无'}</p>
-            <p><strong>创建时间:</strong> {dayjs(selectedStrategy.created_at).format('YYYY-MM-DD HH:mm:ss')}</p>
-            <p><strong>更新时间:</strong> {dayjs(selectedStrategy.updated_at).format('YYYY-MM-DD HH:mm:ss')}</p>
+            <p><strong>创建时间:</strong> {dayjs(selectedStrategy.created_time).format('YYYY-MM-DD HH:mm:ss')}</p>
+            <p><strong>更新时间:</strong> {dayjs(selectedStrategy.updated_time).format('YYYY-MM-DD HH:mm:ss')}</p>
             <div style={{ marginTop: 16 }}>
               <strong>策略代码:</strong>
               <pre

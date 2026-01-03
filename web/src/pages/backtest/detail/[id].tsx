@@ -93,7 +93,7 @@ const BacktestDetail: React.FC = () => {
           <ProDescriptions.Item label="策略名称">{task.strategy_name || '-'}</ProDescriptions.Item>
           <ProDescriptions.Item label="状态">{getStatusTag(task.status)}</ProDescriptions.Item>
           <ProDescriptions.Item label="创建时间">
-            {dayjs(task.created_at).format('YYYY-MM-DD HH:mm:ss')}
+            {dayjs(task.created_time).format('YYYY-MM-DD HH:mm:ss')}
           </ProDescriptions.Item>
           <ProDescriptions.Item label="回测开始日期">
             {task.start_date && dayjs(task.start_date).isValid() 

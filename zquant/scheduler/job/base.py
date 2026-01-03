@@ -46,6 +46,7 @@ from sqlalchemy.orm import Session
 
 from zquant.database import SessionLocal
 from zquant.models.data import TustockTradecal
+from zquant.utils.date_helper import DateHelper
 
 
 class BaseSyncJob:
@@ -137,13 +138,14 @@ class BaseSyncJob:
         """
         today = date.today()
 
+        latest_trading_date = today
         # 获取最近交易日（如果 self.db 可用）
-        latest_trading_date = None
-        if self.db:
-            try:
-                latest_trading_date = self.get_latest_trading_date()
-            except Exception as e:
-                logger.debug(f"无法获取最近交易日: {e}，将使用默认逻辑")
+        # latest_trading_date = None
+        # if self.db:
+        #     try:
+        #         latest_trading_date = self.get_latest_trading_date()
+        #     except Exception as e:
+        #         logger.debug(f"无法获取最近交易日: {e}，将使用默认逻辑")
 
         # 判断是否所有日期参数都为空
         all_empty = not start_date and not end_date
@@ -253,7 +255,7 @@ class BaseSyncJob:
         print("执行摘要:")
         for key, value in kwargs.items():
             print(f"  - {key}: {value}")
-        print(f"  - 执行时长: {duration:.2f} 秒")
+        print(f"  - 执行时长: {DateHelper.format_duration(duration)} ({duration:.2f} 秒)")
         print(f"  - 状态: {'成功' if success else '失败'}")
 
     def run(self, args: argparse.Namespace | None = None):

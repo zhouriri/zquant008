@@ -31,6 +31,14 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 from zquant.models.notification import NotificationType
+from zquant.schemas.common import QueryRequest
+
+
+class NotificationListRequest(QueryRequest):
+    """通知列表查询请求模型"""
+    is_read: bool | None = Field(None, description="是否已读")
+    type: NotificationType | None = Field(None, description="通知类型")
+    order_by: str = Field("created_time", description="排序字段：created_time, updated_time")
 
 
 class NotificationCreate(BaseModel):
@@ -72,8 +80,10 @@ class NotificationResponse(BaseModel):
     content: str = Field(..., description="通知内容")
     is_read: bool = Field(..., description="是否已读")
     extra_data: dict[str, Any] | None = Field(None, description="额外数据（JSON格式）")
-    created_at: datetime = Field(..., description="创建时间")
-    updated_at: datetime = Field(..., description="更新时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime = Field(..., description="更新时间")
 
     class Config:
         from_attributes = True
@@ -109,3 +119,18 @@ class NotificationStatsResponse(BaseModel):
 
     unread_count: int = Field(..., description="未读通知数")
     total_count: int = Field(..., description="总通知数")
+
+
+class NotificationGetRequest(BaseModel):
+    """获取通知详情请求模型"""
+    notification_id: int = Field(..., description="通知ID")
+
+
+class NotificationDeleteRequest(BaseModel):
+    """删除通知请求模型"""
+    notification_id: int = Field(..., description="通知ID")
+
+
+class NotificationReadRequest(BaseModel):
+    """标记已读请求模型"""
+    notification_id: int = Field(..., description="通知ID")

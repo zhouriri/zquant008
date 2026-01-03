@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 from zquant.database import engine
 from zquant.data.storage_base import log_sql_statement
 from zquant.models.data import (
+    SPACEX_FACTOR_VIEW_NAME,
     TUSTOCK_DAILY_BASIC_VIEW_NAME,
     TUSTOCK_DAILY_VIEW_NAME,
     TUSTOCK_FACTOR_VIEW_NAME,
@@ -539,5 +540,129 @@ def drop_stkfactorpro_view(db: Session) -> bool:
         return True
     except Exception as e:
         logger.error(f"删除专业版因子数据视图失败: {e}")
+        db.rollback()
+        return False
+
+
+def get_all_spacex_factor_tables(db: Session) -> list:
+    """
+    获取所有自定义量化因子结果分表名称
+
+    Returns:
+        表名列表，如：['zq_quant_factor_spacex_000001', ...]
+    """
+    inspector = inspect(engine)
+    all_tables = inspector.get_table_names()
+
+    # 过滤出所有自定义量化因子结果分表（以 zq_quant_factor_spacex_ 开头）
+    spacex_factor_tables = [
+        t for t in all_tables if t.startswith("zq_quant_factor_spacex_") and t != SPACEX_FACTOR_VIEW_NAME
+    ]
+
+    return sorted(spacex_factor_tables)
+
+
+def _create_or_update_spacex_factor_view_direct(db: Session) -> bool:
+    """
+    直接使用Python代码创建或更新自定义量化因子结果联合视图（私有函数，作为回退方案）
+
+    Args:
+        db: 数据库会话
+
+    Returns:
+        是否成功
+    """
+    try:
+        # 获取所有分表
+        spacex_factor_tables = get_all_spacex_factor_tables(db)
+
+        if not spacex_factor_tables:
+            logger.warning("没有找到自定义量化因子结果分表，跳过视图创建")
+            return False
+
+        logger.info(f"找到 {len(spacex_factor_tables)} 个自定义量化因子结果分表，开始创建/更新视图...")
+
+        # 构建 UNION ALL SQL
+        union_parts = []
+        for table in spacex_factor_tables:
+            union_parts.append(f"SELECT * FROM `{table}`")
+
+        union_sql = " UNION ALL ".join(union_parts)
+
+        # 创建或替换视图
+        view_sql = f"""
+        CREATE OR REPLACE VIEW `{SPACEX_FACTOR_VIEW_NAME}` AS
+        {union_sql}
+        """
+
+        # 打印SQL语句
+        log_sql_statement(view_sql)
+        db.execute(text(view_sql))
+        db.commit()
+
+        logger.info(f"成功创建/更新视图 {SPACEX_FACTOR_VIEW_NAME}，包含 {len(spacex_factor_tables)} 个分表")
+        return True
+
+    except Exception as e:
+        logger.error(f"创建/更新自定义量化因子结果视图失败: {e}")
+        db.rollback()
+        return False
+
+
+def create_or_update_spacex_factor_view(db: Session) -> bool:
+    """
+    创建或更新自定义量化因子结果联合视图
+    优先使用存储过程，失败时回退到Python代码
+
+    Args:
+        db: 数据库会话
+
+    Returns:
+        是否成功
+    """
+    try:
+        # 先尝试使用存储过程
+        try:
+            result = db.execute(text("CALL sp_create_spacex_factor_view()"))
+            db.commit()
+
+            # 获取存储过程的输出消息
+            message = result.fetchone()
+            if message:
+                logger.info(f"存储过程输出: {message[0]}")
+
+            logger.info("自定义量化因子结果视图创建完成（通过存储过程）")
+            return True
+        except Exception as proc_error:
+            logger.warning(f"存储过程创建视图失败，回退到Python代码: {proc_error}")
+            # 回退到直接使用Python代码创建视图
+            return _create_or_update_spacex_factor_view_direct(db)
+
+    except Exception as e:
+        logger.error(f"创建/更新自定义量化因子结果视图失败: {e}")
+        db.rollback()
+        return False
+
+
+def drop_spacex_factor_view(db: Session) -> bool:
+    """
+    删除自定义量化因子结果视图
+
+    Args:
+        db: 数据库会话
+
+    Returns:
+        是否成功
+    """
+    try:
+        drop_sql = f"DROP VIEW IF EXISTS `{SPACEX_FACTOR_VIEW_NAME}`"
+        # 打印SQL语句
+        log_sql_statement(drop_sql)
+        db.execute(text(drop_sql))
+        db.commit()
+        logger.info(f"成功删除视图 {SPACEX_FACTOR_VIEW_NAME}")
+        return True
+    except Exception as e:
+        logger.error(f"删除自定义量化因子结果视图失败: {e}")
         db.rollback()
         return False

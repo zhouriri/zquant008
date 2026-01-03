@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Tag, message } from 'antd';
-import { ProForm, ProFormText, ProFormDatePicker, ProFormDateRangePicker } from '@ant-design/pro-components';
+import { ProForm, ProFormText, ProFormDatePicker } from '@ant-design/pro-components';
 import type { ProFormInstance } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
@@ -162,8 +162,8 @@ const TableStatistics: React.FC = () => {
       const params: ZQuant.TableStatisticsRequest = {
         stat_date: values.stat_date ? dayjs(values.stat_date).format('YYYY-MM-DD') : undefined,
         table_name: values.table_name,
-        start_date: values.dateRange ? dayjs(values.dateRange[0]).format('YYYY-MM-DD') : undefined,
-        end_date: values.dateRange ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
+        start_date: values.start_date ? dayjs(values.start_date).format('YYYY-MM-DD') : undefined,
+        end_date: values.end_date ? dayjs(values.end_date).format('YYYY-MM-DD') : undefined,
         skip: 0,
         limit: 1000,
       };
@@ -197,7 +197,8 @@ const TableStatistics: React.FC = () => {
           }
         }}
         initialValues={{
-          dateRange: [dayjs().subtract(7, 'day'), dayjs()],
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
         }}
         submitter={{
           render: (props, doms) => {
@@ -220,9 +221,13 @@ const TableStatistics: React.FC = () => {
           label="统计日期"
           placeholder="请选择统计日期"
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="日期范围"
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
         />
       </ProForm>
 

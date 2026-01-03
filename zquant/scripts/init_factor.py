@@ -49,7 +49,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from zquant.database import SessionLocal, engine
-from zquant.models.factor import FactorConfig, FactorDefinition, FactorModel
+from zquant.models.factor import FactorConfig, FactorDefinition, FactorModel, FACTOR_TYPE_COMBINED, FACTOR_TYPE_SINGLE
 from zquant.services.factor import FactorService
 
 
@@ -68,11 +68,15 @@ def create_tables():
                     en_name VARCHAR(100),
                     column_name VARCHAR(100) NOT NULL,
                     description TEXT,
+                    factor_type VARCHAR(20) DEFAULT '单因子' COMMENT '因子类型：单因子、组合因子',
                     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_by VARCHAR(50) COMMENT '创建人',
+                    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(50) COMMENT '修改人',
+                    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_factor_name (factor_name),
-                    INDEX idx_enabled (enabled)
+                    INDEX idx_enabled (enabled),
+                    INDEX idx_factor_type (factor_type)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
             )
@@ -88,8 +92,10 @@ def create_tables():
                     config_json TEXT,
                     is_default BOOLEAN NOT NULL DEFAULT FALSE,
                     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_by VARCHAR(50) COMMENT '创建人',
+                    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(50) COMMENT '修改人',
+                    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_factor_id (factor_id),
                     INDEX idx_model_code (model_code),
                     INDEX idx_is_default (is_default),
@@ -106,131 +112,16 @@ def create_tables():
                     factor_id INTEGER NOT NULL PRIMARY KEY,
                     config_json TEXT COMMENT '因子配置（JSON格式）：{"enabled": true, "mappings": [{"model_id": 1, "codes": [...]}]}',
                     enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_by VARCHAR(50) COMMENT '创建人',
+                    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(50) COMMENT '修改人',
+                    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_factor_id (factor_id),
                     INDEX idx_enabled (enabled),
                     FOREIGN KEY (factor_id) REFERENCES zq_quant_factor_definitions(id) ON DELETE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """)
             )
-
-            # 检查并添加缺失的列（用于表已存在但结构不完整的情况）
-            from sqlalchemy import inspect as sql_inspect
-            inspector = sql_inspect(engine)
-            
-            # 检查因子定义表
-            if "zq_quant_factor_definitions" in inspector.get_table_names():
-                existing_columns = [col["name"] for col in inspector.get_columns("zq_quant_factor_definitions")]
-                
-                # 删除不需要的字段（如果存在）
-                if "factor_type" in existing_columns:
-                    logger.info("表 zq_quant_factor_definitions 包含不需要的 factor_type 列，正在删除...")
-                    try:
-                        # 先删除可能存在的索引
-                        try:
-                            conn.execute(text("ALTER TABLE zq_quant_factor_definitions DROP INDEX idx_factor_type"))
-                        except:
-                            pass
-                        conn.execute(text("ALTER TABLE zq_quant_factor_definitions DROP COLUMN factor_type"))
-                        logger.info("已删除 factor_type 列")
-                    except Exception as e:
-                        logger.warning(f"删除 factor_type 列失败: {e}")
-                
-                # 添加缺失的 enabled 列
-                if "enabled" not in existing_columns:
-                    logger.info("表 zq_quant_factor_definitions 缺少 enabled 列，正在添加...")
-                    try:
-                        conn.execute(text("ALTER TABLE zq_quant_factor_definitions ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE"))
-                        # 检查索引是否存在
-                        existing_indexes = [idx["name"] for idx in inspector.get_indexes("zq_quant_factor_definitions")]
-                        if "idx_enabled" not in existing_indexes:
-                            conn.execute(text("ALTER TABLE zq_quant_factor_definitions ADD INDEX idx_enabled (enabled)"))
-                        logger.info("已添加 enabled 列和索引")
-                    except Exception as e:
-                        logger.warning(f"添加 enabled 列失败（可能已存在）: {e}")
-            
-            # 检查因子模型表
-            if "zq_quant_factor_models" in inspector.get_table_names():
-                existing_columns = [col["name"] for col in inspector.get_columns("zq_quant_factor_models")]
-                
-                # 添加缺失的 enabled 列
-                if "enabled" not in existing_columns:
-                    logger.info("表 zq_quant_factor_models 缺少 enabled 列，正在添加...")
-                    try:
-                        conn.execute(text("ALTER TABLE zq_quant_factor_models ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE"))
-                        existing_indexes = [idx["name"] for idx in inspector.get_indexes("zq_quant_factor_models")]
-                        if "idx_enabled" not in existing_indexes:
-                            conn.execute(text("ALTER TABLE zq_quant_factor_models ADD INDEX idx_enabled (enabled)"))
-                        logger.info("已添加 enabled 列和索引")
-                    except Exception as e:
-                        logger.warning(f"添加 enabled 列失败（可能已存在）: {e}")
-                
-                # 添加缺失的 is_default 列
-                if "is_default" not in existing_columns:
-                    logger.info("表 zq_quant_factor_models 缺少 is_default 列，正在添加...")
-                    try:
-                        conn.execute(text("ALTER TABLE zq_quant_factor_models ADD COLUMN is_default BOOLEAN NOT NULL DEFAULT FALSE"))
-                        existing_indexes = [idx["name"] for idx in inspector.get_indexes("zq_quant_factor_models")]
-                        if "idx_is_default" not in existing_indexes:
-                            conn.execute(text("ALTER TABLE zq_quant_factor_models ADD INDEX idx_is_default (is_default)"))
-                        logger.info("已添加 is_default 列和索引")
-                    except Exception as e:
-                        logger.warning(f"添加 is_default 列失败（可能已存在）: {e}")
-                
-                # 添加缺失的 config_json 列
-                if "config_json" not in existing_columns:
-                    logger.info("表 zq_quant_factor_models 缺少 config_json 列，正在添加...")
-                    try:
-                        conn.execute(text("ALTER TABLE zq_quant_factor_models ADD COLUMN config_json TEXT"))
-                        logger.info("已添加 config_json 列")
-                    except Exception as e:
-                        logger.warning(f"添加 config_json 列失败（可能已存在）: {e}")
-                
-                # 添加缺失的 created_at 和 updated_at 列
-                if "created_at" not in existing_columns:
-                    logger.info("表 zq_quant_factor_models 缺少 created_at 列，正在添加...")
-                    try:
-                        conn.execute(text("ALTER TABLE zq_quant_factor_models ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))
-                        logger.info("已添加 created_at 列")
-                    except Exception as e:
-                        logger.warning(f"添加 created_at 列失败（可能已存在）: {e}")
-                
-                if "updated_at" not in existing_columns:
-                    logger.info("表 zq_quant_factor_models 缺少 updated_at 列，正在添加...")
-                    try:
-                        conn.execute(text("ALTER TABLE zq_quant_factor_models ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
-                        logger.info("已添加 updated_at 列")
-                    except Exception as e:
-                        logger.warning(f"添加 updated_at 列失败（可能已存在）: {e}")
-            
-            # 检查因子配置表
-            if "zq_quant_factor_configs" in inspector.get_table_names():
-                existing_columns = [col["name"] for col in inspector.get_columns("zq_quant_factor_configs")]
-                
-                # 检查是否是旧表结构（有id列）
-                if "id" in existing_columns:
-                    logger.warning("检测到旧的 zq_quant_factor_configs 表结构（有id列），需要运行迁移脚本重构表结构")
-                else:
-                    # 新表结构，检查缺失的列
-                    if "config_json" not in existing_columns:
-                        logger.info("表 zq_quant_factor_configs 缺少 config_json 列，正在添加...")
-                        try:
-                            conn.execute(text("ALTER TABLE zq_quant_factor_configs ADD COLUMN config_json TEXT COMMENT '因子配置（JSON格式）'"))
-                            logger.info("已添加 config_json 列")
-                        except Exception as e:
-                            logger.warning(f"添加 config_json 列失败（可能已存在）: {e}")
-                    
-                    if "enabled" not in existing_columns:
-                        logger.info("表 zq_quant_factor_configs 缺少 enabled 列，正在添加...")
-                        try:
-                            conn.execute(text("ALTER TABLE zq_quant_factor_configs ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE"))
-                            existing_indexes = [idx["name"] for idx in inspector.get_indexes("zq_quant_factor_configs")]
-                            if "idx_enabled" not in existing_indexes:
-                                conn.execute(text("ALTER TABLE zq_quant_factor_configs ADD INDEX idx_enabled (enabled)"))
-                            logger.info("已添加 enabled 列和索引")
-                        except Exception as e:
-                            logger.warning(f"添加 enabled 列失败（可能已存在）: {e}")
 
             # 使用 engine.begin() 时，事务会在 with 块结束时自动提交
             logger.info("因子相关表创建完成")
@@ -247,117 +138,89 @@ def create_turnover_rate_factor(force: bool = False):
     db = SessionLocal()
     try:
         # 检查是否已存在
-        existing = FactorService.get_factor_definition_by_name(db, "turnover_rate")
-        if existing and not force:
-            logger.info("换手率因子已存在，跳过创建（使用 --force 强制重新创建）")
-            return True
-
-        # 如果存在且需要强制重新创建，先删除
-        if existing and force:
-            logger.info("删除已存在的换手率因子...")
-            FactorService.delete_factor_definition(db, existing.id)
-
-        # 创建因子定义
-        factor_def = FactorService.create_factor_definition(
-            db=db,
-            factor_name="turnover_rate",
-            cn_name="换手率",
-            en_name="Turnover Rate",
-            column_name="turnover_rate",
-            description="换手率因子，反映股票交易的活跃程度",
-            enabled=True,
-        )
-
-        # 创建默认模型
-        default_model = FactorService.create_factor_model(
-            db=db,
-            factor_id=factor_def.id,
-            model_name="换手率计算模型（每日指标）",
-            model_code="turnover_rate",
-            config_json={"source": "daily_basic", "field": "turnover_rate"},
-            is_default=True,
-            enabled=True,
-        )
-
-        # 创建第二个换手率模型（移动平均）
-        ma_model = FactorService.create_factor_model(
-            db=db,
-            factor_id=factor_def.id,
-            model_name="换手率计算模型（移动平均）",
-            model_code="turnover_rate_ma",
-            config_json={"source": "daily_basic", "field": "turnover_rate", "method": "ma", "window": 5},
-            is_default=False,
-            enabled=True,
-        )
-
-        logger.info(f"成功创建换手率因子: factor_id={factor_def.id}, default_model_id={default_model.id}, ma_model_id={ma_model.id}")
-        return True
-
-    except Exception as e:
-        logger.error(f"创建换手率因子失败: {e}")
-        db.rollback()
-        return False
-    finally:
-        db.close()
-
-
-def create_example_config(force: bool = False):
-    """创建示例因子配置（多映射配置示例，使用新的FactorConfig表）"""
-    logger.info("开始创建示例因子配置...")
-
-    db = SessionLocal()
-    try:
-        # 获取换手率因子
         factor_def = FactorService.get_factor_definition_by_name(db, "turnover_rate")
-        if not factor_def:
-            logger.warning("换手率因子不存在，跳过创建示例配置")
-            return True
-
-        # 检查是否已存在配置
-        try:
-            existing_config = FactorService.get_factor_config_by_factor_id(db, factor_def.id)
-            if existing_config and not force:
-                logger.info("示例因子配置已存在，跳过创建（使用 --force 强制重新创建）")
-                return True
+        
+        if factor_def and not force:
+            logger.info("换手率因子定义已存在，检查模型和配置...")
+            # 获取默认模型和MA模型
+            default_model = db.query(FactorModel).filter(
+                FactorModel.factor_id == factor_def.id, 
+                FactorModel.model_code == "turnover_rate"
+            ).first()
+            ma_model = db.query(FactorModel).filter(
+                FactorModel.factor_id == factor_def.id, 
+                FactorModel.model_code == "turnover_rate_ma"
+            ).first()
             
+            if not default_model or not ma_model:
+                logger.warning("换手率因子模型不完整，请使用 --force 强制重新创建")
+                return True
+        else:
             # 如果存在且需要强制重新创建，先删除
-            if existing_config and force:
-                logger.info("删除已存在的因子配置...")
+            if factor_def and force:
+                logger.info("删除已存在的换手率因子...")
+                FactorService.delete_factor_definition(db, factor_def.id)
+
+            # 创建因子定义
+            factor_def = FactorService.create_factor_definition(
+                db=db,
+                factor_name="turnover_rate",
+                cn_name="换手率因子",
+                en_name="Turnover Rate",
+                column_name="turnover_rate",
+                description="换手率因子，反映股票交易的活跃程度",
+                factor_type=FACTOR_TYPE_SINGLE,
+                enabled=True,
+                created_by="admin",
+            )
+
+            # 创建默认模型
+            default_model = FactorService.create_factor_model(
+                db=db,
+                factor_id=factor_def.id,
+                model_name="换手率因子计算模型（每日指标）",
+                model_code="turnover_rate",
+                config_json={"source": "daily_basic", "field": "turnover_rate"},
+                is_default=True,
+                enabled=True,
+                created_by="admin",
+            )
+
+            # 创建第二个换手率模型（移动平均）
+            ma_model = FactorService.create_factor_model(
+                db=db,
+                factor_id=factor_def.id,
+                model_name="换手率因子计算模型（移动平均）",
+                model_code="turnover_rate_ma",
+                config_json={"source": "daily_basic", "field": "turnover_rate", "method": "ma", "window": 5},
+                is_default=False,
+                enabled=True,
+                created_by="admin",
+            )
+
+        # 3. 创建换手率因子配置
+        # 直接查询数据库检查是否已存在配置，避免 get_factor_config_by_factor_id 抛出 NotFoundError
+        existing_config = db.query(FactorConfig).filter(FactorConfig.factor_id == factor_def.id).first()
+        if existing_config:
+            if force:
+                logger.info("删除已存在的换手率因子配置...")
                 FactorService.delete_factor_config_by_factor_id(db, factor_def.id)
-        except Exception:
-            # 配置不存在，继续创建
-            pass
-
-        # 获取换手率因子的所有模型
-        models, _ = FactorService.list_factor_models(db, factor_id=factor_def.id, limit=10)
-        default_model = next((m for m in models if m.is_default), None)
-        ma_model = next((m for m in models if m.model_code == "turnover_rate_ma"), None)
-
-        if not default_model:
-            logger.warning("未找到默认换手率模型，跳过创建示例配置")
-            return True
-
-        if not ma_model:
-            logger.warning("未找到移动平均换手率模型，将只创建默认配置")
+            else:
+                logger.info("换手率因子配置已存在，跳过创建")
+                return True
 
         # 创建多映射配置
         mappings = [
             {
                 "model_id": default_model.id,
                 "codes": None,  # 默认配置，用于所有未指定的股票
+            },
+            {
+                "model_id": ma_model.id,
+                "codes": ["000001.SZ", "000002.SZ"],  # 特定股票使用移动平均模型示例
             }
         ]
 
-        # 如果存在移动平均模型，添加特定股票代码的配置
-        if ma_model:
-            mappings.append(
-                {
-                    "model_id": ma_model.id,
-                    "codes": ["000001.SZ", "000002.SZ"],  # 特定股票使用移动平均模型
-                }
-            )
-
-        # 使用新的create_factor_config方法创建配置
         factor_config = {
             "enabled": True,
             "mappings": mappings,
@@ -367,17 +230,14 @@ def create_example_config(force: bool = False):
             db=db,
             factor_id=factor_def.id,
             config=factor_config,
+            created_by="admin",
         )
 
-        logger.info(f"成功创建示例因子配置: 共 {len(mappings)} 个映射")
-        for i, mapping in enumerate(mappings, 1):
-            codes_str = ", ".join(mapping["codes"]) if mapping["codes"] else "默认配置（所有股票）"
-            logger.info(f"  映射 {i}: model_id={mapping['model_id']}, codes={codes_str}")
-
+        logger.info(f"成功创建换手率因子（共 {len(mappings)} 个映射）: factor_id={factor_def.id}, default_model_id={default_model.id}, ma_model_id={ma_model.id}")
         return True
 
     except Exception as e:
-        logger.error(f"创建示例因子配置失败: {e}")
+        logger.error(f"创建换手率因子失败: {e}")
         db.rollback()
         return False
     finally:
@@ -407,18 +267,113 @@ def main():
         logger.info("=" * 60)
         return
 
-    # 3. 创建换手率因子
+    # 2. 创建换手率因子 (含配置)
     if not create_turnover_rate_factor(force=args.force):
         logger.error("创建换手率因子失败")
         sys.exit(1)
 
-    # 4. 创建示例配置
-    if not create_example_config(force=args.force):
-        logger.warning("创建示例配置失败（不影响整体流程）")
+    # 3. 创建超活跃组合因子
+    if not create_hyper_activity_factor(force=args.force):
+        logger.warning("创建超活跃组合因子失败（不影响整体流程）")
 
     logger.info("=" * 60)
     logger.info("因子系统初始化完成")
     logger.info("=" * 60)
+
+
+def create_hyper_activity_factor(force: bool = False):
+    """创建超活跃组合因子定义和模型"""
+    logger.info("开始创建超活跃组合因子...")
+
+    db = SessionLocal()
+    try:
+        # 检查是否已存在
+        factor_def = FactorService.get_factor_definition_by_name(db, "hyper_activity")
+        
+        if factor_def and not force:
+            logger.info("超活跃组合因子定义已存在，检查模型和配置...")
+            # 获取默认模型
+            default_model = db.query(FactorModel).filter(
+                FactorModel.factor_id == factor_def.id, 
+                FactorModel.model_code == "hyper_activity"
+            ).first()
+            
+            if not default_model:
+                logger.warning("超活跃组合因子模型缺失，请使用 --force 强制重新创建")
+                return True
+        else:
+            # 如果存在且需要强制重新创建，先删除
+            if factor_def and force:
+                logger.info("删除已存在的超活跃组合因子...")
+                FactorService.delete_factor_definition(db, factor_def.id)
+
+            # 创建因子定义
+            factor_def = FactorService.create_factor_definition(
+                db=db,
+                factor_name="hyper_activity",
+                cn_name="超活跃组合因子",
+                en_name="Hyper Activity Factor",
+                column_name="hyper_activity",  # 组合因子不使用单一列名，但需要提供一个默认值
+                description="超活跃组合因子，包含换手率因子（5/10/20/30/60/90日均值）、小十字因子（振幅≤3%且涨跌幅≤1%的K线统计）、半年统计因子（半年内活跃次数、半年内换手率次数等）",
+                factor_type=FACTOR_TYPE_COMBINED,
+                enabled=True,
+                created_by="admin",
+            )
+
+            # 创建默认模型
+            default_model = FactorService.create_factor_model(
+                db=db,
+                factor_id=factor_def.id,
+                model_name="超活跃组合因子计算模型",
+                model_code="hyper_activity",
+                config_json={},  # 超活跃组合因子当前不需要配置
+                is_default=True,
+                enabled=True,
+                created_by="admin",
+            )
+
+        logger.info(f"成功创建超活跃组合因子: factor_id={factor_def.id}, model_id={default_model.id}")
+
+        # 3. 为其创建初始因子配置
+        # 直接查询数据库检查是否已存在配置，避免 get_factor_config_by_factor_id 抛出 NotFoundError
+        existing_config = db.query(FactorConfig).filter(FactorConfig.factor_id == factor_def.id).first()
+        if existing_config:
+            if force:
+                logger.info("删除已存在的超活跃组合因子配置...")
+                FactorService.delete_factor_config_by_factor_id(db, factor_def.id)
+            else:
+                logger.info("超活跃组合因子配置已存在，跳过创建")
+                return True
+
+        # 创建默认配置：映射到默认模型，且开启
+        mappings = [
+            {
+                "model_id": default_model.id,
+                "codes": None,  # 默认配置，用于所有股票
+            }
+        ]
+        
+        factor_config = {
+            "enabled": True,
+            "mappings": mappings,
+        }
+        
+        FactorService.create_factor_config(
+            db=db,
+            factor_id=factor_def.id,
+            config=factor_config,
+            created_by="admin",
+        )
+
+        logger.info(f"成功创建超活跃组合因子（共 {len(mappings)} 个映射）: factor_id={factor_def.id}, model_id={default_model.id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"创建超活跃组合因子失败: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

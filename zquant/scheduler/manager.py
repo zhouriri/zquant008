@@ -34,6 +34,7 @@ from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.jobstores.base import JobLookupError
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -148,13 +149,26 @@ class TaskSchedulerManager:
             job_id: 任务ID
 
         Returns:
-            是否移除成功
+            是否移除成功（如果任务不存在，也返回True，因为目标已达成）
         """
         try:
+            # 先检查任务是否存在
+            job = self.scheduler.get_job(job_id)
+            if job is None:
+                # 任务不存在于调度器中（例如手动任务），这是正常情况
+                logger.debug(f"任务 {job_id} 不在调度器中，无需移除")
+                return True
+            
+            # 任务存在，执行移除
             self.scheduler.remove_job(job_id)
             logger.info(f"任务 {job_id} 已从调度器移除")
             return True
+        except JobLookupError:
+            # APScheduler 明确抛出任务不存在的异常，这是正常情况（例如手动任务）
+            logger.debug(f"任务 {job_id} 不在调度器中，无需移除")
+            return True
         except Exception as e:
+            # 其他异常才是真正的错误
             logger.error(f"移除任务 {job_id} 失败: {e}")
             return False
 
@@ -305,14 +319,39 @@ class TaskSchedulerManager:
                         logger.error(f"[线程 {thread_name}] 任务 {task_id} 不存在")
                         return
 
+                    # 二次检查：确保没有正在运行的相同任务实例
+                    # 这可以防止手动触发与自动调度之间的竞争
+                    active_execution = (
+                        db.query(TaskExecution)
+                        .filter(
+                            TaskExecution.task_id == task_id,
+                            TaskExecution.status.in_([TaskStatus.RUNNING, TaskStatus.PAUSED])
+                        )
+                        .first()
+                    )
+                    if active_execution:
+                        logger.warning(f"[线程 {thread_name}] 任务 {task_obj.name} 已有活跃执行记录(ID: {active_execution.id})，跳过本次执行")
+                        return
+
                     if not task_obj.task_type:
                         logger.error(f"[线程 {thread_name}] 任务 {task_id} 的 task_type 为空")
                         return
 
                     # 创建执行记录
-                    execution = TaskExecution(task_id=task_obj.id, status=TaskStatus.RUNNING, start_time=datetime.now())
+                    execution = TaskExecution(
+                        task_id=task_obj.id, 
+                        status=TaskStatus.RUNNING, 
+                        start_time=datetime.now(),
+                        created_by="scheduler",  # 定时任务由调度器创建
+                        updated_by="scheduler",
+                    )
                     db.add(execution)
                     db.commit()
+                    db.refresh(execution)
+
+                    # 重命名线程，包含执行记录ID，便于后续存活检查
+                    thread_name = f"TaskThread-{task_id}-Exec-{execution.id}"
+                    threading.current_thread().name = thread_name
 
                     logger.info(f"[线程 {thread_name}] 任务 {task_obj.name} 开始执行")
 
@@ -328,6 +367,7 @@ class TaskSchedulerManager:
 
                     # 更新执行记录
                     execution.status = TaskStatus.SUCCESS
+                    execution.progress_percent = 100  # 确保执行成功后进度为100%
                     execution.end_time = datetime.now()
                     execution.duration_seconds = int((execution.end_time - execution.start_time).total_seconds())
                     execution.set_result(result)
@@ -342,13 +382,21 @@ class TaskSchedulerManager:
                     )
 
                     if execution:
-                        execution.status = TaskStatus.FAILED
-                        execution.end_time = datetime.now()
-                        if execution.start_time:
-                            execution.duration_seconds = int(
-                                (execution.end_time - execution.start_time).total_seconds()
-                            )
-                        execution.error_message = error_msg
+                        # 如果已经是终止状态，则不要覆盖为 FAILED
+                        try:
+                            db.rollback() # 结束当前事务快照
+                            db.refresh(execution)
+                        except Exception as refresh_error:
+                            logger.warning(f"刷新执行记录状态失败: {refresh_error}")
+                            
+                        if execution.status != TaskStatus.TERMINATED:
+                            execution.status = TaskStatus.FAILED
+                            execution.end_time = datetime.now()
+                            if execution.start_time:
+                                execution.duration_seconds = int(
+                                    (execution.end_time - execution.start_time).total_seconds()
+                                )
+                            execution.error_message = error_msg
                         db.commit()
 
                     # 重试逻辑
@@ -413,6 +461,8 @@ class TaskSchedulerManager:
                         status=TaskStatus.RUNNING,
                         start_time=datetime.now(),
                         retry_count=recent_execution.retry_count + 1,
+                        created_by="scheduler",  # 重试任务由调度器创建
+                        updated_by="scheduler",
                     )
                     retry_db.add(retry_execution)
                     retry_db.commit()

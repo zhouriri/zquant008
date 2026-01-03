@@ -42,6 +42,11 @@ class ConfigItem(BaseModel):
         from_attributes = True
 
 
+class ConfigListRequest(BaseModel):
+    """配置列表查询请求模型"""
+    include_sensitive: bool = Field(False, description="是否包含敏感值")
+
+
 class ConfigRequest(BaseModel):
     """获取配置请求"""
 
@@ -78,8 +83,14 @@ class ConfigCreateRequest(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     """更新配置请求"""
 
+    config_key: str = Field(..., description="配置键")
     config_value: str | None = Field(None, description="配置值（明文，会自动加密）")
     comment: str | None = Field(None, description="配置说明")
+
+
+class ConfigDeleteRequest(BaseModel):
+    """删除配置请求"""
+    config_key: str = Field(..., description="配置键")
 
 
 class TushareTokenTestRequest(BaseModel):

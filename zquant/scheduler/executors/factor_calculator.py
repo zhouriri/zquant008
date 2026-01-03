@@ -92,6 +92,7 @@ class FactorCalculatorExecutor(TaskExecutor):
                 start_date=start_date,
                 end_date=end_date,
                 extra_info=extra_info,
+                execution=execution,
             )
 
             logger.info(

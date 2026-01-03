@@ -56,6 +56,7 @@ K线数据同步脚本
 """
 
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -73,6 +74,7 @@ from loguru import logger
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.models.data import Tustock
 from zquant.scheduler.job.base import BaseSyncJob
+from zquant.models.scheduler import TaskExecution
 
 __job_name__ = "sync_daily_data"
 
@@ -94,16 +96,31 @@ class SyncDailyDataJob(BaseSyncJob):
         )
         return parser
 
+    def get_execution(self, db) -> TaskExecution | None:
+        """
+        从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+        """
+        execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+        if not execution_id_str:
+            logger.debug("环境变量 ZQUANT_EXECUTION_ID 未设置，无法更新进度")
+            return None
+
+        try:
+            execution_id = int(execution_id_str)
+            execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+            if execution:
+                logger.debug(f"获取到执行记录: {execution_id}")
+                return execution
+            else:
+                logger.warning(f"执行记录 {execution_id} 不存在")
+                return None
+        except (ValueError, Exception) as e:
+            logger.warning(f"获取执行记录失败: {e}")
+            return None
+
     def _convert_codes_to_ts_codes(self, db, codes: list[str]) -> list[str]:
         """
         将纯代码列表转换为TS代码列表
-
-        Args:
-            db: 数据库会话
-            codes: 纯代码列表（如：['000001', '600000']）
-
-        Returns:
-            TS代码列表（如：['000001.SZ', '600000.SH']）
         """
         ts_codes = []
         for code in codes:
@@ -181,6 +198,9 @@ class SyncDailyDataJob(BaseSyncJob):
                     return 1
                 logger.info(f"代码列表 {codelist} 转换为TS代码列表: {ts_code_list}")
 
+            # 获取执行记录（用于进度更新）
+            execution = self.get_execution(db)
+
             # 打印开始信息
             start_date_obj = datetime.strptime(start_date, "%Y%m%d").date()
             end_date_obj = datetime.strptime(end_date, "%Y%m%d").date()
@@ -202,13 +222,13 @@ class SyncDailyDataJob(BaseSyncJob):
             if ts_code:
                 # 规则二：同步单只股票（至少有一个参数传入）
                 logger.info(f"开始同步 {ts_code} 日线数据...")
-                count = scheduler.sync_daily_data(db, ts_code, start_date, end_date, extra_info=extra_info)
+                count = scheduler.sync_daily_data(db, ts_code, start_date, end_date, extra_info=extra_info, execution=execution)
                 self.print_end_info(TS代码=ts_code, 同步记录数=str(count))
             elif ts_code_list:
                 # 规则二：同步股票列表（至少有一个参数传入）
                 logger.info(f"开始同步 {len(ts_code_list)} 只股票的日线数据...")
                 result_summary = scheduler.sync_all_daily_data(
-                    db, start_date, end_date, extra_info=extra_info, codelist=ts_code_list
+                    db, start_date, end_date, extra_info=extra_info, codelist=ts_code_list, execution=execution
                 )
                 self.print_end_info(
                     总股票数=str(result_summary.get("total", 0)),
@@ -222,7 +242,7 @@ class SyncDailyDataJob(BaseSyncJob):
                     logger.info("规则一：所有参数均未传入，使用批量API获取所有股票的最后一个交易日数据...")
                 else:
                     logger.info("规则二：开始同步所有股票日线数据（循环调用API）...")
-                result_summary = scheduler.sync_all_daily_data(db, start_date, end_date, extra_info=extra_info)
+                result_summary = scheduler.sync_all_daily_data(db, start_date, end_date, extra_info=extra_info, execution=execution)
                 self.print_end_info(
                     总股票数=str(result_summary.get("total", 0)),
                     成功=str(result_summary.get("success", 0)),

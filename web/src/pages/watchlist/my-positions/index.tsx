@@ -23,7 +23,6 @@
 import {
   ProForm,
   ProFormDatePicker,
-  ProFormDateRangePicker,
   ProFormDigit,
   ProFormInstance,
   ProFormSelect,
@@ -333,9 +332,9 @@ const MyPositions: React.FC = () => {
       if (values.code) {
         params.code = values.code;
       }
-      if (values.dateRange && values.dateRange.length === 2) {
-        params.start_date = values.dateRange[0].format('YYYY-MM-DD');
-        params.end_date = values.dateRange[1].format('YYYY-MM-DD');
+      if (values.start_date && values.end_date) {
+        params.start_date = values.start_date.format('YYYY-MM-DD');
+        params.end_date = values.end_date.format('YYYY-MM-DD');
       }
 
       const response = await getPositions(params);
@@ -363,6 +362,11 @@ const MyPositions: React.FC = () => {
             pageCache.saveFormValues(formValues);
           }
         }}
+        initialValues={{
+          code: '000001',
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
+        }}
         submitter={{
           render: (props, doms) => {
             return (
@@ -389,9 +393,13 @@ const MyPositions: React.FC = () => {
           placeholder="请输入股票代码，如：000001"
           width="sm"
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="买入日期范围"
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
         />
       </ProForm>
 

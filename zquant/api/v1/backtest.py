@@ -27,19 +27,28 @@
 import json
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from zquant.api.deps import get_current_active_user
 from zquant.database import get_db
 from zquant.models.user import User
 from zquant.schemas.backtest import (
+    BacktestResultDeleteRequest,
+    BacktestResultGetRequest,
+    BacktestResultListRequest,
     BacktestResultResponse,
     BacktestRunRequest,
+    BacktestTaskGetRequest,
+    BacktestTaskListRequest,
     BacktestTaskResponse,
     PerformanceResponse,
     StrategyCreateRequest,
+    StrategyDeleteRequest,
     StrategyFrameworkResponse,
+    StrategyGetRequest,
+    StrategyListRequest,
     StrategyResponse,
     StrategyUpdateRequest,
 )
@@ -79,7 +88,7 @@ def _build_task_response(task) -> BacktestTaskResponse:
         strategy_name=task.strategy_name,
         status=task.status.value,
         error_message=task.error_message,
-        created_at=task.created_at,
+        created_time=task.created_time,
         started_at=task.started_at,
         completed_at=task.completed_at,
         start_date=start_date,
@@ -101,12 +110,13 @@ def run_backtest(
             request.config.dict(),
             strategy_id=request.strategy_id,
             strategy_code=request.strategy_code,
+            created_by=current_user.username,
         )
 
         # 异步运行回测（这里简化处理，直接同步运行）
         # 生产环境应使用Celery异步任务
         try:
-            BacktestService.run_backtest(db, task.id)
+            BacktestService.run_backtest(db, task.id, updated_by=current_user.username)
         except Exception:
             # 错误已在任务中记录
             pass
@@ -117,49 +127,59 @@ def run_backtest(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建回测任务失败: {e!s}")
+        logger.error(f"创建回测任务失败: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="创建回测任务失败")
 
 
-@router.get("/tasks", response_model=list[BacktestTaskResponse], summary="获取回测任务列表")
+@router.post("/tasks", response_model=list[BacktestTaskResponse], summary="获取回测任务列表")
 def get_backtest_tasks(
-    skip: int = 0,
-    limit: int = 100,
-    order_by: str | None = Query(None, description="排序字段：id, name, status, created_at, updated_at"),
-    order: str | None = Query("desc", description="排序方向：asc 或 desc"),
+    request: BacktestTaskListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """获取当前用户的所有回测任务（支持排序）"""
-    tasks = BacktestService.get_user_tasks(db, current_user.id, skip, limit, order_by=order_by, order=order)
+    """获取当前用户的所有回测任务列表"""
+    tasks = BacktestService.get_user_tasks(
+        db, current_user.id, request.skip, request.limit, order_by=request.order_by, order=request.order
+    )
     return [_build_task_response(task) for task in tasks]
 
 
-@router.get("/tasks/{task_id}", response_model=BacktestTaskResponse, summary="获取回测任务")
+@router.post("/tasks/get", response_model=BacktestTaskResponse, summary="获取回测任务详情")
 def get_backtest_task(
-    task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: BacktestTaskGetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """获取回测任务详情"""
-    task = BacktestService.get_task(db, task_id, current_user.id)
+    """获取单个回测任务详情"""
+    task = BacktestService.get_task(db, request.task_id, current_user.id)
     if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"回测任务 {task_id} 不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="回测任务不存在")
     return _build_task_response(task)
 
 
-@router.get("/tasks/{task_id}/result", response_model=BacktestResultResponse, summary="获取回测结果")
+@router.post("/tasks/result", response_model=BacktestResultResponse, summary="获取回测结果详情")
 def get_backtest_result(
-    task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: BacktestResultGetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """获取回测结果"""
-    result = BacktestService.get_result(db, task_id, current_user.id)
+    """获取回测结果详情（仅基本信息）"""
+    result = BacktestService.get_result(db, request.task_id, current_user.id)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="回测结果不存在")
     return result
 
 
-@router.get("/tasks/{task_id}/performance", response_model=PerformanceResponse, summary="获取绩效报告")
-def get_performance(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+
+
+@router.post("/tasks/performance", response_model=PerformanceResponse, summary="获取绩效报告")
+def get_performance(
+    request: BacktestResultGetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """获取绩效报告（包含详细指标、交易记录、投资组合）"""
-    result = BacktestService.get_result(db, task_id, current_user.id)
+    result = BacktestService.get_result(db, request.task_id, current_user.id)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="回测结果不存在")
 
@@ -175,7 +195,7 @@ def get_performance(task_id: int, db: Session = Depends(get_db), current_user: U
 # ========== 策略管理API ==========
 
 
-@router.get("/strategies/framework", response_model=StrategyFrameworkResponse, summary="获取策略框架代码")
+@router.post("/strategies/framework", response_model=StrategyFrameworkResponse, summary="获取策略框架代码")
 def get_strategy_framework():
     """获取策略框架代码模板"""
     framework_code = """from zquant.backtest.context import Context
@@ -243,22 +263,17 @@ def create_strategy(
             request.category,
             request.params_schema,
             request.is_template,
+            created_by=current_user.username,
         )
         return strategy
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建策略失败: {e!s}")
+        logger.error(f"创建策略失败: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="创建策略失败")
 
 
-@router.get("/strategies", response_model=list[StrategyResponse], summary="获取策略列表")
+@router.post("/strategies/list", response_model=list[StrategyResponse], summary="获取策略列表")
 def get_strategies(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    category: str | None = Query(None, description="策略分类筛选"),
-    search: str | None = Query(None, description="搜索关键词（名称或描述）"),
-    is_template: bool | None = Query(None, description="是否为模板策略"),
-    order_by: str | None = Query(None, description="排序字段：id, name, category, created_at, updated_at"),
-    order: str = Query("desc", description="排序方向：asc 或 desc"),
-    include_all: bool = Query(False, description="是否包含所有可操作策略（包括模板策略和其他用户的策略）"),
+    request: StrategyListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -268,29 +283,29 @@ def get_strategies(
     - 如果 include_all=False：仅返回当前用户的策略
     - 如果 include_all=True：返回所有可操作策略（用户自己的策略 + 模板策略 + 其他用户的策略）
     """
-    if include_all:
+    if request.include_all:
         strategies = StrategyService.list_all_operable_strategies(
             db,
             current_user.id,
-            skip,
-            limit,
-            category=category,
-            search=search,
-            is_template=is_template,
-            order_by=order_by,
-            order=order,
+            request.skip,
+            request.limit,
+            category=request.category,
+            search=request.search,
+            is_template=request.is_template,
+            order_by=request.order_by,
+            order=request.order,
         )
     else:
         strategies = StrategyService.list_strategies(
             db,
             current_user.id,
-            skip,
-            limit,
-            category=category,
-            search=search,
-            is_template=is_template,
-            order_by=order_by,
-            order=order,
+            request.skip,
+            request.limit,
+            category=request.category,
+            search=request.search,
+            is_template=request.is_template,
+            order_by=request.order_by,
+            order=request.order,
         )
 
     # 添加权限字段
@@ -317,8 +332,8 @@ def get_strategies(
             "code": strategy.code,
             "params_schema": strategy.params_schema,
             "is_template": strategy.is_template,
-            "created_at": strategy.created_at,
-            "updated_at": strategy.updated_at,
+            "created_time": strategy.created_time,
+            "updated_time": strategy.updated_time,
             "can_edit": can_edit,
             "can_delete": can_delete,
         }
@@ -327,33 +342,59 @@ def get_strategies(
     return result
 
 
-@router.get("/strategies/templates", response_model=list[StrategyResponse], summary="获取模板策略列表")
+@router.post("/strategies/get", response_model=StrategyResponse, summary="获取策略详情")
+def get_strategy(
+    request: StrategyGetRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取单个策略详情"""
+    strategy = StrategyService.get_strategy(db, request.strategy_id, current_user.id)
+    if not strategy:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="策略不存在")
+    
+    # 判断是否可以编辑
+    can_edit = strategy.user_id == current_user.id
+    if strategy.is_template and strategy.user_id != current_user.id:
+        can_edit = False
+
+    # 判断是否可以删除
+    can_delete = strategy.user_id == current_user.id
+    if strategy.is_template and strategy.user_id != current_user.id:
+        can_delete = False
+
+    strategy_dict = {
+        "id": strategy.id,
+        "user_id": strategy.user_id,
+        "name": strategy.name,
+        "description": strategy.description,
+        "category": strategy.category,
+        "code": strategy.code,
+        "params_schema": strategy.params_schema,
+        "is_template": strategy.is_template,
+        "created_time": strategy.created_time,
+        "updated_time": strategy.updated_time,
+        "can_edit": can_edit,
+        "can_delete": can_delete,
+    }
+    return StrategyResponse(**strategy_dict)
+
+
+@router.post("/strategies/templates", response_model=list[StrategyResponse], summary="获取模板策略列表")
 def get_template_strategies(
-    category: str | None = Query(None, description="策略分类筛选"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    request: StrategyListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """获取模板策略列表（所有用户可见）"""
-    strategies = StrategyService.get_template_strategies(db, category=category, skip=skip, limit=limit)
+    strategies = StrategyService.get_template_strategies(
+        db, category=request.category, skip=request.skip, limit=request.limit
+    )
     return strategies
 
 
-@router.get("/strategies/{strategy_id}", response_model=StrategyResponse, summary="获取策略详情")
-def get_strategy(
-    strategy_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
-):
-    """获取策略详情"""
-    strategy = StrategyService.get_strategy(db, strategy_id, current_user.id)
-    if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"策略 {strategy_id} 不存在")
-    return strategy
-
-
-@router.put("/strategies/{strategy_id}", response_model=StrategyResponse, summary="更新策略")
+@router.post("/strategies/update", response_model=StrategyResponse, summary="更新策略")
 def update_strategy(
-    strategy_id: int,
     request: StrategyUpdateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -362,62 +403,66 @@ def update_strategy(
     try:
         strategy = StrategyService.update_strategy(
             db,
-            strategy_id,
+            request.strategy_id,
             current_user.id,
             name=request.name,
             description=request.description,
             category=request.category,
             code=request.code,
             params_schema=request.params_schema,
+            updated_by=current_user.username,
         )
         if not strategy:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"策略 {strategy_id} 不存在")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"策略 {request.strategy_id} 不存在")
         return strategy
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"更新策略失败: {e!s}")
+        logger.error(f"更新策略失败: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="更新策略失败")
 
 
-@router.delete("/strategies/{strategy_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除策略")
+@router.post("/strategies/delete", status_code=status.HTTP_204_NO_CONTENT, summary="删除策略")
 def delete_strategy(
-    strategy_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: StrategyDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """删除策略"""
     try:
-        success = StrategyService.delete_strategy(db, strategy_id, current_user.id)
+        success = StrategyService.delete_strategy(db, request.strategy_id, current_user.id)
         if not success:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"策略 {strategy_id} 不存在")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"策略 {request.strategy_id} 不存在")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"删除策略失败: {e!s}")
+        logger.error(f"删除策略失败: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="删除策略失败")
 
 
 # ========== 回测结果管理API ==========
 
 
-@router.get("/results", response_model=list[BacktestResultResponse], summary="获取回测结果列表")
+@router.post("/results", response_model=list[BacktestResultResponse], summary="获取回测结果列表")
 def get_backtest_results(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    order_by: str | None = Query(
-        None, description="排序字段：id, task_id, total_return, annual_return, sharpe_ratio, created_at"
-    ),
-    order: str = Query("desc", description="排序方向：asc 或 desc"),
+    request: BacktestResultListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """获取当前用户的所有回测结果列表（支持排序）"""
-    results = BacktestService.list_results(db, current_user.id, skip, limit, order_by=order_by, order=order)
+    results = BacktestService.list_results(
+        db, current_user.id, request.skip, request.limit, order_by=request.order_by, order=request.order
+    )
     return results
 
 
-@router.delete("/results/{result_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除回测结果")
+@router.post("/results/delete", status_code=status.HTTP_204_NO_CONTENT, summary="删除回测结果")
 def delete_backtest_result(
-    result_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: BacktestResultDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """删除回测结果（级联删除任务）"""
-    success = BacktestService.delete_result(db, result_id, current_user.id)
+    success = BacktestService.delete_result(db, request.result_id, current_user.id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"回测结果 {result_id} 不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"回测结果 {request.result_id} 不存在")

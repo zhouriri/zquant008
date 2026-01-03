@@ -129,6 +129,34 @@ class DateHelper:
             return []
 
     @staticmethod
+    def format_duration(seconds: float | None) -> str:
+        """
+        格式化时长（秒 -> 时分秒）
+
+        Args:
+            seconds: 时长（秒）
+
+        Returns:
+            格式化后的字符串，如：1小时2分3秒
+        """
+        if seconds is None:
+            return "-"
+
+        seconds = int(seconds)
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        s = seconds % 60
+
+        parts = []
+        if h > 0:
+            parts.append(f"{h}小时")
+        if m > 0 or h > 0:
+            parts.append(f"{m}分")
+        parts.append(f"{s}秒")
+
+        return "".join(parts)
+
+    @staticmethod
     def format_date_range(
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,

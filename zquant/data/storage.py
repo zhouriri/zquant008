@@ -245,7 +245,9 @@ class DataStorage:
         grouped = all_data_df.groupby("ts_code")
 
         for ts_code, group_df in grouped:
-            table_name = f"zq_data_tustock_daily_{ts_code.replace('.', '_')}"
+            from zquant.models.data import get_daily_table_name
+
+            table_name = get_daily_table_name(ts_code)
             try:
                 # 使用现有的单股票写入方法
                 count = DataStorage.upsert_daily_data(db, group_df, ts_code, extra_info, update_view=False)
@@ -405,7 +407,9 @@ class DataStorage:
         grouped = all_data_df.groupby("ts_code")
 
         for ts_code, group_df in grouped:
-            table_name = f"zq_data_tustock_daily_basic_{ts_code.replace('.', '_')}"
+            from zquant.models.data import get_daily_basic_table_name
+
+            table_name = get_daily_basic_table_name(ts_code)
             try:
                 # 使用现有的单股票写入方法
                 count = DataStorage.upsert_daily_basic_data(db, group_df, ts_code, extra_info, update_view=False)
@@ -542,10 +546,10 @@ class DataStorage:
             records.append(record)
 
         stmt = insert(Fundamental).values(records)
-        # 财务数据的更新字典需要特殊处理（使用updated_at而不是updated_time）
+        # 财务数据的更新字典需要特殊处理
         update_dict = {
             "data_json": stmt.inserted.data_json,
-            "updated_at": datetime.now(),
+            "updated_time": func.now(),
         }
         # 设置updated_by
         update_dict["updated_by"] = "system"
@@ -1132,12 +1136,8 @@ class DataStorage:
             )
 
         # 更新视图逻辑：
-        # 1. 如果表是新创建的，无论 update_view 参数如何，都必须更新视图（新表必须加入视图）
-        # 2. 如果表已存在，按照 update_view 参数决定是否更新视图
-        if is_new_table:
-            logger.info(f"[数据存储] upsert_stkfactorpro_data - 检测到新表 {table_name}，强制更新视图以确保新表被包含")
-            create_or_update_stkfactorpro_view(db)
-        elif update_view:
+        # 按照 update_view 参数决定是否更新视图
+        if update_view:
             create_or_update_stkfactorpro_view(db)
 
         return count

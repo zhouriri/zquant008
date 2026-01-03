@@ -26,7 +26,7 @@
 
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -37,6 +37,8 @@ from zquant.models.data import StockPosition, Tustock
 from zquant.models.user import User
 from zquant.schemas.user import (
     PositionCreate,
+    PositionDeleteRequest,
+    PositionGetRequest,
     PositionListRequest,
     PositionListResponse,
     PositionResponse,
@@ -98,18 +100,12 @@ def create_position(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"创建持仓失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建持仓失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="创建持仓失败")
 
 
-@router.get("", response_model=PositionListResponse, summary="查询持仓列表")
+@router.post("/query", response_model=PositionListResponse, summary="查询持仓列表")
 def get_positions(
-    code: str | None = Query(None, description="股票代码（精确查询）"),
-    start_date: str | None = Query(None, description="开始日期（买入日期范围，YYYY-MM-DD格式）"),
-    end_date: str | None = Query(None, description="结束日期（买入日期范围，YYYY-MM-DD格式）"),
-    skip: int = Query(0, ge=0, description="跳过记录数"),
-    limit: int = Query(100, ge=1, le=1000, description="每页记录数"),
-    order_by: str | None = Query("created_time", description="排序字段：id, code, buy_date, created_time"),
-    order: str | None = Query("desc", description="排序方向：asc 或 desc"),
+    request: PositionListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -119,54 +115,54 @@ def get_positions(
 
         start_date_obj = None
         end_date_obj = None
-        if start_date:
-            start_date_obj = date_type.fromisoformat(start_date)
-        if end_date:
-            end_date_obj = date_type.fromisoformat(end_date)
+        if request.start_date:
+            start_date_obj = date_type.fromisoformat(request.start_date)
+        if request.end_date:
+            end_date_obj = date_type.fromisoformat(request.end_date)
 
         positions, total = PositionService.get_positions(
             db,
             current_user.id,
-            code=code,
+            code=request.code,
             start_date=start_date_obj,
             end_date=end_date_obj,
-            skip=skip,
-            limit=limit,
-            order_by=order_by or "created_time",
-            order=order or "desc",
+            skip=request.skip,
+            limit=request.limit,
+            order_by=request.order_by or "created_time",
+            order=request.order or "desc",
         )
 
         # 丰富响应数据
         items = [_enrich_position_response(pos, db) for pos in positions]
 
-        return PositionListResponse(items=items, total=total, skip=skip, limit=limit)
+        return PositionListResponse(items=items, total=total, skip=request.skip, limit=request.limit)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"日期格式错误: {str(e)}")
+        logger.error(f"日期格式错误: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="日期格式错误")
     except Exception as e:
         logger.error(f"查询持仓列表失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"查询持仓列表失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询持仓列表失败")
 
 
-@router.get("/{position_id}", response_model=PositionResponse, summary="查询单个持仓详情")
+@router.post("/get", response_model=PositionResponse, summary="查询单个持仓详情")
 def get_position(
-    position_id: int,
+    request: PositionGetRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """查询单个持仓详情"""
     try:
-        position = PositionService.get_position_by_id(db, position_id, current_user.id)
+        position = PositionService.get_position_by_id(db, request.position_id, current_user.id)
         return _enrich_position_response(position, db)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"查询持仓详情失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"查询持仓详情失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询持仓详情失败")
 
 
-@router.put("/{position_id}", response_model=PositionResponse, summary="更新持仓")
+@router.post("/update", response_model=PositionResponse, summary="更新持仓")
 def update_position(
-    position_id: int,
     position_data: PositionUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -174,28 +170,28 @@ def update_position(
     """更新持仓"""
     try:
         position = PositionService.update_position(
-            db, position_id, current_user.id, position_data, updated_by=current_user.username
+            db, position_data.position_id, current_user.id, position_data, updated_by=current_user.username
         )
         return _enrich_position_response(position, db)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"更新持仓失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"更新持仓失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="更新持仓失败")
 
 
-@router.delete("/{position_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除持仓")
+@router.post("/delete", status_code=status.HTTP_204_NO_CONTENT, summary="删除持仓")
 def delete_position(
-    position_id: int,
+    request: PositionDeleteRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """删除持仓"""
     try:
-        PositionService.delete_position(db, position_id, current_user.id)
+        PositionService.delete_position(db, request.position_id, current_user.id)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"删除持仓失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"删除持仓失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="删除持仓失败")
 

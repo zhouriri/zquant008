@@ -123,9 +123,9 @@ const APIKeys: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
-      sorter: (a, b) => dayjs(a.created_at).valueOf() - dayjs(b.created_at).valueOf(),
+      sorter: (a, b) => dayjs(a.created_time).valueOf() - dayjs(b.created_time).valueOf(),
       render: (text) => dayjs(text).format('YYYY-MM-DD HH:mm:ss'),
     },
     {

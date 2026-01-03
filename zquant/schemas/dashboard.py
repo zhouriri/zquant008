@@ -24,6 +24,7 @@
 系统大盘相关Pydantic模型
 """
 
+from datetime import date, datetime
 from pydantic import BaseModel, Field
 
 
@@ -32,9 +33,9 @@ class SyncStatusResponse(BaseModel):
 
     tushare_connection_status: bool = Field(..., description="Tushare同步链路是否正常")
     is_trading_day: bool = Field(..., description="当日是否交易日")
-    latest_trade_date_from_api: str | None = Field(None, description="Tushare接口返回的最新日线行情数据的交易日期（YYYY-MM-DD格式）")
+    latest_trade_date_from_api: date | str | None = Field(None, description="Tushare接口返回的最新日线行情数据的交易日期（YYYY-MM-DD格式）")
     today_data_ready: bool = Field(..., description="当日日线行情数据是否已准备就绪")
-    latest_trade_date_in_db: str | None = Field(None, description="数据库中最新日线数据的交易日期（YYYY-MM-DD格式）")
+    latest_trade_date_in_db: date | str | None = Field(None, description="数据库中最新日线数据的交易日期（YYYY-MM-DD格式）")
 
 
 class TaskStatsResponse(BaseModel):
@@ -57,17 +58,17 @@ class LatestOperationLogItem(BaseModel):
     insert_count: int = Field(0, description="插入记录数")
     update_count: int = Field(0, description="更新记录数")
     delete_count: int = Field(0, description="删除记录数")
-    start_time: str | None = Field(None, description="开始时间（ISO格式）")
-    end_time: str | None = Field(None, description="结束时间（ISO格式）")
+    start_time: datetime | str | None = Field(None, description="开始时间（ISO格式）")
+    end_time: datetime | str | None = Field(None, description="结束时间（ISO格式）")
     duration_seconds: float | None = Field(None, description="耗时(秒)")
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
 
 
 class LatestTableStatisticsItem(BaseModel):
     """最新表统计项"""
 
-    stat_date: str | None = Field(None, description="统计日期（ISO格式）")
+    stat_date: date | str | None = Field(None, description="统计日期（ISO格式）")
     table_name: str = Field(..., description="表名")
     is_split_table: bool = Field(False, description="是否分表")
     split_count: int = Field(0, description="分表个数")
@@ -76,8 +77,8 @@ class LatestTableStatisticsItem(BaseModel):
     daily_insert_count: int = Field(0, description="日新增记录数")
     daily_update_count: int = Field(0, description="日更新记录数")
     created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
-    updated_time: str | None = Field(None, description="更新时间（ISO格式）")
+    created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
+    updated_time: datetime | str | None = Field(None, description="更新时间（ISO格式）")
 
 
 class LatestDataResponse(BaseModel):

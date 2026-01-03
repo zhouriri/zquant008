@@ -41,6 +41,7 @@ from zquant.database import Base, engine
 def log_sql_statement(stmt: Any, params: dict | None = None) -> None:
     """
     打印SQL语句（用于调试）
+    日志级别为INFO，确保同时输出到控制台和日志文件
 
     Args:
         stmt: SQLAlchemy语句对象或SQL字符串
@@ -51,27 +52,27 @@ def log_sql_statement(stmt: Any, params: dict | None = None) -> None:
             # 原生SQL字符串
             sql_str = stmt
             if params:
-                logger.debug(f"[SQL] {sql_str}")
-                logger.debug(f"[SQL Params] {params}")
+                logger.info(f"[SQL] {sql_str}")
+                logger.info(f"[SQL Params] {params}")
             else:
-                logger.debug(f"[SQL] {sql_str}")
+                logger.info(f"[SQL] {sql_str}")
         elif hasattr(stmt, "compile"):
             # SQLAlchemy语句对象
             # 使用MySQL方言编译，获取更准确的SQL
             compiled = stmt.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True})
             sql_str = str(compiled)
-            logger.debug(f"[SQL] {sql_str}")
+            logger.info(f"[SQL] {sql_str}")
             if params:
-                logger.debug(f"[SQL Params] {params}")
+                logger.info(f"[SQL Params] {params}")
         else:
             # 其他类型，尝试转换为字符串
             sql_str = str(stmt)
-            logger.debug(f"[SQL] {sql_str}")
+            logger.info(f"[SQL] {sql_str}")
             if params:
-                logger.debug(f"[SQL Params] {params}")
+                logger.info(f"[SQL Params] {params}")
     except Exception as e:
         # 如果打印SQL失败，不影响主流程
-        logger.debug(f"[SQL] 无法打印SQL语句: {e}")
+        logger.info(f"[SQL] 无法打印SQL语句: {e}")
 
 
 def ensure_table_exists(db: Session, model_class, table_name: str | None = None) -> bool:

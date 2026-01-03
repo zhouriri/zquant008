@@ -85,6 +85,7 @@ interface DataTableProps<T = any> {
   loading?: boolean;
   scrollX?: number;
   pageSize?: number;
+  rowClassName?: (record: T, index: number) => string;
 }
 
 export function DataTable<T = any>({
@@ -93,6 +94,7 @@ export function DataTable<T = any>({
   loading = false,
   scrollX = 1600,
   pageSize = 20,
+  rowClassName,
 }: DataTableProps<T>) {
   return (
     <ProTable<T>
@@ -106,6 +108,7 @@ export function DataTable<T = any>({
         showSizeChanger: true,
       }}
       style={{ marginTop: 16 }}
+      rowClassName={rowClassName}
     />
   );
 }

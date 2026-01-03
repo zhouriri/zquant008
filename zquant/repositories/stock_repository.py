@@ -157,11 +157,24 @@ class StockRepository:
                     "ts_code": stock.ts_code,
                     "symbol": stock.symbol,
                     "name": stock.name,
-                    "exchange": stock.exchange,
+                    "area": stock.area,
+                    "industry": stock.industry,
+                    "fullname": stock.fullname,
+                    "enname": stock.enname,
+                    "cnspell": stock.cnspell,
                     "market": stock.market,
+                    "exchange": stock.exchange,
+                    "curr_type": stock.curr_type,
                     "list_status": stock.list_status,
                     "list_date": stock.list_date.isoformat() if stock.list_date else None,
                     "delist_date": stock.delist_date.isoformat() if stock.delist_date else None,
+                    "is_hs": stock.is_hs,
+                    "act_name": stock.act_name,
+                    "act_ent_type": stock.act_ent_type,
+                    "created_by": stock.created_by,
+                    "created_time": stock.created_time.isoformat() if stock.created_time else None,
+                    "updated_by": stock.updated_by,
+                    "updated_time": stock.updated_time.isoformat() if stock.updated_time else None,
                 }
                 # 缓存1小时
                 import json
@@ -222,6 +235,12 @@ class StockRepository:
                         "list_date": stock.list_date.isoformat() if stock.list_date else None,
                         "delist_date": stock.delist_date.isoformat() if stock.delist_date else None,
                         "is_hs": stock.is_hs,
+                        "act_name": stock.act_name,
+                        "act_ent_type": stock.act_ent_type,
+                        "created_by": stock.created_by,
+                        "created_time": stock.created_time.isoformat() if stock.created_time else None,
+                        "updated_by": stock.updated_by,
+                        "updated_time": stock.updated_time.isoformat() if stock.updated_time else None,
                     }
                 )
             return result

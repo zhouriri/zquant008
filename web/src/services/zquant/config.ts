@@ -24,23 +24,30 @@ import { request } from '@umijs/max';
 
 /**
  * 获取配置
- * GET /api/v1/config/{config_key}
+ * POST /api/v1/config/get
  */
 export async function getConfig(configKey: string) {
-  return request<ZQuant.ConfigResponse>(`/api/v1/config/${configKey}`, {
-    method: 'GET',
+  return request<ZQuant.ConfigResponse>('/api/v1/config/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { config_key: configKey },
   });
 }
 
 /**
  * 获取所有配置列表
- * GET /api/v1/config
+ * POST /api/v1/config/query
  */
 export async function getAllConfigs(includeSensitive?: boolean) {
-  return request<ZQuant.ConfigListResponse>('/api/v1/config', {
-    method: 'GET',
-    params: {
-      include_sensitive: includeSensitive,
+  return request<ZQuant.ConfigListResponse>('/api/v1/config/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {
+      include_sensitive: includeSensitive || false,
     },
   });
 }
@@ -61,25 +68,29 @@ export async function setConfig(body: ZQuant.ConfigCreateRequest) {
 
 /**
  * 更新配置
- * PUT /api/v1/config/{config_key}
+ * POST /api/v1/config/update
  */
 export async function updateConfig(configKey: string, body: ZQuant.ConfigUpdateRequest) {
-  return request<ZQuant.ConfigResponse>(`/api/v1/config/${configKey}`, {
-    method: 'PUT',
+  return request<ZQuant.ConfigResponse>('/api/v1/config/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, config_key: configKey },
   });
 }
 
 /**
  * 删除配置
- * DELETE /api/v1/config/{config_key}
+ * POST /api/v1/config/delete
  */
 export async function deleteConfig(configKey: string) {
-  return request<{ success: boolean; message: string }>(`/api/v1/config/${configKey}`, {
-    method: 'DELETE',
+  return request<{ success: boolean; message: string }>('/api/v1/config/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { config_key: configKey },
   });
 }
 

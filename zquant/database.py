@@ -29,9 +29,10 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, Column, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql import func
 from loguru import logger
 
 from zquant.config import settings
@@ -65,13 +66,13 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
 @event.listens_for(engine, "checkout")
 def receive_checkout(dbapi_conn, connection_record, connection_proxy):
     """连接从池中取出时的回调"""
-    logger.debug("数据库连接从池中取出")
+    pass
 
 
 @event.listens_for(engine, "checkin")
 def receive_checkin(dbapi_conn, connection_record):
     """连接归还到池中时的回调"""
-    logger.debug("数据库连接归还到池中")
+    pass
 
 
 # 创建会话工厂
@@ -79,6 +80,17 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 声明基类
 Base = declarative_base()
+
+
+class AuditMixin:
+    """审计字段 Mixin"""
+
+    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
+    created_time = Column(DateTime, default=func.now(), nullable=False, index=True, info={"name": "创建时间"}, comment="创建时间")
+    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
+    updated_time = Column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False, index=True, info={"name": "修改时间"}, comment="修改时间"
+    )
 
 
 def get_db() -> Generator[Session, None, None]:

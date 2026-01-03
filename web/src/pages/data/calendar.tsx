@@ -20,7 +20,7 @@
 //     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 //     - Repository: https://github.com/yoyoung/zquant
 
-import { ProForm, ProFormDateRangePicker, ProFormSelect, ProTable } from '@ant-design/pro-components';
+import { ProForm, ProFormDatePicker, ProFormSelect, ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ProFormInstance } from '@ant-design/pro-components';
 import { Button, Card, message, Tag, Segmented, Calendar as AntCalendar, Popover, Space, Divider, Modal, Table, Typography, Spin, Input } from 'antd';
 import { useLocation } from '@umijs/max';
@@ -124,16 +124,16 @@ const Calendar: React.FC = () => {
   }, [fetchResult]);
 
   const handleFetchFromApi = async (formValues: any) => {
-    const [startDate, endDate] = formValues.dateRange || [];
-    if (!startDate || !endDate) {
+    const { start_date, end_date } = formValues;
+    if (!start_date || !end_date) {
       message.error('请选择日期范围');
       return;
     }
     setFetchLoading(true);
     try {
       const response = await fetchCalendarFromApi({
-        start_date: dayjs(startDate).format('YYYY-MM-DD'),
-        end_date: dayjs(endDate).format('YYYY-MM-DD'),
+        start_date: dayjs(start_date).format('YYYY-MM-DD'),
+        end_date: dayjs(end_date).format('YYYY-MM-DD'),
         exchange: formValues.exchange === 'all' ? undefined : (formValues.exchange || 'SSE'),
       });
       setFetchResult(response);
@@ -192,16 +192,16 @@ const Calendar: React.FC = () => {
   };
 
   const handleValidate = async (formValues: any) => {
-    const [startDate, endDate] = formValues.dateRange || [];
-    if (!startDate || !endDate) {
+    const { start_date, end_date } = formValues;
+    if (!start_date || !end_date) {
       message.error('请选择日期范围');
       return;
     }
     setValidateLoading(true);
     try {
       const response = await validateCalendar({
-        start_date: dayjs(startDate).format('YYYY-MM-DD'),
-        end_date: dayjs(endDate).format('YYYY-MM-DD'),
+        start_date: dayjs(start_date).format('YYYY-MM-DD'),
+        end_date: dayjs(end_date).format('YYYY-MM-DD'),
         exchange: formValues.exchange === 'all' ? undefined : (formValues.exchange || 'SSE'),
       });
       setValidateResult(response);
@@ -314,11 +314,11 @@ const Calendar: React.FC = () => {
       // 保存表单值到缓存
       pageCache.saveFormValues(values);
       
-      const [startDate, endDate] = values.dateRange || [];
+      const { start_date, end_date } = values;
       
       const response = await getCalendar({
-        start_date: startDate ? dayjs(startDate).format('YYYY-MM-DD') : dayjs().subtract(30, 'day').format('YYYY-MM-DD'),
-        end_date: endDate ? dayjs(endDate).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+        start_date: start_date ? dayjs(start_date).format('YYYY-MM-DD') : dayjs().subtract(1, 'month').format('YYYY-MM-DD'),
+        end_date: end_date ? dayjs(end_date).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
         exchange: values.exchange === 'all' ? undefined : (values.exchange || 'SSE'),
       });
 
@@ -347,8 +347,8 @@ const Calendar: React.FC = () => {
       pageCache.update({ viewMode });
       
       // 如果有数据，设置日历视图的月份为查询日期范围的开始月份
-      if (startDate) {
-        setCalendarMonth(dayjs(startDate));
+      if (start_date) {
+        setCalendarMonth(dayjs(start_date));
       } else if (response.items.length > 0) {
         const firstDate = dayjs(response.items[0].cal_date);
         setCalendarMonth(firstDate);
@@ -492,6 +492,13 @@ const Calendar: React.FC = () => {
 
   const columns: ProColumns<any>[] = [
     {
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index',
+      width: 60,
+      fixed: 'left',
+    },
+    {
       title: 'ID',
       dataIndex: 'id',
       width: 80,
@@ -515,6 +522,7 @@ const Calendar: React.FC = () => {
       title: '日历日期',
       dataIndex: 'cal_date',
       width: 150,
+      defaultSortOrder: 'descend',
       sorter: (a, b) => dayjs(a.cal_date).unix() - dayjs(b.cal_date).unix(),
     },
     {
@@ -634,7 +642,8 @@ const Calendar: React.FC = () => {
               }
             }}
             initialValues={{
-              dateRange: [dayjs().startOf('month'), dayjs().endOf('month')],
+              start_date: dayjs().subtract(1, 'month'),
+              end_date: dayjs(),
               exchange: 'all',
             }}
             submitter={{
@@ -683,10 +692,15 @@ const Calendar: React.FC = () => {
               ]}
               rules={[{ required: true, message: '请选择交易所' }]}
             />
-            <ProFormDateRangePicker
-              name="dateRange"
-              label="日期范围"
-              rules={[{ required: true, message: '请选择日期范围' }]}
+            <ProFormDatePicker
+              name="start_date"
+              label="开始日期"
+              rules={[{ required: true, message: '请选择开始日期' }]}
+            />
+            <ProFormDatePicker
+              name="end_date"
+              label="结束日期"
+              rules={[{ required: true, message: '请选择结束日期' }]}
             />
           </ProForm>
 

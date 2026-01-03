@@ -26,7 +26,7 @@ import { request } from '@umijs/max';
 
 /**
  * 获取通知列表
- * GET /api/v1/notifications
+ * POST /api/v1/notifications/query
  */
 export async function getNotifications(params?: {
   skip?: number;
@@ -36,59 +36,78 @@ export async function getNotifications(params?: {
   order_by?: string;
   order?: 'asc' | 'desc';
 }) {
-  return request<ZQuant.NotificationListResponse>('/api/v1/notifications', {
-    method: 'GET',
-    params,
+  return request<ZQuant.NotificationListResponse>('/api/v1/notifications/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 获取通知统计
- * GET /api/v1/notifications/stats
+ * POST /api/v1/notifications/stats
  */
 export async function getNotificationStats() {
   return request<ZQuant.NotificationStatsResponse>('/api/v1/notifications/stats', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
 /**
  * 获取通知详情
- * GET /api/v1/notifications/{notification_id}
+ * POST /api/v1/notifications/get
  */
 export async function getNotification(notificationId: number) {
-  return request<ZQuant.NotificationResponse>(`/api/v1/notifications/${notificationId}`, {
-    method: 'GET',
+  return request<ZQuant.NotificationResponse>('/api/v1/notifications/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { notification_id: notificationId },
   });
 }
 
 /**
  * 标记通知为已读
- * PUT /api/v1/notifications/{notification_id}/read
+ * POST /api/v1/notifications/read
  */
 export async function markNotificationAsRead(notificationId: number) {
-  return request<ZQuant.NotificationResponse>(`/api/v1/notifications/${notificationId}/read`, {
-    method: 'PUT',
+  return request<ZQuant.NotificationResponse>('/api/v1/notifications/read', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { notification_id: notificationId },
   });
 }
 
 /**
  * 全部标记为已读
- * PUT /api/v1/notifications/read-all
+ * POST /api/v1/notifications/read-all
  */
 export async function markAllNotificationsAsRead() {
   return request<{ message: string; count: number }>('/api/v1/notifications/read-all', {
-    method: 'PUT',
+    method: 'POST',
   });
 }
 
 /**
  * 删除通知
- * DELETE /api/v1/notifications/{notification_id}
+ * POST /api/v1/notifications/delete
  */
 export async function deleteNotification(notificationId: number) {
-  return request<{ message: string }>(`/api/v1/notifications/${notificationId}`, {
-    method: 'DELETE',
+  return request<{ message: string }>('/api/v1/notifications/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { notification_id: notificationId },
   });
 }
 

@@ -88,7 +88,7 @@ const NotificationsPage: React.FC = () => {
         limit: pagination.pageSize,
         is_read: filter.is_read,
         type: filter.type,
-        order_by: 'created_at',
+        order_by: 'created_time',
         order: 'desc',
       }),
     {
@@ -304,7 +304,7 @@ const NotificationsPage: React.FC = () => {
                     <div>
                       <div style={{ marginBottom: '8px' }}>{item.content}</div>
                       <Text type="secondary" style={{ fontSize: '12px' }}>
-                        {formatTime(item.created_at)}
+                        {formatTime(item.created_time)}
                       </Text>
                     </div>
                   }

@@ -24,7 +24,7 @@ import { request } from '@umijs/max';
 
 /**
  * 获取因子定义列表
- * GET /api/v1/factor/definitions
+ * POST /api/v1/factor/definitions/query
  */
 export async function getFactorDefinitions(params?: {
   skip?: number;
@@ -33,9 +33,12 @@ export async function getFactorDefinitions(params?: {
   order_by?: string;
   order?: string;
 }) {
-  return request<ZQuant.FactorDefinitionListResponse>('/api/v1/factor/definitions', {
-    method: 'GET',
-    params,
+  return request<ZQuant.FactorDefinitionListResponse>('/api/v1/factor/definitions/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
@@ -55,41 +58,49 @@ export async function createFactorDefinition(body: ZQuant.FactorDefinitionCreate
 
 /**
  * 更新因子定义
- * PUT /api/v1/factor/definitions/{id}
+ * POST /api/v1/factor/definitions/update
  */
 export async function updateFactorDefinition(id: number, body: ZQuant.FactorDefinitionUpdate) {
-  return request<ZQuant.FactorDefinitionResponse>(`/api/v1/factor/definitions/${id}`, {
-    method: 'PUT',
+  return request<ZQuant.FactorDefinitionResponse>('/api/v1/factor/definitions/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, factor_id: id },
   });
 }
 
 /**
  * 删除因子定义
- * DELETE /api/v1/factor/definitions/{id}
+ * POST /api/v1/factor/definitions/delete
  */
 export async function deleteFactorDefinition(id: number) {
-  return request<void>(`/api/v1/factor/definitions/${id}`, {
-    method: 'DELETE',
+  return request<void>('/api/v1/factor/definitions/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: id },
   });
 }
 
 /**
  * 获取因子定义详情
- * GET /api/v1/factor/definitions/{id}
+ * POST /api/v1/factor/definitions/get
  */
 export async function getFactorDefinition(id: number) {
-  return request<ZQuant.FactorDefinitionResponse>(`/api/v1/factor/definitions/${id}`, {
-    method: 'GET',
+  return request<ZQuant.FactorDefinitionResponse>('/api/v1/factor/definitions/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: id },
   });
 }
 
 /**
  * 获取因子配置列表
- * GET /api/v1/factor/configs
+ * POST /api/v1/factor/configs/query
  */
 export async function getFactorConfigs(params?: {
   skip?: number;
@@ -98,25 +109,32 @@ export async function getFactorConfigs(params?: {
   order_by?: string;
   order?: string;
 }) {
-  return request<ZQuant.FactorConfigListResponse>('/api/v1/factor/configs', {
-    method: 'GET',
-    params,
+  return request<ZQuant.FactorConfigListResponse>('/api/v1/factor/configs/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 获取单个因子配置
- * GET /api/v1/factor/configs/{factor_id}
+ * POST /api/v1/factor/configs/get
  */
 export async function getFactorConfigById(factorId: number) {
-  return request<ZQuant.FactorConfigResponse>(`/api/v1/factor/configs/${factorId}`, {
-    method: 'GET',
+  return request<ZQuant.FactorConfigResponse>('/api/v1/factor/configs/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: factorId },
   });
 }
 
 /**
  * 更新因子配置
- * PUT /api/v1/factor/configs/{factor_id}
+ * POST /api/v1/factor/configs/update
  */
 export async function updateFactorConfigById(
   factorId: number,
@@ -128,28 +146,32 @@ export async function updateFactorConfigById(
     enabled?: boolean | null;
   }
 ) {
-  return request<ZQuant.FactorConfigResponse>(`/api/v1/factor/configs/${factorId}`, {
-    method: 'PUT',
+  return request<ZQuant.FactorConfigResponse>('/api/v1/factor/configs/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, factor_id: factorId },
   });
 }
 
 /**
  * 删除因子配置
- * DELETE /api/v1/factor/configs/{factor_id}
+ * POST /api/v1/factor/configs/delete
  */
 export async function deleteFactorConfigById(factorId: number) {
-  return request<void>(`/api/v1/factor/configs/${factorId}`, {
-    method: 'DELETE',
+  return request<void>('/api/v1/factor/configs/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: factorId },
   });
 }
 
 /**
  * 获取因子配置（JSON格式）（已废弃，向后兼容）
- * GET /api/v1/factor/definitions/{factor_id}/config
+ * POST /api/v1/factor/definitions/config
  */
 export async function getFactorConfig(factorId: number) {
   return request<{
@@ -158,14 +180,18 @@ export async function getFactorConfig(factorId: number) {
       model_id: number;
       codes: string[] | null;
     }>;
-  }>(`/api/v1/factor/definitions/${factorId}/config`, {
-    method: 'GET',
+  }>('/api/v1/factor/definitions/config', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: factorId },
   });
 }
 
 /**
  * 更新因子配置（JSON格式）
- * PUT /api/v1/factor/definitions/{factor_id}/config
+ * POST /api/v1/factor/definitions/config/update
  */
 export async function updateFactorConfigJson(
   factorId: number,
@@ -183,28 +209,32 @@ export async function updateFactorConfigJson(
       model_id: number;
       codes: string[] | null;
     }>;
-  }>(`/api/v1/factor/definitions/${factorId}/config`, {
-    method: 'PUT',
+  }>('/api/v1/factor/definitions/config/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, factor_id: factorId },
   });
 }
 
 /**
  * 删除因子配置（清空配置）
- * DELETE /api/v1/factor/definitions/{factor_id}/config
+ * POST /api/v1/factor/definitions/config/delete
  */
 export async function deleteFactorConfigJson(factorId: number) {
-  return request<void>(`/api/v1/factor/definitions/${factorId}/config`, {
-    method: 'DELETE',
+  return request<void>('/api/v1/factor/definitions/config/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: factorId },
   });
 }
 
 /**
  * 获取因子模型列表
- * GET /api/v1/factor/models
+ * POST /api/v1/factor/models/query
  */
 export async function getFactorModels(params?: {
   factor_id?: number;
@@ -214,9 +244,12 @@ export async function getFactorModels(params?: {
   order_by?: string;
   order?: string;
 }) {
-  return request<ZQuant.FactorModelListResponse>('/api/v1/factor/models', {
-    method: 'GET',
-    params,
+  return request<ZQuant.FactorModelListResponse>('/api/v1/factor/models/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
@@ -236,35 +269,43 @@ export async function createFactorModel(body: ZQuant.FactorModelCreate) {
 
 /**
  * 更新因子模型
- * PUT /api/v1/factor/models/{id}
+ * POST /api/v1/factor/models/update
  */
 export async function updateFactorModel(id: number, body: ZQuant.FactorModelUpdate) {
-  return request<ZQuant.FactorModelResponse>(`/api/v1/factor/models/${id}`, {
-    method: 'PUT',
+  return request<ZQuant.FactorModelResponse>('/api/v1/factor/models/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, model_id: id },
   });
 }
 
 /**
  * 删除因子模型
- * DELETE /api/v1/factor/models/{id}
+ * POST /api/v1/factor/models/delete
  */
 export async function deleteFactorModel(id: number) {
-  return request<void>(`/api/v1/factor/models/${id}`, {
-    method: 'DELETE',
+  return request<void>('/api/v1/factor/models/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { model_id: id },
   });
 }
 
 /**
  * 获取因子模型详情
- * GET /api/v1/factor/models/{id}
+ * POST /api/v1/factor/models/get
  */
 export async function getFactorModel(id: number) {
-  return request<ZQuant.FactorModelResponse>(`/api/v1/factor/models/${id}`, {
-    method: 'GET',
+  return request<ZQuant.FactorModelResponse>('/api/v1/factor/models/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { model_id: id },
   });
 }
 
@@ -284,68 +325,73 @@ export async function createFactorConfig(body: ZQuant.FactorConfigCreate) {
 
 /**
  * 获取因子配置列表（按因子分组）（已废弃）
- * GET /api/v1/factor/configs/grouped
+ * POST /api/v1/factor/configs/grouped
  */
 export async function getFactorConfigsGrouped(params?: {
   enabled?: boolean;
 }) {
   return request<ZQuant.FactorConfigGroupedListResponse>('/api/v1/factor/configs/grouped', {
-    method: 'GET',
-    params,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 更新因子配置（按因子ID，支持多映射）
- * PUT /api/v1/factor/configs/by-factor/{factor_id}
+ * POST /api/v1/factor/configs/by-factor/update
  */
 export async function updateFactorConfigByFactor(factorId: number, body: ZQuant.FactorConfigUpdate) {
-  return request<ZQuant.FactorConfigGroupedResponse>(`/api/v1/factor/configs/by-factor/${factorId}`, {
-    method: 'PUT',
+  return request<ZQuant.FactorConfigGroupedResponse>('/api/v1/factor/configs/by-factor/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, factor_id: factorId },
   });
 }
 
 /**
- * 更新单个因子配置（使用查询参数）
- * PUT /api/v1/factor/configs?config_id={id}
+ * 更新单个因子配置
+ * POST /api/v1/factor/configs/update_single
  */
 export async function updateFactorConfig(id: number, body: ZQuant.FactorConfigSingleUpdate) {
-  return request<ZQuant.FactorConfigResponse>('/api/v1/factor/configs', {
-    method: 'PUT',
-    params: {
-      config_id: id,
-    },
+  return request<ZQuant.FactorConfigResponse>('/api/v1/factor/configs/update_single', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, config_id: id },
   });
 }
 
 /**
- * 删除因子配置（使用查询参数）
- * DELETE /api/v1/factor/configs?config_id={id}
+ * 删除因子配置
+ * POST /api/v1/factor/configs/delete_single
  */
 export async function deleteFactorConfig(id: number) {
-  return request<void>('/api/v1/factor/configs', {
-    method: 'DELETE',
-    params: {
-      config_id: id,
+  return request<void>('/api/v1/factor/configs/delete_single', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
+    data: { config_id: id },
   });
 }
 
 /**
  * 删除因子配置（按因子ID，删除该因子的所有配置）
- * DELETE /api/v1/factor/configs/by-factor/{factorId}
+ * POST /api/v1/factor/configs/by-factor/delete
  */
 export async function deleteFactorConfigByFactor(factorId: number) {
-  return request<void>(`/api/v1/factor/configs/by-factor/${factorId}`, {
-    method: 'DELETE',
+  return request<void>('/api/v1/factor/configs/by-factor/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { factor_id: factorId },
   });
 }
 
@@ -374,6 +420,29 @@ export async function getFactorResults(body: ZQuant.FactorResultQueryRequest) {
       'Content-Type': 'application/json',
     },
     data: body,
+  });
+}
+
+/**
+ * 查询量化因子数据
+ * POST /api/v1/factor/quant-factors/query
+ */
+export async function getQuantFactors(params: {
+  ts_code?: string;
+  start_date?: string;
+  end_date?: string;
+  filter_conditions?: any;
+  skip?: number;
+  limit?: number;
+  order_by?: string;
+  order?: string;
+}) {
+  return request<ZQuant.QuantFactorQueryResponse>('/api/v1/factor/quant-factors/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params,
   });
 }
 

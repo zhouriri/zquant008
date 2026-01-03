@@ -30,6 +30,7 @@
 """
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -45,6 +46,7 @@ from loguru import logger
 
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.scheduler.job.base import BaseSyncJob
+from zquant.models.scheduler import TaskExecution
 
 __job_name__ = "sync_stock_list"
 
@@ -60,6 +62,28 @@ class SyncStockListJob(BaseSyncJob):
         parser = argparse.ArgumentParser(description=self.description)
         return parser
 
+    def get_execution(self, db) -> TaskExecution | None:
+        """
+        从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+        """
+        execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+        if not execution_id_str:
+            logger.debug("环境变量 ZQUANT_EXECUTION_ID 未设置，无法更新进度")
+            return None
+
+        try:
+            execution_id = int(execution_id_str)
+            execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+            if execution:
+                logger.debug(f"获取到执行记录: {execution_id}")
+                return execution
+            else:
+                logger.warning(f"执行记录 {execution_id} 不存在")
+                return None
+        except (ValueError, Exception) as e:
+            logger.warning(f"获取执行记录失败: {e}")
+            return None
+
     def execute(self, args: argparse.Namespace) -> int:
         self.print_start_info()
 
@@ -67,8 +91,11 @@ class SyncStockListJob(BaseSyncJob):
         extra_info = self.build_extra_info()
 
         with self.db_session() as db:
+            # 获取执行记录（用于进度更新）
+            execution = self.get_execution(db)
+
             logger.info("开始同步股票列表...")
-            count = scheduler.sync_stock_list(db, extra_info=extra_info)
+            count = scheduler.sync_stock_list(db, extra_info=extra_info, execution=execution)
 
             self.print_end_info(同步记录数=str(count))
 

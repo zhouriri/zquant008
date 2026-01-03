@@ -81,8 +81,10 @@ def create_tables():
                     config_json TEXT,
                     max_retries INTEGER NOT NULL DEFAULT 3,
                     retry_interval INTEGER NOT NULL DEFAULT 60,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_by VARCHAR(50) COMMENT '创建人',
+                    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(50) COMMENT '修改人',
+                    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_name (name),
                     INDEX idx_job_id (job_id),
                     INDEX idx_task_type (task_type),
@@ -105,7 +107,17 @@ def create_tables():
                     result_json TEXT,
                     error_message TEXT,
                     retry_count INTEGER NOT NULL DEFAULT 0,
-                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    progress_percent FLOAT NOT NULL DEFAULT 0,
+                    current_item VARCHAR(255),
+                    total_items INTEGER NOT NULL DEFAULT 0,
+                    processed_items INTEGER NOT NULL DEFAULT 0,
+                    estimated_end_time DATETIME,
+                    is_paused BOOLEAN NOT NULL DEFAULT FALSE,
+                    terminate_requested BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_by VARCHAR(50) COMMENT '创建人',
+                    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by VARCHAR(50) COMMENT '修改人',
+                    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_task_id (task_id),
                     INDEX idx_status (status),
                     INDEX idx_start_time (start_time)
@@ -180,6 +192,7 @@ def _create_single_task(db: Session, task_config: dict, skip_tasks: set, existin
             max_retries=task_config.get("max_retries", 3),
             retry_interval=task_config.get("retry_interval", 300),
             enabled=enabled,
+            created_by="admin",
         )
         task_type_label = "手动任务" if is_manual_task else "通用任务"
         logger.info(f"✓ 创建任务: {name} (ID: {task.id}, 类型: {task_type_label})")
@@ -195,6 +208,18 @@ def create_zquant_tasks(force: bool = False):
     """创建ZQuant任务"""
     logger.info("开始创建ZQuant任务...")
     db: Session = SessionLocal()
+
+    # 1. 定义核心步骤名称常量（按执行顺序1~10连续编号）
+    STEP1_NAME = "STEP1-同步交易日历（当日）-命令执行"
+    STEP2_NAME = "STEP2-同步股票列表（当日）-命令执行"
+    STEP3_NAME = "STEP3-同步日线数据（当日）-命令执行"
+    STEP4_NAME = "STEP4-同步每日指标数据（当日）-命令执行"
+    STEP5_NAME = "STEP5-同步因子数据（当日）-命令执行"
+    STEP6_NAME = "STEP6-同步专业版因子数据（当日）-命令执行"
+    STEP7_NAME = "STEP7-同步财务数据-利润表-命令执行"
+    STEP8_NAME = "STEP8-量化因子计算（当日）-数据库任务"
+    STEP9_NAME = "STEP9-量化股票筛选（当日）-数据库任务"
+    STEP10_NAME = "STEP10-数据表统计-命令执行"
 
     try:
         # ========== 配置：需要跳过的任务列表 ==========
@@ -218,10 +243,11 @@ def create_zquant_tasks(force: bool = False):
             db.commit()
             logger.info(f"已删除 {len(existing_tasks)} 个已存在的示例任务")
 
-        # 定义所有任务配置
+        # 定义所有任务配置 (按 STEP1 ~ STEP10 顺序排列)
         task_configs = [
+            # --- 核心步骤 STEP1 ~ STEP10 ---
             {
-                "name": "STEP1-同步交易日历（当日）-命令执行",
+                "name": STEP1_NAME,
                 "cron_expression": "0 2 * * *",  # 每天凌晨2点执行
                 "description": "使用命令执行方式同步交易日历数据，每天自动更新交易日历",
                 "config": {"command": "python zquant/scheduler/job/sync_trading_calendar.py", "timeout_seconds": 600},
@@ -230,7 +256,7 @@ def create_zquant_tasks(force: bool = False):
                 "enabled": True,
             },
             {
-                "name": "STEP2-同步股票列表（当日）-命令执行",
+                "name": STEP2_NAME,
                 "cron_expression": "0 1 * * *",  # 每天凌晨1点执行
                 "description": "使用命令执行方式同步股票列表数据，每天自动更新股票基础信息",
                 "config": {"command": "python zquant/scheduler/job/sync_stock_list.py", "timeout_seconds": 300},
@@ -239,7 +265,7 @@ def create_zquant_tasks(force: bool = False):
                 "enabled": True,
             },
             {
-                "name": "STEP3-同步日线数据（当日）-命令执行",
+                "name": STEP3_NAME,
                 "cron_expression": "0 18 * * *",  # 每天收盘后18:00执行
                 "description": "使用命令执行方式同步所有股票的日线数据，每天收盘后自动更新日线数据",
                 "config": {"command": "python zquant/scheduler/job/sync_daily_data.py", "timeout_seconds": 3600},
@@ -248,20 +274,7 @@ def create_zquant_tasks(force: bool = False):
                 "enabled": True,
             },
             {
-                "name": "STEP4-同步所有股票日线数据（当日）-数据库任务",
-                "cron_expression": "0 18 * * *",  # 每天收盘后18:00执行
-                "description": "使用数据库任务方式同步所有股票的日线数据，每天收盘后自动更新（按 ts_code 分表存储）",
-                "config": {
-                    "task_action": "sync_all_daily_data",
-                    "start_date": None,  # None 表示使用默认（最近一年）
-                    "end_date": None,  # None 表示使用默认（当天）
-                },
-                "max_retries": 3,
-                "retry_interval": 600,
-                "enabled": True,
-            },
-            {
-                "name": "STEP4-同步每日指标数据（当日）-命令执行",
+                "name": STEP4_NAME,
                 "cron_expression": "0 18 * * *",  # 每天收盘后18:00执行
                 "description": "使用命令执行方式同步所有股票的每日指标数据，每天收盘后自动更新",
                 "config": {"command": "python zquant/scheduler/job/sync_daily_basic_data.py", "timeout_seconds": 3600},
@@ -270,77 +283,7 @@ def create_zquant_tasks(force: bool = False):
                 "enabled": True,
             },
             {
-                "name": "同步交易日历-命令执行（手动）",
-                "description": "使用命令执行方式同步交易日历数据，支持手动触发",
-                "config": {"command": "python zquant/scheduler/job/sync_trading_calendar.py --start-date 20250101", "timeout_seconds": 600},
-                "max_retries": 3,
-                "retry_interval": 300,
-                "enabled": False,  # 手动任务默认禁用
-            },
-            {
-                "name": "同步股票列表-命令执行（手动）",
-                "description": "使用命令执行方式同步股票列表数据，支持手动触发",
-                "config": {"command": "python zquant/scheduler/job/sync_stock_list.py", "timeout_seconds": 300},
-                "max_retries": 3,
-                "retry_interval": 300,
-                "enabled": False,  # 手动任务默认禁用
-            },
-            {
-                "name": "同步日线数据-命令执行（时间段）",
-                "description": "使用命令执行方式同步历史日线数据，从20250101开始，用于历史数据补全",
-                "config": {
-                    "command": "python zquant/scheduler/job/sync_daily_data.py --start-date 20250101",
-                    "timeout_seconds": 7200,
-                },
-                "max_retries": 3,
-                "retry_interval": 1800,
-                "enabled": False,  # 手动任务默认禁用
-            },
-            {
-                "name": "同步每日指标数据-命令执行（时间段）",
-                "description": "使用命令执行方式同步历史每日指标数据，从20250101开始，用于历史数据补全",
-                "config": {
-                    "command": "python zquant/scheduler/job/sync_daily_basic_data.py --start-date 20250101",
-                    "timeout_seconds": 7200,
-                },
-                "max_retries": 3,
-                "retry_interval": 1800,
-                "enabled": False,  # 手动任务默认禁用
-            },
-            {
-                "name": "同步财务数据-命令执行（时间段）",
-                "description": "使用命令执行方式同步历史财务数据，从20250101开始，用于历史数据补全。依次同步三种报表类型：income（利润表）→ balance（资产负债表）→ cashflow（现金流量表）。如果某个报表类型同步失败，后续类型不会执行",
-                "config": {
-                    "command": "python zquant/scheduler/job/sync_financial_data.py --start-date 20250101",
-                    "timeout_seconds": 10800,  # 3小时（三种报表类型需要更长时间）
-                },
-                "max_retries": 3,
-                "retry_interval": 1800,
-                "enabled": False,  # 手动任务默认禁用
-            },
-            {
-                "name": "STEP5-同步财务数据-利润表-命令执行",
-                "cron_expression": "0 2 1 * *",  # 每月1号凌晨2点执行
-                "description": "使用命令执行方式同步所有股票的财务数据（利润表），每月自动更新",
-                "config": {
-                    "command": "python zquant/scheduler/job/sync_financial_data.py --statement-type income",
-                    "timeout_seconds": 7200,
-                },
-                "max_retries": 3,
-                "retry_interval": 1800,
-                "enabled": True,
-            },
-            {
-                "name": "STEP6-数据表统计-命令执行",
-                "cron_expression": "0 3 * * *",  # 每天凌晨3点执行（在数据同步之后）
-                "description": "使用命令执行方式统计每日数据表中的数据入库情况，每天自动统计当天的数据",
-                "config": {"command": "python zquant/scheduler/job/sync_table_statistics.py", "timeout_seconds": 1800},
-                "max_retries": 3,
-                "retry_interval": 600,
-                "enabled": True,
-            },
-            {
-                "name": "STEP7-同步因子数据（当日）-命令执行",
+                "name": STEP5_NAME,
                 "cron_expression": "0 18 * * *",  # 每天收盘后18:00执行
                 "description": "使用命令执行方式同步所有股票的因子数据，每天收盘后自动更新（按 ts_code 分表存储）",
                 "config": {"command": "python zquant/scheduler/job/sync_factor_data.py", "timeout_seconds": 3600},
@@ -349,7 +292,7 @@ def create_zquant_tasks(force: bool = False):
                 "enabled": True,
             },
             {
-                "name": "STEP8-同步专业版因子数据（当日）-命令执行",
+                "name": STEP6_NAME,
                 "cron_expression": "0 18 * * *",  # 每天收盘后18:00执行
                 "description": "使用命令执行方式同步所有股票的专业版因子数据，每天收盘后自动更新（按 ts_code 分表存储）",
                 "config": {"command": "python zquant/scheduler/job/sync_stkfactorpro_data.py", "timeout_seconds": 3600},
@@ -358,11 +301,108 @@ def create_zquant_tasks(force: bool = False):
                 "enabled": True,
             },
             {
-                "name": "同步因子数据-命令执行（时间段）",
-                "description": "使用命令执行方式同步历史因子数据，从20250101开始，用于历史数据补全",
+                "name": STEP7_NAME,
+                "cron_expression": "0 2 1 * *",  # 每月1号凌晨2点执行
+                "description": "使用命令执行方式同步所有股票的财务数据（利润表），每月自动更新",
                 "config": {
-                    "command": "python zquant/scheduler/job/sync_factor_data.py --start-date 20250101",
-                    "timeout_seconds": 7200,
+                    "command": "python zquant/scheduler/job/sync_financial_data.py --statement-type income",
+                    "timeout_seconds": 36000,
+                },
+                "max_retries": 3,
+                "retry_interval": 1800,
+                "enabled": True,
+            },
+            {
+                "name": STEP8_NAME,
+                "cron_expression": "30 18 * * *",  # 每天收盘后18:30执行（在数据同步之后）
+                "description": "使用命令执行方式计算所有启用的因子，每天收盘后自动计算（在数据同步之后），默认使用最后一个交易日",
+                "config": {
+                    "command": "python zquant/scheduler/job/calculate_factor.py",  # 示例：添加参数 --factor-id 1 --codes 000001.SZ,600000.SH --start-date 20240101 --end-date 20241231
+                    "timeout_seconds": 36000,
+                },
+                "max_retries": 3,
+                "retry_interval": 600,
+                "enabled": True,
+            },
+            {
+                "name": STEP9_NAME,
+                "cron_expression": "45 18 * * *",  # 每天收盘后18:45执行（在因子计算之后）
+                "description": "根据所有启用的量化策略执行批量选股，结果保存到结果表中",
+                "config": {
+                    "task_action": "batch_stock_filter",
+                    "start_date": None,  # None表示今日
+                    "end_date": None,    # None表示今日
+                },
+                "max_retries": 3,
+                "retry_interval": 600,
+                "enabled": True,
+            },
+            {
+                "name": STEP10_NAME,
+                "cron_expression": "0 3 * * *",  # 每天凌晨3点执行（在数据同步之后）
+                "description": "使用命令执行方式统计每日数据表中的数据入库情况，每天自动统计当天的数据",
+                "config": {"command": "python zquant/scheduler/job/sync_table_statistics.py", "timeout_seconds": 1800},
+                "max_retries": 3,
+                "retry_interval": 600,
+                "enabled": True,
+            },
+
+            # --- 手动/时间段 任务 ---
+            {
+                "name": "同步交易日历-命令执行（手动）",
+                "description": "使用命令执行方式同步交易日历数据，支持手动触发",
+                "config": {"command": "python zquant/scheduler/job/sync_trading_calendar.py --start-date 20240101", "timeout_seconds": 600},
+                "max_retries": 3,
+                "retry_interval": 300,
+                "enabled": False,  # 手动任务默认禁用
+            },
+            {
+                "name": "同步股票列表-命令执行（手动）",
+                "description": "使用命令执行方式同步股票列表数据，支持手动触发",
+                "config": {"command": "python zquant/scheduler/job/sync_stock_list.py", "timeout_seconds": 60000},
+                "max_retries": 3,
+                "retry_interval": 300,
+                "enabled": False,  # 手动任务默认禁用
+            },
+            {
+                "name": "同步日线数据-命令执行（时间段）",
+                "description": "使用命令执行方式同步历史日线数据，从20240101开始，用于历史数据补全",
+                "config": {
+                    "command": "python zquant/scheduler/job/sync_daily_data.py --start-date 20240101",
+                    "timeout_seconds": 36000,
+                },
+                "max_retries": 3,
+                "retry_interval": 1800,
+                "enabled": False,  # 手动任务默认禁用
+            },
+            {
+                "name": "同步每日指标数据-命令执行（时间段）",
+                "description": "使用命令执行方式同步历史每日指标数据，从20240101开始，用于历史数据补全",
+                "config": {
+                    "command": "python zquant/scheduler/job/sync_daily_basic_data.py --start-date 20240101",
+                    "timeout_seconds": 36000,
+                },
+                "max_retries": 3,
+                "retry_interval": 1800,
+                "enabled": False,  # 手动任务默认禁用
+            },
+            {
+                "name": "同步财务数据-命令执行（时间段）",
+                "description": "使用命令执行方式同步历史财务数据，从20240101开始，用于历史数据补全。依次同步三种报表类型：income（利润表）→ balance（资产负债表）→ cashflow（现金流量表）。如果某个报表类型同步失败，后续类型不会执行",
+                "config": {
+                    "command": "python zquant/scheduler/job/sync_financial_data.py --start-date 20240101",
+                    "timeout_seconds": 10800,  # 3小时（三种报表类型需要更长时间）
+                },
+                "max_retries": 3,
+                "retry_interval": 1800,
+                "enabled": False,  # 手动任务默认禁用
+            },
+            {
+                "name": "同步因子数据-命令执行（时间段）",
+                "description": "使用命令执行方式同步历史因子数据，从20240101开始，用于历史数据补全",
+                "config": {
+                    "command": "python zquant/scheduler/job/sync_factor_data.py --start-date 20240101",
+                    "timeout_seconds": 36000,
                 },
                 "max_retries": 3,
                 "retry_interval": 1800,
@@ -370,41 +410,46 @@ def create_zquant_tasks(force: bool = False):
             },
             {
                 "name": "同步专业版因子数据-命令执行（时间段）",
-                "description": "使用命令执行方式同步历史专业版因子数据，从20250101开始，用于历史数据补全",
+                "description": "使用命令执行方式同步历史专业版因子数据，从20240101开始，用于历史数据补全",
                 "config": {
-                    "command": "python zquant/scheduler/job/sync_stkfactorpro_data.py --start-date 20250101",
-                    "timeout_seconds": 7200,
+                    "command": "python zquant/scheduler/job/sync_stkfactorpro_data.py --start-date 20240101",
+                    "timeout_seconds": 36000,
                 },
                 "max_retries": 3,
                 "retry_interval": 1800,
                 "enabled": False,  # 手动任务默认禁用
             },
             {
-                "name": "STEP9-计算因子（当日）-数据库任务",
-                "cron_expression": "30 18 * * *",  # 每天收盘后18:30执行（在数据同步之后）
-                "description": "使用数据库任务方式计算所有启用的因子，每天收盘后自动计算（在数据同步之后）",
+                "name": "量化因子计算-数据库任务（时间段）",
+                "description": "使用命令执行方式量化因子计算，支持手动触发，用于历史数据补全或特定日期范围计算。可通过命令行参数指定日期范围，如：--start-date 20240101 --end-date 20241231",
                 "config": {
-                    "task_action": "calculate_factor",
-                    "factor_id": None,  # None表示计算所有启用的因子
-                    "codes": None,  # None表示使用配置中的codes
-                    # start_date 和 end_date 都不提供，则使用今日
+                    "command": "python zquant/scheduler/job/calculate_factor.py --start-date 20251201",  # 示例：添加参数 --factor-id 1 --codes 000001.SZ,600000.SH --end-date 20241231
+                    "timeout_seconds": 36000,
                 },
                 "max_retries": 3,
                 "retry_interval": 600,
-                "enabled": True,
+                "enabled": False,  # 手动任务默认禁用
             },
             {
-                "name": "计算因子-数据库任务（时间段）",
-                "description": "使用数据库任务方式计算因子，支持手动触发，用于历史数据补全或特定日期范围计算",
+                "name": "量化股票筛选-数据库任务（手动）",
+                "description": "使用命令执行方式量化股票筛选任务，支持手动触发，用于历史数据补全或特定日期范围选股。可通过命令行参数指定日期范围和策略ID，如：--start-date 20240101 --end-date 20241231 --strategy-id 1",
                 "config": {
-                    "task_action": "calculate_factor",
-                    "factor_id": None,  # None表示计算所有启用的因子
-                    "codes": None,  # None表示使用配置中的codes
-                    "start_date": None,  # 开始日期（ISO格式字符串，如 "2025-01-01"），与end_date一起使用表示日期范围；都不提供则使用今日
-                    "end_date": None,  # 结束日期（ISO格式字符串，如 "2025-01-31"），与start_date一起使用表示日期范围；都不提供则使用今日
+                    "command": "python zquant/scheduler/job/batch_stock_filter.py --start-date 20251201",  # 示例：添加参数 --end-date 20241231 --strategy-id 1
+                    "timeout_seconds": 36000,
                 },
                 "max_retries": 3,
                 "retry_interval": 600,
+                "enabled": False,  # 手动任务默认禁用
+            },
+            {
+                "name": "数据表统计-命令执行（手动）",
+                "description": "使用命令执行方式统计数据表入库情况，支持手动触发，用于统计指定日期或日期范围的数据表记录数、新增数、更新数等信息。可通过命令行参数指定日期范围，如：--start-date 20240101 --end-date 20241231（不指定则统计今天）",
+                "config": {
+                    "command": "python zquant/scheduler/job/statistics_table_data.py --start-date 20240101",  # 示例：添加参数 --end-date 20250131
+                    "timeout_seconds": 36000,  # 10小时（支持日期范围，可能需要更长时间）
+                },
+                "max_retries": 3,
+                "retry_interval": 300,
                 "enabled": False,  # 手动任务默认禁用
             },
         ]
@@ -429,21 +474,13 @@ def create_zquant_tasks(force: bool = False):
 
         logger.info(f"✓ ZQuant任务创建完成！共创建 {created_count} 个新任务，跳过 {skipped_count} 个任务")
 
-        # 创建STEP1~STEP9的串行编排任务
-        logger.info("开始创建STEP1~STEP9串行编排任务...")
+        # 2. 创建 STEP1 ~ STEP10 的串行编排任务
+        logger.info("开始创建STEP1~STEP10串行编排任务...")
         try:
-            # 查询所有STEP任务，获取任务ID映射
+            # 查询所有STEP任务，获取任务ID映射（按执行顺序1~10）
             step_task_names = [
-                "STEP1-同步交易日历（当日）-命令执行",
-                "STEP2-同步股票列表（当日）-命令执行",
-                "STEP3-同步日线数据（当日）-命令执行",
-                "STEP4-同步所有股票日线数据（当日）-数据库任务",
-                "STEP4-同步每日指标数据（当日）-命令执行",
-                "STEP5-同步财务数据-利润表-命令执行",
-                "STEP6-数据表统计-命令执行",
-                "STEP7-同步因子数据（当日）-命令执行",
-                "STEP8-同步专业版因子数据（当日）-命令执行",
-                "STEP9-计算因子（当日）-数据库任务",
+                STEP1_NAME, STEP2_NAME, STEP3_NAME, STEP4_NAME,
+                STEP5_NAME, STEP6_NAME, STEP7_NAME, STEP8_NAME, STEP9_NAME, STEP10_NAME
             ]
 
             step_tasks = db.query(ScheduledTask).filter(ScheduledTask.name.in_(step_task_names)).all()
@@ -453,73 +490,34 @@ def create_zquant_tasks(force: bool = False):
             missing_tasks = [name for name in step_task_names if name not in step_task_map]
             if missing_tasks:
                 logger.warning(f"以下STEP任务不存在，将跳过编排任务创建: {missing_tasks}")
-                logger.info("✓ 跳过创建STEP1~STEP9串行编排任务（部分任务不存在）")
+                logger.info("✓ 跳过创建STEP1~STEP10串行编排任务（部分任务不存在）")
             else:
                 # 检查是否所有任务都已启用
                 disabled_tasks = [name for name, task in step_task_map.items() if not task.enabled]
                 if disabled_tasks:
                     logger.warning(f"以下STEP任务未启用: {disabled_tasks}")
 
-                # 创建编排任务配置（串行执行）
+                # 创建编排任务配置 (串行执行，严格按顺序依赖)
+                # 执行顺序：STEP1 → STEP2 → STEP3 → STEP4 → STEP5 → STEP6 → STEP7 → STEP8 → STEP9 → STEP10
                 workflow_config = {
                     "workflow_type": "serial",
                     "tasks": [
-                        {
-                            "task_id": step_task_map["STEP1-同步交易日历（当日）-命令执行"].id,
-                            "name": "STEP1-同步交易日历（当日）-命令执行",
-                            "dependencies": [],
-                        },
-                        {
-                            "task_id": step_task_map["STEP2-同步股票列表（当日）-命令执行"].id,
-                            "name": "STEP2-同步股票列表（当日）-命令执行",
-                            "dependencies": [step_task_map["STEP1-同步交易日历（当日）-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP3-同步日线数据（当日）-命令执行"].id,
-                            "name": "STEP3-同步日线数据（当日）-命令执行",
-                            "dependencies": [step_task_map["STEP2-同步股票列表（当日）-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP4-同步所有股票日线数据（当日）-数据库任务"].id,
-                            "name": "STEP4-同步所有股票日线数据（当日）-数据库任务",
-                            "dependencies": [step_task_map["STEP3-同步日线数据（当日）-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP4-同步每日指标数据（当日）-命令执行"].id,
-                            "name": "STEP4-同步每日指标数据（当日）-命令执行",
-                            "dependencies": [step_task_map["STEP4-同步所有股票日线数据（当日）-数据库任务"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP5-同步财务数据-利润表-命令执行"].id,
-                            "name": "STEP5-同步财务数据-利润表-命令执行",
-                            "dependencies": [step_task_map["STEP4-同步每日指标数据（当日）-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP6-数据表统计-命令执行"].id,
-                            "name": "STEP6-数据表统计-命令执行",
-                            "dependencies": [step_task_map["STEP5-同步财务数据-利润表-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP7-同步因子数据（当日）-命令执行"].id,
-                            "name": "STEP7-同步因子数据（当日）-命令执行",
-                            "dependencies": [step_task_map["STEP6-数据表统计-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP8-同步专业版因子数据（当日）-命令执行"].id,
-                            "name": "STEP8-同步专业版因子数据（当日）-命令执行",
-                            "dependencies": [step_task_map["STEP7-同步因子数据（当日）-命令执行"].id],
-                        },
-                        {
-                            "task_id": step_task_map["STEP9-计算因子（当日）-数据库任务"].id,
-                            "name": "STEP9-计算因子（当日）-数据库任务",
-                            "dependencies": [step_task_map["STEP8-同步专业版因子数据（当日）-命令执行"].id],
-                        },
+                        {"task_id": step_task_map[STEP1_NAME].id, "name": STEP1_NAME, "dependencies": []},
+                        {"task_id": step_task_map[STEP2_NAME].id, "name": STEP2_NAME, "dependencies": [step_task_map[STEP1_NAME].id]},
+                        {"task_id": step_task_map[STEP3_NAME].id, "name": STEP3_NAME, "dependencies": [step_task_map[STEP2_NAME].id]},
+                        {"task_id": step_task_map[STEP4_NAME].id, "name": STEP4_NAME, "dependencies": [step_task_map[STEP3_NAME].id]},
+                        {"task_id": step_task_map[STEP5_NAME].id, "name": STEP5_NAME, "dependencies": [step_task_map[STEP4_NAME].id]},
+                        {"task_id": step_task_map[STEP6_NAME].id, "name": STEP6_NAME, "dependencies": [step_task_map[STEP5_NAME].id]},
+                        {"task_id": step_task_map[STEP7_NAME].id, "name": STEP7_NAME, "dependencies": [step_task_map[STEP6_NAME].id]},
+                        {"task_id": step_task_map[STEP8_NAME].id, "name": STEP8_NAME, "dependencies": [step_task_map[STEP7_NAME].id]},
+                        {"task_id": step_task_map[STEP9_NAME].id, "name": STEP9_NAME, "dependencies": [step_task_map[STEP8_NAME].id]},
+                        {"task_id": step_task_map[STEP10_NAME].id, "name": STEP10_NAME, "dependencies": [step_task_map[STEP9_NAME].id]},
                     ],
                     "on_failure": "stop",
                 }
 
                 # 检查是否已存在该编排任务
-                workflow_name = "编排任务-STEP1~STEP9串行执行"
+                workflow_name = "编排任务-STEP1~STEP10串行执行"
                 existing_workflow = (
                     db.query(ScheduledTask)
                     .filter(ScheduledTask.name == workflow_name, ScheduledTask.task_type == TaskType.WORKFLOW)
@@ -540,19 +538,19 @@ def create_zquant_tasks(force: bool = False):
                             name=workflow_name,
                             task_type=TaskType.WORKFLOW,
                             cron_expression="30 18 * * *",  # 每天收盘后18:30执行（在所有子任务之后）
-                            description="串行执行STEP1~STEP9的所有数据同步任务，按顺序依次执行：交易日历→股票列表→日线数据→日线数据(DB)→每日指标→财务数据→数据统计→因子数据→专业版因子→计算因子",
+                            description="串行执行STEP1~STEP10的所有数据同步任务，按顺序依次执行：STEP1交易日历→STEP2股票列表→STEP3日线数据→STEP4每日指标→STEP5因子数据→STEP6专业版因子→STEP7财务数据→STEP8量化因子计算→STEP9批量选股→STEP10数据统计",
                             config=workflow_config,
                             max_retries=3,
                             retry_interval=600,
                             enabled=True,
+                            created_by="admin",
                         )
                         logger.info(f"✓ 创建编排任务: {workflow_task.name} (ID: {workflow_task.id})")
                         created_count += 1
 
         except Exception as e:
-            logger.error(f"✗ 创建STEP1~STEP9串行编排任务失败: {e}")
+            logger.error(f"✗ 创建STEP1~STEP10串行编排任务失败: {e}")
             import traceback
-
             traceback.print_exc()
 
         return True
@@ -560,7 +558,6 @@ def create_zquant_tasks(force: bool = False):
     except Exception as e:
         logger.error(f"✗ 创建ZQuant任务失败: {e}")
         import traceback
-
         traceback.print_exc()
         db.rollback()
         return False
@@ -636,6 +633,7 @@ def create_example_tasks(force: bool = False):
                 max_retries=3,
                 retry_interval=60,
                 enabled=True,
+                created_by="admin",
             )
             logger.info(f"✓ 创建任务: {task1.name} (ID: {task1.id})")
             created_count += 1
@@ -732,6 +730,7 @@ def create_example_tasks(force: bool = False):
                 max_retries=3,
                 retry_interval=60,
                 enabled=True,
+                created_by="admin",
             )
             logger.info(f"✓ 创建任务: {task5.name} (ID: {task5.id})")
             created_count += 1
@@ -753,6 +752,7 @@ def create_example_tasks(force: bool = False):
                 max_retries=3,
                 retry_interval=60,
                 enabled=True,
+                created_by="admin",
             )
             logger.info(f"✓ 创建任务: {task6.name} (ID: {task6.id})")
             created_count += 1
@@ -776,6 +776,7 @@ def create_example_tasks(force: bool = False):
                     max_retries=3,
                     retry_interval=300,
                     enabled=True,
+                    created_by="admin",
                 )
                 logger.info(f"✓ 创建任务: {task7_name} (ID: {task7.id})")
                 created_count += 1
@@ -800,10 +801,11 @@ def create_example_tasks(force: bool = False):
                     task_type=TaskType.COMMON_TASK,
                     cron_expression="0 1 * * *",  # 每天凌晨1点执行
                     description="使用命令执行方式同步股票列表数据，每天自动更新股票基础信息",
-                    config={"command": "python zquant/scheduler/job/sync_stock_list.py", "timeout_seconds": 300},
+                    config={"command": "python zquant/scheduler/job/sync_stock_list.py", "timeout_seconds": 3600},
                     max_retries=3,
                     retry_interval=300,
                     enabled=True,
+                    created_by="admin",
                 )
                 logger.info(f"✓ 创建任务: {task8_name} (ID: {task8.id})")
                 created_count += 1
@@ -842,38 +844,6 @@ def create_example_tasks(force: bool = False):
                     raise
         else:
             logger.info(f"○ 任务已存在: {task9_name}")
-
-        # 示例任务9.1：同步所有股票日线数据-数据库任务（使用 DATA_SYNC_ALL_DAILY_DATA 类型）
-        task9_1_name = "STEP4-同步所有股票日线数据（当日）-数据库任务"
-        if task9_1_name in SKIP_TASKS:
-            logger.info(f"⊘ 跳过任务: {task9_1_name}（在SKIP_TASKS配置中）")
-            skipped_count += 1
-        elif task9_1_name not in existing_names:
-            try:
-                task9_1 = SchedulerService.create_task(
-                    db=db,
-                    name=task9_1_name,
-                    task_type=TaskType.COMMON_TASK,
-                    cron_expression="0 18 * * *",  # 每天收盘后18:00执行
-                    description="使用数据库任务方式同步所有股票的日线数据，每天收盘后自动更新（按 ts_code 分表存储）",
-                    config={
-                        "task_action": "sync_all_daily_data",
-                        "start_date": None,  # None 表示使用默认（最近一年）
-                        "end_date": None,  # None 表示使用默认（当天）
-                    },
-                    max_retries=3,
-                    retry_interval=600,
-                    enabled=True,
-                )
-                logger.info(f"✓ 创建任务: {task9_1_name} (ID: {task9_1.id})")
-                created_count += 1
-            except Exception as e:
-                if "Duplicate entry" in str(e) or "1062" in str(e):
-                    logger.info(f"○ 任务已存在: {task9_1_name}（数据库中存在）")
-                else:
-                    raise
-        else:
-            logger.info(f"○ 任务已存在: {task9_1_name}")
 
         # 示例任务9.2：同步每日指标数据-命令执行
         task9_2_name = "STEP4-同步每日指标数据（当日）-命令执行"
@@ -918,7 +888,7 @@ def create_example_tasks(force: bool = False):
                     description="使用命令执行方式同步指定时间段（2024-01-01至2025-11-16）的历史日线数据，用于历史数据补全",
                     config={
                         "command": "python zquant/scheduler/job/sync_daily_data.py --start-date 20240101 --end-date 20251116",
-                        "timeout_seconds": 7200,
+                        "timeout_seconds": 36000,
                     },
                     max_retries=3,
                     retry_interval=1800,
@@ -949,7 +919,7 @@ def create_example_tasks(force: bool = False):
                     description="使用命令执行方式同步指定时间段（2024-01-01至2025-11-16）的历史每日指标数据，用于历史数据补全",
                     config={
                         "command": "python zquant/scheduler/job/sync_daily_basic_data.py --start-date 20240101 --end-date 20251116",
-                        "timeout_seconds": 7200,
+                        "timeout_seconds": 36000,
                     },
                     max_retries=3,
                     retry_interval=1800,
@@ -966,7 +936,7 @@ def create_example_tasks(force: bool = False):
             logger.info(f"○ 任务已存在: {task9_4_name}")
 
         # 示例任务10：同步财务数据-命令执行（利润表）
-        task10_name = "STEP5-同步财务数据-利润表-命令执行"
+        task10_name = "STEP7-同步财务数据-利润表-命令执行"
         if task10_name in SKIP_TASKS:
             logger.info(f"⊘ 跳过任务: {task10_name}（在SKIP_TASKS配置中）")
             skipped_count += 1
@@ -980,7 +950,7 @@ def create_example_tasks(force: bool = False):
                     description="使用命令执行方式同步所有股票的财务数据（利润表），每月自动更新",
                     config={
                         "command": "python zquant/scheduler/job/sync_financial_data.py --statement-type income",
-                        "timeout_seconds": 7200,
+                        "timeout_seconds": 36000,
                     },
                     max_retries=3,
                     retry_interval=1800,
@@ -1104,6 +1074,7 @@ def create_workflow_examples(force: bool = False):
                 max_retries=3,
                 retry_interval=60,
                 enabled=True,
+                created_by="admin",
             )
             logger.info(f"✓ 创建编排任务: {serial_workflow.name} (ID: {serial_workflow.id})")
             created_count += 1
@@ -1130,6 +1101,7 @@ def create_workflow_examples(force: bool = False):
                 max_retries=3,
                 retry_interval=60,
                 enabled=True,
+                created_by="admin",
             )
             logger.info(f"✓ 创建编排任务: {parallel_workflow.name} (ID: {parallel_workflow.id})")
             created_count += 1
@@ -1165,6 +1137,7 @@ def create_workflow_examples(force: bool = False):
                 max_retries=3,
                 retry_interval=60,
                 enabled=True,
+                created_by="admin",
             )
             logger.info(f"✓ 创建编排任务: {mixed_workflow.name} (ID: {mixed_workflow.id})")
             created_count += 1

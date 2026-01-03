@@ -27,8 +27,8 @@
 | column_name | VARCHAR(100) | 因子表数据列名 |
 | description | TEXT | 因子详细描述 |
 | enabled | BOOLEAN | 是否启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| created_time | DATETIME | 创建时间 |
+| updated_time | DATETIME | 更新时间 |
 
 ### 2. 因子模型表 (`zq_quant_factor_models`)
 
@@ -41,8 +41,8 @@
 | config_json | TEXT | 模型配置（JSON格式） |
 | is_default | BOOLEAN | 是否默认算法 |
 | enabled | BOOLEAN | 是否启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| created_time | DATETIME | 创建时间 |
+| updated_time | DATETIME | 更新时间 |
 
 ### 3. 因子配置表 (`zq_quant_factor_configs`)
 
@@ -53,8 +53,8 @@
 | model_id | INTEGER | 模型ID（外键，NULL表示使用默认算法） |
 | codes | TEXT | 股票代码列表（逗号分隔，NULL表示所有股票） |
 | enabled | BOOLEAN | 是否启用 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+| created_time | DATETIME | 创建时间 |
+| updated_time | DATETIME | 更新时间 |
 
 ### 4. 因子结果表 (`zq_quant_factor_spacex_{code}`)
 

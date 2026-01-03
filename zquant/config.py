@@ -24,6 +24,7 @@
 配置管理模块
 """
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 from zquant import __version__
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
 
     # 数据库配置
     DB_HOST: str = "localhost"
-    DB_PORT: int = 3307
+    DB_PORT: int = 3306
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     DB_NAME: str = "zquant"
@@ -71,10 +72,19 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_HOUR: int = 1000  # 每小时允许的请求数
 
     # JWT配置
-    SECRET_KEY: str = "your-secret-key-change-this-in-production"
+    SECRET_KEY: str | None = Field(
+        default=None,
+        description="JWT密钥，生产环境必须从环境变量设置。开发环境未设置时会自动生成随机密钥（不安全，仅用于开发）"
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24小时
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # CORS配置
+    CORS_ORIGINS: list[str] = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"],
+        description="允许的CORS来源列表，生产环境必须配置具体域名，不能使用 '*'"
+    )
 
     # 加密配置
     ENCRYPTION_KEY: str | None = None  # 加密密钥（从环境变量读取），用于加密敏感配置
@@ -120,7 +130,34 @@ class Settings(BaseSettings):
 
 
 # 全局配置实例
-settings = Settings()
+_settings = Settings()
+
+# 如果SECRET_KEY未设置，根据环境处理
+if not _settings.SECRET_KEY:
+    import os
+    import secrets
+    import warnings
+    
+    # 检查是否明确标记为生产环境
+    is_production = os.getenv("PRODUCTION", "").lower() in ("true", "1", "yes")
+    
+    if is_production:
+        # 生产环境：必须设置，否则抛出错误
+        raise ValueError(
+            "SECRET_KEY未设置！生产环境必须设置SECRET_KEY环境变量。"
+            "请设置环境变量: export SECRET_KEY='your-secret-key-here'"
+        )
+    else:
+        # 开发/测试环境：生成随机密钥并警告
+        _settings.SECRET_KEY = secrets.token_urlsafe(32)
+        warnings.warn(
+            "警告: SECRET_KEY未设置，已自动生成随机密钥（每次启动都会不同）。"
+            "生产环境必须设置SECRET_KEY环境变量，否则JWT token可能被伪造！"
+            "设置方法: export SECRET_KEY='your-secret-key-here'",
+            UserWarning
+        )
+
+settings = _settings
 
 
 def print_config_debug_info():

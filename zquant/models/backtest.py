@@ -32,7 +32,7 @@ from sqlalchemy.dialects.mysql import DOUBLE as Double
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from zquant.database import Base
+from zquant.database import AuditMixin, Base
 
 
 class BacktestStatus(str, enum.Enum):
@@ -45,7 +45,7 @@ class BacktestStatus(str, enum.Enum):
     CANCELLED = "cancelled"  # 已取消
 
 
-class BacktestTask(Base):
+class BacktestTask(Base, AuditMixin):
     """回测任务表"""
 
     __tablename__ = "zq_backtest_tasks"
@@ -60,8 +60,6 @@ class BacktestTask(Base):
     error_message = Column(Text, nullable=True)  # 错误信息
     started_at = Column(DateTime, nullable=True)  # 开始时间
     completed_at = Column(DateTime, nullable=True)  # 完成时间
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     # 关系
     user = relationship("User", back_populates="backtest_tasks")
@@ -69,7 +67,7 @@ class BacktestTask(Base):
     result = relationship("BacktestResult", back_populates="task", uselist=False, cascade="all, delete-orphan")
 
 
-class Strategy(Base):
+class Strategy(Base, AuditMixin):
     """策略表"""
 
     __tablename__ = "zq_backtest_strategies"
@@ -82,14 +80,12 @@ class Strategy(Base):
     code = Column(Text, nullable=False)  # 策略代码（Python代码字符串）
     params_schema = Column(Text, nullable=True)  # 策略参数Schema（JSON格式）
     is_template = Column(Boolean, default=False, nullable=False, index=True)  # 是否为模板策略
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     # 关系
     user = relationship("User", back_populates="strategies")
 
 
-class BacktestResult(Base):
+class BacktestResult(Base, AuditMixin):
     """回测结果表"""
 
     __tablename__ = "zq_backtest_results"
@@ -111,8 +107,6 @@ class BacktestResult(Base):
     metrics_json = Column(Text, nullable=True)  # 详细指标（JSON格式）
     trades_json = Column(Text, nullable=True)  # 交易记录（JSON格式）
     portfolio_json = Column(Text, nullable=True)  # 每日投资组合（JSON格式）
-
-    created_at = Column(DateTime, default=func.now(), nullable=False)
 
     # 关系
     task = relationship("BacktestTask", back_populates="result")

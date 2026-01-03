@@ -120,7 +120,7 @@ def init_database():
         for role_data in roles_data:
             role = db.query(Role).filter(Role.name == role_data["name"]).first()
             if not role:
-                role = Role(**role_data)
+                role = Role(**role_data, created_by="admin", updated_by="admin")
                 db.add(role)
                 logger.info(f"创建角色: {role_data['name']}")
 
@@ -165,7 +165,7 @@ def init_database():
         for perm_data in permissions_data:
             perm = db.query(Permission).filter(Permission.name == perm_data["name"]).first()
             if not perm:
-                perm = Permission(**perm_data)
+                perm = Permission(**perm_data, created_by="admin", updated_by="admin")
                 db.add(perm)
                 logger.info(f"创建权限: {perm_data['name']}")
 
@@ -264,6 +264,8 @@ def init_database():
                 hashed_password=get_password_hash("admin123"),  # 默认密码，生产环境应修改
                 role_id=admin_role.id,
                 is_active=True,
+                created_by="admin",
+                updated_by="admin",
             )
             db.add(admin_user)
             db.commit()

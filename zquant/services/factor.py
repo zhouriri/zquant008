@@ -28,10 +28,12 @@ from datetime import date, datetime
 from typing import Any
 
 from loguru import logger
-from sqlalchemy import asc, desc, func
+from sqlalchemy import asc, desc, func, text
 from sqlalchemy.orm import Session
 
-from zquant.core.exceptions import NotFoundError
+from zquant.core.exceptions import NotFoundError, ValidationError
+from zquant.data.storage_base import log_sql_statement
+from zquant.models.data import SPACEX_FACTOR_VIEW_NAME, Tustock
 from zquant.models.factor import FactorConfig, FactorDefinition, FactorModel
 
 
@@ -48,14 +50,18 @@ class FactorService:
         en_name: str | None = None,
         column_name: str | None = None,
         description: str | None = None,
+        factor_type: str | None = None,
         enabled: bool = True,
         factor_config: dict[str, Any] | None = None,
+        created_by: str | None = None,
     ) -> FactorDefinition:
         """
         创建因子定义
         
         Args:
+            factor_type: 因子类型，可选值："单因子"、"组合因子"，默认为"单因子"
             factor_config: 因子配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            created_by: 创建人
         """
         # 检查因子名称是否已存在
         existing = db.query(FactorDefinition).filter(FactorDefinition.factor_name == factor_name).first()
@@ -66,13 +72,21 @@ class FactorService:
         if not column_name:
             column_name = factor_name
 
+        # 如果没有指定因子类型，默认为"单因子"
+        if factor_type is None:
+            from zquant.models.factor import FACTOR_TYPE_SINGLE
+            factor_type = FACTOR_TYPE_SINGLE
+
         factor_def = FactorDefinition(
             factor_name=factor_name,
             cn_name=cn_name,
             en_name=en_name,
             column_name=column_name,
             description=description,
+            factor_type=factor_type,
             enabled=enabled,
+            created_by=created_by,
+            updated_by=created_by,
         )
         
         # 设置因子配置
@@ -120,8 +134,8 @@ class FactorService:
                 "id": FactorDefinition.id,
                 "factor_name": FactorDefinition.factor_name,
                 "cn_name": FactorDefinition.cn_name,
-                "created_at": FactorDefinition.created_at,
-                "updated_at": FactorDefinition.updated_at,
+                "created_time": FactorDefinition.created_time,
+                "updated_time": FactorDefinition.updated_time,
             }
             if order_by in sortable_fields:
                 sort_field = sortable_fields[order_by]
@@ -130,7 +144,7 @@ class FactorService:
                 else:
                     query = query.order_by(desc(sort_field))
         else:
-            query = query.order_by(desc(FactorDefinition.created_at))
+            query = query.order_by(desc(FactorDefinition.created_time))
 
         total = query.count()
         items = query.offset(skip).limit(limit).all()
@@ -145,14 +159,18 @@ class FactorService:
         en_name: str | None = None,
         column_name: str | None = None,
         description: str | None = None,
+        factor_type: str | None = None,
         enabled: bool | None = None,
         factor_config: dict[str, Any] | None = None,
+        updated_by: str | None = None,
     ) -> FactorDefinition:
         """
         更新因子定义
         
         Args:
+            factor_type: 因子类型，可选值："单因子"、"组合因子"
             factor_config: 因子配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            updated_by: 修改人
         """
         factor_def = FactorService.get_factor_definition(db, factor_id)
 
@@ -164,10 +182,14 @@ class FactorService:
             factor_def.column_name = column_name
         if description is not None:
             factor_def.description = description
+        if factor_type is not None:
+            factor_def.factor_type = factor_type
         if enabled is not None:
             factor_def.enabled = enabled
         if factor_config is not None:
             factor_def.set_factor_config(factor_config)
+        if updated_by is not None:
+            factor_def.updated_by = updated_by
 
         db.commit()
         db.refresh(factor_def)
@@ -197,6 +219,7 @@ class FactorService:
         config_json: dict[str, Any] | None = None,
         is_default: bool = False,
         enabled: bool = True,
+        created_by: str | None = None,
     ) -> FactorModel:
         """创建因子模型"""
         # 检查因子是否存在
@@ -214,6 +237,8 @@ class FactorService:
             model_code=model_code,
             is_default=is_default,
             enabled=enabled,
+            created_by=created_by,
+            updated_by=created_by,
         )
         model.set_config(config_json or {})
 
@@ -256,8 +281,8 @@ class FactorService:
                 "id": FactorModel.id,
                 "model_name": FactorModel.model_name,
                 "model_code": FactorModel.model_code,
-                "created_at": FactorModel.created_at,
-                "updated_at": FactorModel.updated_at,
+                "created_time": FactorModel.created_time,
+                "updated_time": FactorModel.updated_time,
             }
             if order_by in sortable_fields:
                 sort_field = sortable_fields[order_by]
@@ -266,7 +291,7 @@ class FactorService:
                 else:
                     query = query.order_by(desc(sort_field))
         else:
-            query = query.order_by(desc(FactorModel.created_at))
+            query = query.order_by(desc(FactorModel.created_time))
 
         total = query.count()
         items = query.offset(skip).limit(limit).all()
@@ -291,6 +316,7 @@ class FactorService:
         config_json: dict[str, Any] | None = None,
         is_default: bool | None = None,
         enabled: bool | None = None,
+        updated_by: str | None = None,
     ) -> FactorModel:
         """更新因子模型"""
         model = FactorService.get_factor_model(db, model_id)
@@ -310,6 +336,8 @@ class FactorService:
                     FactorModel.factor_id == model.factor_id, FactorModel.is_default == True
                 ).update({"is_default": False})
             model.is_default = is_default
+        if updated_by is not None:
+            model.updated_by = updated_by
 
         db.commit()
         db.refresh(model)
@@ -397,8 +425,8 @@ class FactorService:
                 "id": FactorConfig.id,
                 "factor_id": FactorConfig.factor_id,
                 "model_id": FactorConfig.model_id,
-                "created_at": FactorConfig.created_at,
-                "updated_at": FactorConfig.updated_at,
+                "created_time": FactorConfig.created_time,
+                "updated_time": FactorConfig.updated_time,
             }
             if order_by in sortable_fields:
                 sort_field = sortable_fields[order_by]
@@ -407,7 +435,7 @@ class FactorService:
                 else:
                     query = query.order_by(desc(sort_field))
         else:
-            query = query.order_by(desc(FactorConfig.created_at))
+            query = query.order_by(desc(FactorConfig.created_time))
 
         total = query.count()
         items = query.offset(skip).limit(limit).all()
@@ -762,4 +790,113 @@ class FactorService:
         
         logger.info(f"删除因子配置: factor_id={factor_id}")
         return True
+
+    # ==================== 量化因子结果查询 ====================
+
+    @staticmethod
+    def get_quant_factor_results(
+        db: Session,
+        ts_code: str | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        filter_conditions: Any | None = None,
+        skip: int = 0,
+        limit: int = 100,
+        order_by: str | None = None,
+        order: str = "desc",
+    ) -> tuple[list[dict[str, Any]], int]:
+        """
+        查询量化因子结果（通过 zq_quant_factor_spacex_view）
+        
+        支持关联股票基础信息，并支持动态条件筛选
+        """
+        try:
+            from zquant.services.stock_filter import StockFilterService
+            
+            # 1. 必须提供 ts_code 才能定位物理表
+            if not ts_code or "%" in ts_code or "*" in ts_code:
+                raise ValidationError("当前查询模式要求必须输入完整的股票代码（如 000001.SZ）以定位分表")
+
+            # 解析 symbol 以确定表名
+            symbol = ts_code.split('.')[0] if '.' in ts_code else ts_code
+            target_table = f"zq_quant_factor_spacex_{symbol}"
+
+            # 2. 构建基础 WHERE 条件
+            where_parts = ["f.ts_code = :ts_code"]
+            params = {"ts_code": ts_code, "skip": skip, "limit": limit}
+            
+            if start_date:
+                where_parts.append("f.trade_date >= :start_date")
+                params["start_date"] = start_date
+                
+            if end_date:
+                where_parts.append("f.trade_date <= :end_date")
+                params["end_date"] = end_date
+                
+            # 3. 构建自定义筛选条件 (复用 StockFilterService 逻辑)
+            if filter_conditions:
+                custom_where, custom_params = StockFilterService._build_filter_conditions(
+                    filter_conditions, use_mapping=False, table_alias="f"
+                )
+                if custom_where and custom_where != "1=1":
+                    where_parts.append(f"({custom_where})")
+                    params.update(custom_params)
+            
+            where_clause = " AND ".join(where_parts)
+            
+            # 4. 构建排序
+            if order_by:
+                import re
+                if not re.match(r'^[a-zA-Z0-9_]+$', order_by):
+                    order_by = "trade_date"
+                sort_clause = f"ORDER BY f.`{order_by}` {order.upper() if order.lower() == 'asc' else 'DESC'}"
+            else:
+                sort_clause = "ORDER BY f.trade_date DESC"
+                
+            # 5. 执行 SQL 查询（直接查询物理分表）
+            sql = f"""
+            SELECT f.*, s.name as stock_name, COUNT(*) OVER() as total_count
+            FROM `{target_table}` f
+            LEFT JOIN `zq_data_tustock_stockbasic` s ON f.ts_code = s.ts_code
+            WHERE {where_clause}
+            {sort_clause}
+            LIMIT :limit OFFSET :skip
+            """
+            
+            log_sql_statement(sql, params)
+            result = db.execute(text(sql), params)
+            rows = result.fetchall()
+            columns = list(result.keys())
+            
+            # 5. 格式化结果
+            items = []
+            total = 0
+            
+            total_count_idx = columns.index("total_count") if "total_count" in columns else None
+            
+            for row_idx, row in enumerate(rows):
+                item = {}
+                for col_idx, col in enumerate(columns):
+                    if col_idx == total_count_idx:
+                        if row_idx == 0:
+                            total = int(row[col_idx])
+                        continue
+                        
+                    val = row[col_idx]
+                    if hasattr(val, "isoformat"):
+                        item[col] = val.isoformat()
+                    else:
+                        item[col] = val
+                items.append(item)
+                
+            if not rows:
+                total = 0
+                
+            return items, total
+            
+        except Exception as e:
+            logger.error(f"查询量化因子结果失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            raise ValidationError(f"查询量化因子结果失败: {str(e)}")
 

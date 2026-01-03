@@ -20,7 +20,7 @@
 //     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 //     - Repository: https://github.com/yoyoung/zquant
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from '@umijs/max';
 import { usePageCacheContext, type PageCache } from '@/contexts/PageCacheContext';
 
@@ -100,14 +100,15 @@ export const usePageCache = () => {
    * 保存数据源到缓存
    * @param dataSource 数据源
    * @param rawData 原始数据（可选）
+   * @param total 总记录数（可选）
    */
-  const saveDataSource = useCallback((dataSource: any[], rawData?: any[]) => {
-    update({ dataSource, rawData });
+  const saveDataSource = useCallback((dataSource: any[], rawData?: any[], total?: number) => {
+    update({ dataSource, rawData, total });
   }, [update]);
 
   /**
    * 从缓存恢复数据源
-   * @returns 包含dataSource和rawData的对象，如果不存在则返回undefined
+   * @returns 包含dataSource、rawData和total的对象，如果不存在则返回undefined
    */
   const getDataSource = useCallback(() => {
     const cache = get();
@@ -115,6 +116,7 @@ export const usePageCache = () => {
     return {
       dataSource: cache.dataSource,
       rawData: cache.rawData,
+      total: cache.total,
     };
   }, [get]);
 
@@ -138,7 +140,7 @@ export const usePageCache = () => {
     return get()?.modalStates?.[modalKey];
   }, [get]);
 
-  return {
+  return useMemo(() => ({
     // 基础方法
     save,
     get,
@@ -156,6 +158,10 @@ export const usePageCache = () => {
     
     // 当前路径（只读）
     currentPath: currentPathRef.current,
-  };
+  }), [
+    save, get, clear, has, update, 
+    saveFormValues, getFormValues, saveDataSource, 
+    getDataSource, saveModalState, getModalState
+  ]);
 };
 

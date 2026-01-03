@@ -27,6 +27,7 @@
 from typing import Any
 from sqlalchemy.orm import Session
 
+from zquant.models.scheduler import TaskExecution
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.services.sync_strategies.base import DataSyncStrategy
 
@@ -37,7 +38,9 @@ class DailyBasicSyncStrategy(DataSyncStrategy):
     def __init__(self):
         self.data_scheduler = DataScheduler()
 
-    def sync(self, db: Session, config: dict[str, Any], extra_info: dict | None = None) -> dict[str, Any]:
+    def sync(
+        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+    ) -> dict[str, Any]:
         """
         同步每日指标数据
 
@@ -45,6 +48,7 @@ class DailyBasicSyncStrategy(DataSyncStrategy):
             db: 数据库会话
             config: 同步配置，可包含 start_date, end_date, codelist
             extra_info: 额外信息字典
+            execution: 执行记录对象（可选）
 
         Returns:
             同步结果字典
@@ -59,14 +63,14 @@ class DailyBasicSyncStrategy(DataSyncStrategy):
         elif codelist is None:
             codelist = None
 
-        result = self.data_scheduler.sync_daily_basic_data(db, start_date, end_date, extra_info, codelist)
+        result = self.data_scheduler.sync_all_daily_basic_data(db, start_date, end_date, extra_info, codelist, execution)
         return {
             "success": True,
             "total": result.get("total", 0),
             "success_count": result.get("success", 0),
             "failed_count": len(result.get("failed", [])),
             "failed_symbols": result.get("failed", []),
-            "message": f"同步完成: 成功 {result.get('success', 0)}/{result.get('total', 0)}"
+            "message": f"同步完成: 成功 {result.get('success', 0)}/{result.get('total', 0)}",
         }
 
     def get_strategy_name(self) -> str:

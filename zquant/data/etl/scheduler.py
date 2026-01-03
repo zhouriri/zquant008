@@ -34,6 +34,8 @@ from zquant.data.etl.tushare import TushareClient
 from zquant.data.storage import DataStorage
 from zquant.data.storage_base import log_sql_statement
 from zquant.database import Base, engine
+from zquant.models.scheduler import TaskExecution
+from zquant.scheduler.utils import update_execution_progress
 from zquant.services.data import DataService
 
 
@@ -242,13 +244,14 @@ class DataScheduler:
 
         return " ".join(parts).strip()
 
-    def sync_stock_list(self, db: Session, extra_info: dict | None = None) -> int:
+    def sync_stock_list(self, db: Session, extra_info: dict | None = None, execution: TaskExecution | None = None) -> int:
         """
         同步股票列表
 
         Args:
             db: 数据库会话
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
@@ -258,7 +261,11 @@ class DataScheduler:
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             logger.info("开始同步股票列表...")
+            update_execution_progress(db, execution, message="正在从 Tushare 获取股票列表...")
+            
             df = self.tushare.get_stock_list()
+            
+            update_execution_progress(db, execution, message=f"获取到 {len(df)} 只股票，正在写入数据库...")
             count = self.storage.upsert_stocks(db, df, extra_info)
 
             # 记录结束时间和结果
@@ -280,11 +287,49 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stock_basic",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"股票列表同步完成，更新 {count} 条")
+            update_execution_progress(db, execution, progress_percent=100, message=f"股票列表同步完成，更新 {count} 条")
+
+            # ==================== 新增：分表自动管理 ====================
+            # 检测新增股票代码并初始化分表
+            try:
+                from zquant.services.partition_manager import PartitionManager
+
+                logger.info("检测新增股票代码...")
+                update_execution_progress(db, execution, message="正在检测并初始化新增股票分表...")
+                new_codes = PartitionManager.detect_new_stock_codes(db)
+
+                if new_codes:
+                    logger.info(f"发现 {len(new_codes)} 只新增股票，开始初始化分表...")
+                    
+                    # 为新增代码初始化所有类型的分表
+                    init_result = PartitionManager.init_partition_tables_for_codes(db, new_codes)
+                    logger.info(
+                        f"分表初始化完成: 成功 {init_result['success']}/{init_result['total']}，"
+                        f"失败 {len(init_result['failed'])}"
+                    )
+
+                    # 更新所有分表视图
+                    logger.info("更新所有分表视图...")
+                    view_result = PartitionManager.update_all_views(db)
+                    success_views = sum(1 for v in view_result.values() if v)
+                    logger.info(f"视图更新完成: {success_views}/{len(view_result)} 个视图更新成功")
+                else:
+                    logger.info("未检测到新增股票代码，跳过分表初始化")
+
+            except Exception as partition_error:
+                # 分表初始化失败不影响主流程
+                logger.error(f"分表自动管理失败: {partition_error}")
+                logger.warning("分表初始化失败不影响股票列表同步，可稍后手动初始化")
+            # ==================== 分表自动管理结束 ====================
+
             return count
         except Exception as e:
             # 记录失败的操作日志
@@ -306,12 +351,16 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stock_basic",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.error(f"同步股票列表失败: {e}")
             raise
+
 
     def sync_trading_calendar(
         self,
@@ -320,6 +369,7 @@ class DataScheduler:
         end_date: str | None = None,
         exchanges: list[str] | None = None,
         extra_info: dict | None = None,
+        execution: TaskExecution | None = None,
     ) -> int:
         """
         同步交易日历
@@ -331,6 +381,7 @@ class DataScheduler:
             exchanges: 交易所列表，如果为None则同步上交所和深交所
                 SSE=上交所, SZSE=深交所
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
@@ -344,20 +395,33 @@ class DataScheduler:
                 exchanges = ["SSE", "SZSE"]
 
             logger.info(f"开始同步交易日历，交易所：{exchanges}")
+            update_execution_progress(db, execution, message=f"开始同步交易日历: {exchanges}")
+            
             if not start_date:
                 start_date = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
             if not end_date:
                 end_date = (date.today() + timedelta(days=365)).strftime("%Y%m%d")
 
             total_count = 0
-            for exchange in exchanges:
+            for i, exchange in enumerate(exchanges, 1):
                 try:
                     logger.info(f"同步 {exchange} 交易日历...")
+                    update_execution_progress(
+                        db, 
+                        execution, 
+                        processed_items=i-1, 
+                        total_items=len(exchanges), 
+                        current_item=exchange,
+                        message=f"正在同步 {exchange} 交易日历 ({start_date} 至 {end_date})..."
+                    )
+                    
                     df = self.tushare.get_trade_cal(exchange=exchange, start_date=start_date, end_date=end_date)
                     count = self.storage.upsert_trading_calendar(db, df, extra_info)
                     total_count += count
                     logger.info(f"{exchange} 交易日历同步完成，更新 {count} 条")
                 except Exception as e:
+                    if "Task terminated" in str(e):
+                        raise
                     logger.error(f"同步 {exchange} 交易日历失败: {e}")
                     # 继续同步其他交易所，不中断整个流程
                     continue
@@ -381,11 +445,21 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="trade_cal",
+                    api_data_count=total_count,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"交易日历同步完成，共更新 {total_count} 条")
+            update_execution_progress(
+                db, 
+                execution, 
+                processed_items=len(exchanges), 
+                total_items=len(exchanges),
+                message=f"交易日历同步完成，更新 {total_count} 条"
+            )
             return total_count
         except Exception as e:
             # 记录失败的操作日志
@@ -407,6 +481,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="trade_cal",
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -422,6 +499,7 @@ class DataScheduler:
         end_date: str | None = None,
         extra_info: dict | None = None,
         update_view: bool = True,
+        execution: TaskExecution | None = None,
     ) -> int:
         """
         同步单只股票的日线数据（按 ts_code 分表存储）
@@ -433,6 +511,7 @@ class DataScheduler:
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
             update_view: 是否更新视图，默认True。批量同步时建议设置为False，完成后统一更新
+            execution: 执行记录对象（可选）
         """
         try:
             # 确保基础表存在
@@ -441,6 +520,8 @@ class DataScheduler:
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             logger.info(f"开始同步 {ts_code} 日线数据...")
+            update_execution_progress(db, execution, message=f"正在同步 {ts_code} 日线数据...")
+            
             if not start_date:
                 # 默认获取最近一年的数据
                 start_date = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
@@ -451,6 +532,7 @@ class DataScheduler:
             df = self.tushare.get_daily_data(ts_code, start_date, end_date, adj="qfq")
             if df.empty:
                 logger.warning(f"{ts_code} 无数据")
+                update_execution_progress(db, execution, message=f"{ts_code} 无数据")
                 return 0
 
             # 记录开始时间
@@ -461,7 +543,9 @@ class DataScheduler:
 
             # 记录结束时间和结果
             end_time = datetime.now()
-            table_name = f"zq_data_tustock_daily_{ts_code.replace('.', '_')}"
+            from zquant.models.data import get_daily_table_name
+
+            table_name = get_daily_table_name(ts_code)
             operation_result = "success" if count > 0 else "partial_success"
             created_by = extra_info.get("created_by", "scheduler") if extra_info else "scheduler"
 
@@ -478,16 +562,22 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="daily",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"{ts_code} 日线数据同步完成，更新 {count} 条")
+            update_execution_progress(db, execution, message=f"{ts_code} 同步完成，更新 {count} 条")
             return count
         except Exception as e:
             # 记录失败的操作日志
             end_time = datetime.now()
-            table_name = f"zq_data_tustock_daily_{ts_code.replace('.', '_')}"
+            from zquant.models.data import get_daily_table_name
+
+            table_name = get_daily_table_name(ts_code)
             created_by = extra_info.get("created_by", "scheduler") if extra_info else "scheduler"
             try:
                 DataService.create_data_operation_log(
@@ -502,6 +592,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="daily",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -516,6 +609,7 @@ class DataScheduler:
         end_date: str | None = None,
         extra_info: dict | None = None,
         codelist: list[str] | None = None,
+        execution: TaskExecution | None = None,
     ) -> dict:
         """
         同步所有股票的日线数据（增量更新）
@@ -526,6 +620,7 @@ class DataScheduler:
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
             codelist: TS代码列表（可选），如果提供则只同步列表中的股票
+            execution: 执行记录对象（可选）
 
         同步策略：
             - 规则一（所有参数均未传入，start_date == end_date，且不传 codelist）：
@@ -536,6 +631,7 @@ class DataScheduler:
         start_time = datetime.now()
         try:
             logger.info("开始同步所有股票日线数据...")
+            update_execution_progress(db, execution, message="正在准备同步...")
             from zquant.models.data import Tustock
 
             # 确保基础表存在
@@ -549,6 +645,7 @@ class DataScheduler:
             if is_single_day:
                 # 规则一/按天同步：调用一次 API 获取所有股票数据，然后批量写入
                 logger.info(f"批量API同步模式（按天）：{start_date}")
+                update_execution_progress(db, execution, message=f"正在通过批量API获取数据: {start_date}")
                 if codelist:
                     logger.info(f"指定股票列表，共 {len(codelist)} 只股票，将从批量数据中过滤")
                 try:
@@ -570,12 +667,14 @@ class DataScheduler:
                             return {"total": len(codelist), "success": 0, "failed": codelist}
 
                     logger.info(f"获取到 {len(all_data_df)} 条日线数据，涉及 {all_data_df['ts_code'].nunique()} 只股票")
+                    update_execution_progress(db, execution, message=f"已获取 {len(all_data_df)} 条数据，准备写入数据库...")
 
                     # 批量写入（按 ts_code 分组写入对应分表）
                     result = self.storage.upsert_daily_data_batch(db, all_data_df, extra_info, update_view=False)
 
                     # 批量同步完成后，统一更新一次视图
                     logger.info("批量同步完成，开始更新视图...")
+                    update_execution_progress(db, execution, progress_percent=100, message="同步完成")
                     from zquant.data.view_manager import create_or_update_daily_view
 
                     create_or_update_daily_view(db)
@@ -632,6 +731,9 @@ class DataScheduler:
                                         delete_count=table_detail.get("delete_count", 0),
                                         error_message=table_detail.get("error_message"),
                                         created_by=created_by,
+                                        data_source="tushare",
+                                        api_interface="daily",
+                                        api_data_count=table_detail.get("count", 0),
                                     )
                                 except Exception as log_error:
                                     logger.warning(f"记录表 {table_name} 操作日志失败: {log_error}")
@@ -668,6 +770,9 @@ class DataScheduler:
                                     delete_count=group["delete_count"],
                                     error_message=error_message,
                                     created_by=created_by,
+                                    data_source="tushare",
+                                    api_interface="daily",
+                                    api_data_count=group["insert_count"],
                                 )
                             except Exception as log_error:
                                 logger.warning(f"记录主表 {main_table_name} 操作日志失败: {log_error}")
@@ -690,6 +795,9 @@ class DataScheduler:
                                 if result.get("failed")
                                 else None,
                                 created_by=created_by,
+                                data_source="tushare",
+                                api_interface="daily",
+                                api_data_count=result.get("success", 0),
                             )
                         except Exception as log_error:
                             logger.warning(f"记录操作日志失败: {log_error}")
@@ -714,6 +822,9 @@ class DataScheduler:
                             delete_count=0,
                             error_message=str(e),
                             created_by=created_by,
+                            data_source="tushare",
+                            api_interface="daily",
+                            api_data_count=0,
                         )
                     except Exception as log_error:
                         logger.warning(f"记录操作日志失败: {log_error}")
@@ -729,32 +840,98 @@ class DataScheduler:
                 if codelist:
                     # 如果提供了 codelist，只同步列表中的股票
                     logger.info(f"指定股票列表，共 {len(codelist)} 只股票")
-                    # 验证 codelist 中的股票是否存在
+                    # 验证 codelist 中的股票是否存在，并按代码排序确保顺序稳定
                     stocks = (
-                        db.query(Tustock).filter(Tustock.ts_code.in_(codelist), Tustock.delist_date.is_(None)).all()
+                        db.query(Tustock)
+                        .filter(Tustock.ts_code.in_(codelist), Tustock.delist_date.is_(None))
+                        .order_by(Tustock.ts_code)
+                        .all()
                     )
                     found_ts_codes = {stock.ts_code for stock in stocks}
                     not_found = set(codelist) - found_ts_codes
                     if not_found:
                         logger.warning(f"以下TS代码在数据库中未找到或已退市: {not_found}")
                 else:
-                    # 获取所有上市股票
-                    stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).all()
+                    # 获取所有上市股票，并按代码排序确保顺序稳定
+                    stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).order_by(Tustock.ts_code).all()
+
+                # 处理恢复模式
+                resume_from_id = None
+                if execution:
+                    resume_from_id = execution.get_result().get("resume_from_execution_id")
+                
+                skip_until = None
+                if resume_from_id:
+                    old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+                    if old_execution:
+                        skip_until = old_execution.current_item
+                        logger.info(f"[数据同步] 从执行记录 {resume_from_id} 恢复，准备跳过直到 {skip_until}")
 
                 total = len(stocks)
                 success = 0
                 failed = []
+                skipped_count = 0
 
+                update_execution_progress(db, execution, total_items=total, processed_items=0, message="正在开始循环同步...")
+
+                has_reached_resume_point = skip_until is None
                 for i, stock in enumerate(stocks, 1):
+                    # 如果在恢复模式下，跳过直到达到断点
+                    if not has_reached_resume_point:
+                        if stock.ts_code == skip_until:
+                            has_reached_resume_point = True
+                            logger.info(f"[数据同步] 已到达恢复点: {stock.ts_code}，将跳过该股票并从下一只开始")
+                            skipped_count += 1
+                            success += 1
+                            continue
+                        else:
+                            skipped_count += 1
+                            success += 1  # 视为已成功，为了进度条显示计入
+                            continue
+
                     try:
+                        # 高频检查暂停和终止请求（每一轮都检查）
+                        from zquant.scheduler.utils import check_control_flags
+                        check_control_flags(db, execution)
+
+                        # 进度更新频率控制：每10个股票或首尾股票更新一次数据库
+                        if i % 10 == 0 or i == total or i == skipped_count + 1:
+                            update_execution_progress(
+                                db, 
+                                execution, 
+                                processed_items=i-1,
+                                total_items=total,
+                                current_item=stock.ts_code,
+                                message=f"正在同步日线数据: {stock.ts_code} ({i}/{total})..."
+                            )
+                        else:
+                            # 仅更新内存，不写库，确保断点信息是最新的
+                            if execution:
+                                execution.current_item = stock.ts_code
+                                execution.processed_items = i - 1
+                        
+                        # 日志记录进度
+                        if i % 10 == 0 or i == total:
+                            logger.info(
+                                f"日线数据同步进度: {stock.ts_code} - "
+                                f"已处理 {i}/{total} 个股票 "
+                                f"(成功={success}, 失败={len(failed)})"
+                            )
+                        
                         # 批量同步时，不更新视图，减少锁竞争
                         self.sync_daily_data(db, stock.ts_code, start_date, end_date, extra_info, update_view=False)
                         success += 1
+                        
+                        # 批次进度日志（每100个股票）
                         if i % 100 == 0:
-                            logger.info(f"进度: {i}/{total}")
+                            logger.info(f"日线数据同步批次进度: {i}/{total} (成功={success}, 失败={len(failed)})")
                     except Exception as e:
+                        if "Task terminated" in str(e):
+                            raise
                         logger.error(f"同步 {stock.ts_code} 失败: {e}")
                         failed.append(stock.ts_code)
+
+                update_execution_progress(db, execution, processed_items=total, message="循环同步完成，正在更新视图...")
 
                 # 如果提供了 codelist 且有未找到的股票，将它们添加到失败列表
                 if not_found:
@@ -788,6 +965,9 @@ class DataScheduler:
                         delete_count=0,
                         error_message=f"失败: {len(failed)} 只股票" if failed else None,
                         created_by=created_by,
+                        data_source="tushare",
+                        api_interface="daily",
+                        api_data_count=success,
                     )
                 except Exception as log_error:
                     logger.warning(f"记录操作日志失败: {log_error}")
@@ -811,6 +991,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="daily",
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -826,6 +1009,7 @@ class DataScheduler:
         end_date: str | None = None,
         extra_info: dict | None = None,
         update_view: bool = True,
+        execution: TaskExecution | None = None,
     ) -> int:
         """
         同步单只股票的每日指标数据（按 ts_code 分表存储）
@@ -837,6 +1021,7 @@ class DataScheduler:
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
             update_view: 是否更新视图，默认True。批量同步时建议设置为False，完成后统一更新
+            execution: 执行记录对象（可选）
         """
         try:
             # 确保基础表存在
@@ -845,6 +1030,8 @@ class DataScheduler:
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             logger.info(f"开始同步 {ts_code} 每日指标数据...")
+            update_execution_progress(db, execution, message=f"正在同步 {ts_code} 每日指标数据...")
+            
             if not start_date:
                 # 默认获取最近一年的数据
                 start_date = (date.today() - timedelta(days=365)).strftime("%Y%m%d")
@@ -855,6 +1042,7 @@ class DataScheduler:
             df = self.tushare.get_daily_basic_data(ts_code, start_date, end_date)
             if df.empty:
                 logger.warning(f"{ts_code} 无每日指标数据")
+                update_execution_progress(db, execution, message=f"{ts_code} 无每日指标数据")
                 return 0
 
             # 记录开始时间
@@ -865,7 +1053,9 @@ class DataScheduler:
 
             # 记录结束时间和结果
             end_time = datetime.now()
-            table_name = f"zq_data_tustock_daily_basic_{ts_code.replace('.', '_')}"
+            from zquant.models.data import get_daily_basic_table_name
+
+            table_name = get_daily_basic_table_name(ts_code)
             operation_result = "success" if count > 0 else "partial_success"
             created_by = extra_info.get("created_by", "scheduler") if extra_info else "scheduler"
 
@@ -882,16 +1072,22 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="daily_basic",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"{ts_code} 每日指标数据同步完成，更新 {count} 条")
+            update_execution_progress(db, execution, message=f"{ts_code} 每日指标同步完成，更新 {count} 条")
             return count
         except Exception as e:
             # 记录失败的操作日志
             end_time = datetime.now()
-            table_name = f"zq_data_tustock_daily_basic_{ts_code.replace('.', '_')}"
+            from zquant.models.data import get_daily_basic_table_name
+
+            table_name = get_daily_basic_table_name(ts_code)
             created_by = extra_info.get("created_by", "scheduler") if extra_info else "scheduler"
             try:
                 DataService.create_data_operation_log(
@@ -906,6 +1102,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="daily_basic",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -914,7 +1113,13 @@ class DataScheduler:
             raise
 
     def sync_all_daily_basic_data(
-        self, db: Session, start_date: str | None = None, end_date: str | None = None, extra_info: dict | None = None
+        self,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        extra_info: dict | None = None,
+        codelist: list[str] | None = None,
+        execution: TaskExecution | None = None,
     ) -> dict:
         """
         同步所有股票的每日指标数据（增量更新）
@@ -924,10 +1129,13 @@ class DataScheduler:
             start_date: 开始日期，格式：YYYYMMDD
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            codelist: TS代码列表（可选）
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
             logger.info("开始同步所有股票每日指标数据...")
+            update_execution_progress(db, execution, message="正在准备同步...")
             from zquant.models.data import Tustock
 
             # 确保基础表存在
@@ -939,6 +1147,7 @@ class DataScheduler:
             if is_single_day:
                 # 按天同步：调用一次 API 获取所有股票数据，然后批量写入
                 logger.info(f"按天同步模式：{start_date}")
+                update_execution_progress(db, execution, message=f"正在通过批量API获取数据: {start_date}")
                 try:
                     # 调用批量 API 获取所有股票数据
                     all_data_df = self.tushare.get_all_daily_basic_data_by_date(start_date)
@@ -947,15 +1156,23 @@ class DataScheduler:
                         logger.warning(f"{start_date} 无数据")
                         return {"total": 0, "success": 0, "failed": []}
 
+                    if codelist:
+                        all_data_df = all_data_df[all_data_df["ts_code"].isin(codelist)]
+                        if all_data_df.empty:
+                            logger.warning(f"{start_date} 在指定股票列表中无数据")
+                            return {"total": len(codelist), "success": 0, "failed": codelist}
+
                     logger.info(
                         f"获取到 {len(all_data_df)} 条每日指标数据，涉及 {all_data_df['ts_code'].nunique()} 只股票"
                     )
+                    update_execution_progress(db, execution, message=f"已获取 {len(all_data_df)} 条数据，准备写入数据库...")
 
                     # 批量写入（按 ts_code 分组写入对应分表）
                     result = self.storage.upsert_daily_basic_data_batch(db, all_data_df, extra_info, update_view=False)
 
                     # 批量同步完成后，统一更新一次视图
                     logger.info("批量同步完成，开始更新视图...")
+                    update_execution_progress(db, execution, progress_percent=100, message="同步完成")
                     from zquant.data.view_manager import create_or_update_daily_basic_view
 
                     create_or_update_daily_basic_view(db)
@@ -1012,6 +1229,9 @@ class DataScheduler:
                                         delete_count=table_detail.get("delete_count", 0),
                                         error_message=table_detail.get("error_message"),
                                         created_by=created_by,
+                                        data_source="tushare",
+                                        api_interface="daily_basic",
+                                        api_data_count=table_detail.get("count", 0),
                                     )
                                 except Exception as log_error:
                                     logger.warning(f"记录表 {table_name} 操作日志失败: {log_error}")
@@ -1048,6 +1268,9 @@ class DataScheduler:
                                     delete_count=group["delete_count"],
                                     error_message=error_message,
                                     created_by=created_by,
+                                    data_source="tushare",
+                                    api_interface="daily_basic",
+                                    api_data_count=group["insert_count"],
                                 )
                             except Exception as log_error:
                                 logger.warning(f"记录主表 {main_table_name} 操作日志失败: {log_error}")
@@ -1070,6 +1293,9 @@ class DataScheduler:
                                 if result.get("failed")
                                 else None,
                                 created_by=created_by,
+                                data_source="tushare",
+                                api_interface="daily_basic",
+                                api_data_count=result.get("success", 0),
                             )
                         except Exception as log_error:
                             logger.warning(f"记录操作日志失败: {log_error}")
@@ -1094,6 +1320,9 @@ class DataScheduler:
                             delete_count=0,
                             error_message=str(e),
                             created_by=created_by,
+                            data_source="tushare",
+                            api_interface="daily_basic",
+                            api_data_count=0,
                         )
                     except Exception as log_error:
                         logger.warning(f"记录操作日志失败: {log_error}")
@@ -1104,24 +1333,97 @@ class DataScheduler:
                 # 按时间段同步：保持原有循环调用逻辑
                 logger.info(f"按时间段同步模式：{start_date} 至 {end_date}")
 
-                # 获取所有上市股票
-                stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).all()
+                # 获取股票列表
+                if codelist:
+                    # 验证并按代码排序确保顺序稳定
+                    stocks = (
+                        db.query(Tustock)
+                        .filter(Tustock.ts_code.in_(codelist), Tustock.delist_date.is_(None))
+                        .order_by(Tustock.ts_code)
+                        .all()
+                    )
+                else:
+                    # 按代码排序确保顺序稳定
+                    stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).order_by(Tustock.ts_code).all()
+                
+                # 处理恢复模式
+                resume_from_id = None
+                if execution:
+                    resume_from_id = execution.get_result().get("resume_from_execution_id")
+                
+                skip_until = None
+                if resume_from_id:
+                    old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+                    if old_execution:
+                        skip_until = old_execution.current_item
+                        logger.info(f"[每日指标] 从执行记录 {resume_from_id} 恢复，准备跳过直到 {skip_until}")
+
                 total = len(stocks)
                 success = 0
                 failed = []
+                skipped_count = 0
 
+                update_execution_progress(db, execution, total_items=total, processed_items=0, message="正在开始循环同步...")
+
+                has_reached_resume_point = skip_until is None
                 for i, stock in enumerate(stocks, 1):
+                    # 如果在恢复模式下，跳过直到达到断点
+                    if not has_reached_resume_point:
+                        if stock.ts_code == skip_until:
+                            has_reached_resume_point = True
+                            logger.info(f"[每日指标] 已到达恢复点: {stock.ts_code}，将跳过该股票并从下一只开始")
+                            skipped_count += 1
+                            success += 1
+                            continue
+                        else:
+                            skipped_count += 1
+                            success += 1
+                            continue
+
                     try:
+                        # 高频检查暂停和终止请求（每一轮都检查）
+                        from zquant.scheduler.utils import check_control_flags
+                        check_control_flags(db, execution)
+
+                        # 进度更新频率控制
+                        if i % 10 == 0 or i == total or i == skipped_count + 1:
+                            update_execution_progress(
+                                db,
+                                execution,
+                                processed_items=i - 1,
+                                total_items=total,
+                                current_item=stock.ts_code,
+                                message=f"正在同步每日指标: {stock.ts_code} ({i}/{total})...",
+                            )
+                        else:
+                            if execution:
+                                execution.current_item = stock.ts_code
+                                execution.processed_items = i - 1
+                        
+                        # 日志记录进度
+                        if i % 10 == 0 or i == total:
+                            logger.info(
+                                f"每日指标同步进度: {stock.ts_code} - "
+                                f"已处理 {i}/{total} 个股票 "
+                                f"(成功={success}, 失败={len(failed)})"
+                            )
+                        
                         # 批量同步时，不更新视图，减少锁竞争
                         self.sync_daily_basic_data(
                             db, stock.ts_code, start_date, end_date, extra_info, update_view=False
                         )
                         success += 1
+                        
+                        # 批次进度日志（每100个股票）
                         if i % 100 == 0:
-                            logger.info(f"进度: {i}/{total}")
+                            logger.info(f"每日指标同步批次进度: {i}/{total} (成功={success}, 失败={len(failed)})")
                     except Exception as e:
+                        if "Task terminated" in str(e):
+                            raise
                         logger.error(f"同步 {stock.ts_code} 失败: {e}")
                         failed.append(stock.ts_code)
+
+                update_execution_progress(db, execution, processed_items=total, message="循环同步完成，正在更新视图...")
 
                 # 批量同步完成后，统一更新一次视图
                 logger.info("批量同步完成，开始更新视图...")
@@ -1150,6 +1452,9 @@ class DataScheduler:
                         delete_count=0,
                         error_message=f"失败: {len(failed)} 只股票" if failed else None,
                         created_by=created_by,
+                        data_source="tushare",
+                        api_interface="daily_basic",
+                        api_data_count=success,
                     )
                 except Exception as log_error:
                     logger.warning(f"记录操作日志失败: {log_error}")
@@ -1173,6 +1478,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="daily_basic",
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1188,6 +1496,7 @@ class DataScheduler:
         end_date: str | None = None,
         extra_info: dict | None = None,
         update_view: bool = True,
+        execution: TaskExecution | None = None,
     ) -> int:
         """
         同步单只股票的因子数据（按 ts_code 分表存储）
@@ -1199,6 +1508,7 @@ class DataScheduler:
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
             update_view: 是否更新视图，默认True。批量同步时建议设置为False，完成后统一更新
+            execution: 执行记录对象（可选）
         """
         try:
             # 确保基础表存在
@@ -1207,6 +1517,8 @@ class DataScheduler:
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             logger.info(f"开始同步 {ts_code} 因子数据...")
+            update_execution_progress(db, execution, message=f"正在同步 {ts_code} 因子数据...")
+            
             if not start_date:
                 # 默认获取最后一个交易日的数据
                 latest_trading_date = self._get_latest_trading_date(db)
@@ -1228,6 +1540,7 @@ class DataScheduler:
                     f"{ts_code} 无因子数据 - 日期范围: {start_date} 至 {end_date}, "
                     f"可能原因: 1) 该日期范围内确实无数据 2) API 返回空 3) 日期格式问题"
                 )
+                update_execution_progress(db, execution, message=f"{ts_code} 无因子数据")
                 return 0
             
             # 记录数据基本信息
@@ -1279,11 +1592,15 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"{ts_code} 因子数据同步完成，更新 {count} 条")
+            update_execution_progress(db, execution, message=f"{ts_code} 因子数据同步完成，更新 {count} 条")
             return count
         except Exception as e:
             # 记录失败的操作日志
@@ -1305,6 +1622,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1313,7 +1633,13 @@ class DataScheduler:
             raise
 
     def sync_all_factor_data(
-        self, db: Session, start_date: str | None = None, end_date: str | None = None, extra_info: dict | None = None
+        self,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        extra_info: dict | None = None,
+        codelist: list[str] | None = None,
+        execution: TaskExecution | None = None,
     ) -> dict:
         """
         同步所有股票的因子数据
@@ -1323,32 +1649,108 @@ class DataScheduler:
             start_date: 开始日期，格式：YYYYMMDD
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            codelist: TS代码列表（可选）
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
             logger.info("开始同步所有股票因子数据...")
+            update_execution_progress(db, execution, message="正在准备同步...")
             from zquant.models.data import Tustock
 
             # 确保基础表存在
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             # 获取所有股票列表
-            stocks = db.query(Tustock).all()
+            if codelist:
+                # 验证并按代码排序确保顺序稳定
+                stocks = (
+                    db.query(Tustock)
+                    .filter(Tustock.ts_code.in_(codelist), Tustock.delist_date.is_(None))
+                    .order_by(Tustock.ts_code)
+                    .all()
+                )
+            else:
+                # 按代码排序确保顺序稳定
+                stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).order_by(Tustock.ts_code).all()
+            
+            # 处理恢复模式
+            resume_from_id = None
+            if execution:
+                resume_from_id = execution.get_result().get("resumed_from")
+            
+            skip_until = None
+            if resume_from_id:
+                old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+                if old_execution:
+                    skip_until = old_execution.current_item
+                    logger.info(f"[技术因子] 从执行记录 {resume_from_id} 恢复，准备跳过直到 {skip_until}")
+
             total = len(stocks)
             logger.info(f"共 {total} 只股票需要同步因子数据")
 
             success = 0
             failed = []
+            skipped_count = 0
 
+            update_execution_progress(db, execution, total_items=total, processed_items=0, message="正在开始循环同步...")
+
+            has_reached_resume_point = skip_until is None
             for i, stock in enumerate(stocks, 1):
+                # 如果在恢复模式下，跳过直到达到断点
+                if not has_reached_resume_point:
+                    if stock.ts_code == skip_until:
+                        has_reached_resume_point = True
+                        logger.info(f"[技术因子] 已到达恢复点: {stock.ts_code}，将跳过该股票并从下一只开始")
+                        skipped_count += 1
+                        success += 1
+                        continue
+                    else:
+                        skipped_count += 1
+                        success += 1
+                        continue
+
                 try:
+                    # 高频检查暂停和终止请求
+                    from zquant.scheduler.utils import check_control_flags
+                    check_control_flags(db, execution)
+
+                    # 进度更新频率控制
+                    if i % 10 == 0 or i == total or i == skipped_count + 1:
+                        update_execution_progress(
+                            db,
+                            execution,
+                            processed_items=i - 1,
+                            total_items=total,
+                            current_item=stock.ts_code,
+                            message=f"正在同步技术因子: {stock.ts_code} ({i}/{total})...",
+                        )
+                    else:
+                        if execution:
+                            execution.current_item = stock.ts_code
+                            execution.processed_items = i - 1
+                    
+                    # 日志记录进度
+                    if i % 10 == 0 or i == total:
+                        logger.info(
+                            f"技术因子同步进度: {stock.ts_code} - "
+                            f"已处理 {i}/{total} 个股票 "
+                            f"(成功={success}, 失败={len(failed)})"
+                        )
+                    
                     self.sync_factor_data(db, stock.ts_code, start_date, end_date, extra_info, update_view=False)
                     success += 1
-                    if i % 50 == 0:
-                        logger.info(f"进度: {i}/{total}")
+                    
+                    # 批次进度日志（每100个股票）
+                    if i % 100 == 0:
+                        logger.info(f"技术因子同步批次进度: {i}/{total} (成功={success}, 失败={len(failed)})")
                 except Exception as e:
+                    if "Task terminated" in str(e):
+                        raise
                     logger.error(f"同步 {stock.ts_code} 因子数据失败: {e}")
                     failed.append(stock.ts_code)
+
+            update_execution_progress(db, execution, processed_items=total, message="循环同步完成，正在更新视图...")
 
             # 批量同步完成后，统一更新一次视图
             logger.info("批量同步完成，开始更新视图...")
@@ -1378,6 +1780,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=f"失败: {len(failed)} 只股票" if failed else None,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor",
+                    api_data_count=success,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1403,6 +1808,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor",
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1418,6 +1826,7 @@ class DataScheduler:
         end_date: str | None = None,
         extra_info: dict | None = None,
         update_view: bool = True,
+        execution: TaskExecution | None = None,
     ) -> int:
         """
         同步单只股票的专业版因子数据（按 ts_code 分表存储）
@@ -1429,6 +1838,7 @@ class DataScheduler:
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
             update_view: 是否更新视图，默认True。批量同步时建议设置为False，完成后统一更新
+            execution: 执行记录对象（可选）
         """
         try:
             # 确保基础表存在
@@ -1437,6 +1847,8 @@ class DataScheduler:
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             logger.info(f"开始同步 {ts_code} 专业版因子数据...")
+            update_execution_progress(db, execution, message=f"正在同步 {ts_code} 专业版因子数据...")
+            
             if not start_date:
                 # 默认获取最后一个交易日的数据
                 latest_trading_date = self._get_latest_trading_date(db)
@@ -1458,6 +1870,7 @@ class DataScheduler:
                     f"{ts_code} 无专业版因子数据 - 日期范围: {start_date} 至 {end_date}, "
                     f"可能原因: 1) 该日期范围内确实无数据 2) API 返回空 3) 日期格式问题"
                 )
+                update_execution_progress(db, execution, message=f"{ts_code} 无专业版因子数据")
                 return 0
             
             # 记录数据基本信息
@@ -1509,11 +1922,15 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor_pro",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"{ts_code} 专业版因子数据同步完成，更新 {count} 条")
+            update_execution_progress(db, execution, message=f"{ts_code} 专业版因子同步完成，更新 {count} 条")
             return count
         except Exception as e:
             # 记录失败的操作日志
@@ -1535,6 +1952,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor_pro",
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1543,7 +1963,13 @@ class DataScheduler:
             raise
 
     def sync_all_stkfactorpro_data(
-        self, db: Session, start_date: str | None = None, end_date: str | None = None, extra_info: dict | None = None
+        self,
+        db: Session,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        extra_info: dict | None = None,
+        codelist: list[str] | None = None,
+        execution: TaskExecution | None = None,
     ) -> dict:
         """
         同步所有股票的专业版因子数据
@@ -1553,32 +1979,108 @@ class DataScheduler:
             start_date: 开始日期，格式：YYYYMMDD
             end_date: 结束日期，格式：YYYYMMDD
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            codelist: TS代码列表（可选）
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
             logger.info("开始同步所有股票专业版因子数据...")
+            update_execution_progress(db, execution, message="正在准备同步...")
             from zquant.models.data import Tustock
 
             # 确保基础表存在
             self._ensure_tables_exist(db, [Tustock.__tablename__])
 
             # 获取所有股票列表
-            stocks = db.query(Tustock).all()
+            if codelist:
+                # 验证并按代码排序确保顺序稳定
+                stocks = (
+                    db.query(Tustock)
+                    .filter(Tustock.ts_code.in_(codelist), Tustock.delist_date.is_(None))
+                    .order_by(Tustock.ts_code)
+                    .all()
+                )
+            else:
+                # 按代码排序确保顺序稳定
+                stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).order_by(Tustock.ts_code).all()
+            
+            # 处理恢复模式
+            resume_from_id = None
+            if execution:
+                resume_from_id = execution.get_result().get("resume_from_execution_id")
+            
+            skip_until = None
+            if resume_from_id:
+                old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+                if old_execution:
+                    skip_until = old_execution.current_item
+                    logger.info(f"[专业版因子] 从执行记录 {resume_from_id} 恢复，准备跳过直到 {skip_until}")
+
             total = len(stocks)
             logger.info(f"共 {total} 只股票需要同步专业版因子数据")
 
             success = 0
             failed = []
+            skipped_count = 0
 
+            update_execution_progress(db, execution, total_items=total, processed_items=0, message="正在开始循环同步...")
+
+            has_reached_resume_point = skip_until is None
             for i, stock in enumerate(stocks, 1):
+                # 如果在恢复模式下，跳过直到达到断点
+                if not has_reached_resume_point:
+                    if stock.ts_code == skip_until:
+                        has_reached_resume_point = True
+                        logger.info(f"[专业版因子] 已到达恢复点: {stock.ts_code}，将跳过该股票并从下一只开始")
+                        skipped_count += 1
+                        success += 1
+                        continue
+                    else:
+                        skipped_count += 1
+                        success += 1
+                        continue
+
                 try:
+                    # 高频检查暂停和终止请求
+                    from zquant.scheduler.utils import check_control_flags
+                    check_control_flags(db, execution)
+
+                    # 进度更新频率控制
+                    if i % 10 == 0 or i == total or i == skipped_count + 1:
+                        update_execution_progress(
+                            db,
+                            execution,
+                            processed_items=i - 1,
+                            total_items=total,
+                            current_item=stock.ts_code,
+                            message=f"正在同步专业版因子: {stock.ts_code} ({i}/{total})...",
+                        )
+                    else:
+                        if execution:
+                            execution.current_item = stock.ts_code
+                            execution.processed_items = i - 1
+                    
+                    # 日志记录进度
+                    if i % 10 == 0 or i == total:
+                        logger.info(
+                            f"专业版因子同步进度: {stock.ts_code} - "
+                            f"已处理 {i}/{total} 个股票 "
+                            f"(成功={success}, 失败={len(failed)})"
+                        )
+                    
                     self.sync_stkfactorpro_data(db, stock.ts_code, start_date, end_date, extra_info, update_view=False)
                     success += 1
-                    if i % 50 == 0:
-                        logger.info(f"进度: {i}/{total}")
+                    
+                    # 批次进度日志（每100个股票）
+                    if i % 100 == 0:
+                        logger.info(f"专业版因子同步批次进度: {i}/{total} (成功={success}, 失败={len(failed)})")
                 except Exception as e:
+                    if "Task terminated" in str(e):
+                        raise
                     logger.error(f"同步 {stock.ts_code} 专业版因子数据失败: {e}")
                     failed.append(stock.ts_code)
+
+            update_execution_progress(db, execution, processed_items=total, message="循环同步完成，正在更新视图...")
 
             # 批量同步完成后，统一更新一次视图
             logger.info("批量同步完成，开始更新视图...")
@@ -1608,6 +2110,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=f"失败: {len(failed)} 只股票" if failed else None,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor_pro",
+                    api_data_count=success,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1633,6 +2138,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface="stk_factor_pro",
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1648,6 +2156,7 @@ class DataScheduler:
         start_date: str | None = None,
         end_date: str | None = None,
         extra_info: dict | None = None,
+        execution: TaskExecution | None = None,
     ) -> int:
         """
         同步单只股票的财务数据
@@ -1659,6 +2168,7 @@ class DataScheduler:
             start_date: 开始日期
             end_date: 结束日期
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
@@ -1668,6 +2178,8 @@ class DataScheduler:
             self._ensure_tables_exist(db, [Fundamental.__tablename__, Tustock.__tablename__])
 
             logger.info(f"开始同步 {symbol} 财务数据（{statement_type}）...")
+            update_execution_progress(db, execution, message=f"正在同步 {symbol} 财务数据（{statement_type}）...")
+            
             if statement_type not in ["income", "balance", "cashflow"]:
                 raise ValueError(f"不支持的报表类型: {statement_type}")
 
@@ -1676,6 +2188,7 @@ class DataScheduler:
             )
             if df.empty:
                 logger.warning(f"{symbol} 无财务数据（{statement_type}）")
+                update_execution_progress(db, execution, message=f"{symbol} 无财务数据（{statement_type}）")
                 return 0
 
             count = self.storage.upsert_fundamentals(db, df, symbol, statement_type, extra_info)
@@ -1699,11 +2212,15 @@ class DataScheduler:
                     update_count=0,
                     delete_count=0,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface=statement_type,
+                    api_data_count=len(df) if "df" in locals() else 0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
 
             logger.info(f"{symbol} 财务数据（{statement_type}）同步完成，更新 {count} 条")
+            update_execution_progress(db, execution, message=f"{symbol} 财务数据（{statement_type}）同步完成，更新 {count} 条")
             return count
         except Exception as e:
             # 记录失败的操作日志
@@ -1725,6 +2242,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface=statement_type,
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1739,6 +2259,8 @@ class DataScheduler:
         start_date: str | None = None,
         end_date: str | None = None,
         extra_info: dict | None = None,
+        codelist: list[str] | None = None,
+        execution: TaskExecution | None = None,
     ) -> dict:
         """
         同步所有股票的财务数据（增量更新）
@@ -1749,27 +2271,103 @@ class DataScheduler:
             start_date: 开始日期
             end_date: 结束日期
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            codelist: TS代码列表（可选）
+            execution: 执行记录对象（可选）
         """
         start_time = datetime.now()
         try:
             logger.info(f"开始同步所有股票财务数据（{statement_type}）...")
+            update_execution_progress(db, execution, message=f"正在同步所有股票财务数据（{statement_type}）...")
             from zquant.models.data import Fundamental, Tustock
 
             # 获取所有上市股票
-            stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).all()
+            if codelist:
+                # 验证并按代码排序确保顺序稳定
+                stocks = (
+                    db.query(Tustock)
+                    .filter(Tustock.ts_code.in_(codelist), Tustock.delist_date.is_(None))
+                    .order_by(Tustock.ts_code)
+                    .all()
+                )
+            else:
+                # 按代码排序确保顺序稳定
+                stocks = db.query(Tustock).filter(Tustock.delist_date.is_(None)).order_by(Tustock.ts_code).all()
+            
+            # 处理恢复模式
+            resume_from_id = None
+            if execution:
+                resume_from_id = execution.get_result().get("resumed_from")
+            
+            skip_until = None
+            if resume_from_id:
+                old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+                if old_execution:
+                    skip_until = old_execution.current_item
+                    logger.info(f"[财务数据] 从执行记录 {resume_from_id} 恢复，准备跳过直到 {skip_until}")
+
             total = len(stocks)
             success = 0
             failed = []
+            skipped_count = 0
 
+            update_execution_progress(db, execution, total_items=total, processed_items=0, message="正在开始循环同步...")
+
+            has_reached_resume_point = skip_until is None
             for i, stock in enumerate(stocks, 1):
+                # 如果在恢复模式下，跳过直到达到断点
+                if not has_reached_resume_point:
+                    if stock.ts_code == skip_until:
+                        has_reached_resume_point = True
+                        logger.info(f"[财务数据] 已到达恢复点: {stock.ts_code}，将跳过该股票并从下一只开始")
+                        skipped_count += 1
+                        success += 1
+                        continue
+                    else:
+                        skipped_count += 1
+                        success += 1
+                        continue
+
                 try:
+                    # 高频检查暂停和终止请求
+                    from zquant.scheduler.utils import check_control_flags
+                    check_control_flags(db, execution)
+
+                    # 进度更新频率控制
+                    if i % 10 == 0 or i == total or i == skipped_count + 1:
+                        update_execution_progress(
+                            db,
+                            execution,
+                            processed_items=i - 1,
+                            total_items=total,
+                            current_item=stock.ts_code,
+                            message=f"正在同步财务数据: {stock.ts_code} ({i}/{total})...",
+                        )
+                    else:
+                        if execution:
+                            execution.current_item = stock.ts_code
+                            execution.processed_items = i - 1
+                    
+                    # 日志记录进度
+                    if i % 10 == 0 or i == total:
+                        logger.info(
+                            f"财务数据同步进度: {stock.ts_code} ({statement_type}) - "
+                            f"已处理 {i}/{total} 个股票 "
+                            f"(成功={success}, 失败={len(failed)})"
+                        )
+                    
                     self.sync_financial_data(db, stock.ts_code, statement_type, start_date, end_date, extra_info)
                     success += 1
-                    if i % 50 == 0:
-                        logger.info(f"进度: {i}/{total}")
+                    
+                    # 批次进度日志（每100个股票）
+                    if i % 100 == 0:
+                        logger.info(f"财务数据同步批次进度: {i}/{total} (成功={success}, 失败={len(failed)})")
                 except Exception as e:
+                    if "Task terminated" in str(e):
+                        raise
                     logger.error(f"同步 {stock.ts_code} 财务数据失败: {e}")
                     failed.append(stock.ts_code)
+
+            update_execution_progress(db, execution, processed_items=total, message="同步完成")
 
             # 记录结束时间和结果
             end_time = datetime.now()
@@ -1791,6 +2389,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=f"失败: {len(failed)} 只股票" if failed else None,
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface=statement_type,
+                    api_data_count=success,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")
@@ -1817,6 +2418,9 @@ class DataScheduler:
                     delete_count=0,
                     error_message=str(e),
                     created_by=created_by,
+                    data_source="tushare",
+                    api_interface=statement_type,
+                    api_data_count=0,
                 )
             except Exception as log_error:
                 logger.warning(f"记录操作日志失败: {log_error}")

@@ -29,6 +29,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from zquant.schemas.common import QueryRequest
+
 
 class BacktestConfig(BaseModel):
     """回测配置"""
@@ -64,7 +66,10 @@ class BacktestTaskResponse(BaseModel):
     strategy_name: str | None = Field(None, description="策略名称")
     status: str = Field(..., description="任务状态：pending, running, completed, failed")
     error_message: str | None = Field(None, description="错误信息")
-    created_at: datetime = Field(..., description="创建时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime | None = Field(None, description="更新时间")
     started_at: datetime | None = Field(None, description="开始时间")
     completed_at: datetime | None = Field(None, description="完成时间")
     start_date: date | None = Field(None, description="回测数据开始日期（从配置中解析）")
@@ -90,7 +95,10 @@ class BacktestResultResponse(BaseModel):
     metrics_json: str | None = Field(None, description="绩效指标JSON（详细指标数据）")
     trades_json: str | None = Field(None, description="交易记录JSON（所有交易记录）")
     portfolio_json: str | None = Field(None, description="投资组合JSON（持仓变化数据）")
-    created_at: datetime = Field(..., description="创建时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime | None = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -118,11 +126,17 @@ class StrategyCreateRequest(BaseModel):
 class StrategyUpdateRequest(BaseModel):
     """更新策略请求"""
 
+    strategy_id: int = Field(..., description="策略ID")
     name: str | None = Field(None, description="策略名称")
     code: str | None = Field(None, description="策略代码（Python代码字符串）")
     description: str | None = Field(None, description="策略描述")
     category: str | None = Field(None, description="策略分类")
     params_schema: str | None = Field(None, description="策略参数Schema（JSON格式）")
+
+
+class StrategyDeleteRequest(BaseModel):
+    """删除策略请求模型"""
+    strategy_id: int = Field(..., description="策略ID")
 
 
 class StrategyResponse(BaseModel):
@@ -136,8 +150,10 @@ class StrategyResponse(BaseModel):
     code: str = Field(..., description="策略代码（Python代码字符串）")
     params_schema: str | None = Field(None, description="策略参数Schema（JSON格式）")
     is_template: bool = Field(..., description="是否为模板策略")
-    created_at: datetime = Field(..., description="创建时间")
-    updated_at: datetime = Field(..., description="更新时间")
+    created_by: str | None = Field(None, description="创建人")
+    created_time: datetime = Field(..., description="创建时间")
+    updated_by: str | None = Field(None, description="修改人")
+    updated_time: datetime = Field(..., description="更新时间")
     can_edit: bool | None = Field(None, description="是否可以编辑")
     can_delete: bool | None = Field(None, description="是否可以删除")
 
@@ -145,7 +161,52 @@ class StrategyResponse(BaseModel):
         from_attributes = True
 
 
+class BacktestTaskListRequest(QueryRequest):
+    """回测任务列表查询请求模型"""
+    order_by: str | None = Field(
+        None, description="排序字段：id, name, status, created_time, updated_time"
+    )
+
+
+class BacktestTaskGetRequest(BaseModel):
+    """获取回测任务请求模型"""
+    task_id: int = Field(..., description="任务ID")
+
+
+class BacktestResultGetRequest(BaseModel):
+    """获取回测结果请求模型"""
+    task_id: int = Field(..., description="任务ID")
+
+
+class BacktestResultListRequest(QueryRequest):
+    """回测结果列表查询请求模型"""
+    order_by: str | None = Field(
+        None, description="排序字段：id, task_id, total_return, annual_return, created_time"
+    )
+
+
+class StrategyListRequest(QueryRequest):
+    """策略列表查询请求模型"""
+    category: str | None = Field(None, description="策略分类筛选")
+    search: str | None = Field(None, description="搜索关键词（名称或描述）")
+    is_template: bool | None = Field(None, description="是否为模板策略")
+    include_all: bool = Field(False, description="是否包含所有可操作策略（包括模板策略和其他用户的策略）")
+    order_by: str | None = Field(
+        None, description="排序字段：id, name, category, created_time, updated_time"
+    )
+
+
+class StrategyGetRequest(BaseModel):
+    """获取策略详情请求模型"""
+    strategy_id: int = Field(..., description="策略ID")
+
+
 class StrategyFrameworkResponse(BaseModel):
     """策略框架代码响应"""
 
     code: str = Field(..., description="策略框架代码")
+
+
+class BacktestResultDeleteRequest(BaseModel):
+    """删除回测结果请求模型"""
+    result_id: int = Field(..., description="结果ID")

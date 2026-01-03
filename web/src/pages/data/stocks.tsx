@@ -63,10 +63,10 @@ const Stocks: React.FC = () => {
   const location = useLocation();
   const formRef = useRef<ProFormInstance>();
   const pageCache = usePageCache();
-  
+
   const [dataSource, setDataSource] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   const [fetchLoading, setFetchLoading] = useState(false);
   const [fetchResult, setFetchResult] = useState<ZQuant.StockListFetchResponse | null>(null);
   const [fetchModalVisible, setFetchModalVisible] = useState(false);
@@ -146,7 +146,7 @@ const Stocks: React.FC = () => {
   const handleRefetchFromApi = async () => {
     try {
       const params = JSON.parse(editableRequestParams);
-      
+
       setFetchLoading(true);
       const response = await fetchStockListFromApi({
         exchange: params.exchange || undefined,
@@ -280,17 +280,17 @@ const Stocks: React.FC = () => {
       setLoading(true);
       // 保存表单值到缓存
       pageCache.saveFormValues(values);
-      
+
       const response = await getStocks({
         exchange: values.exchange || undefined,
         symbol: values.symbol || undefined,
         name: values.name || undefined,
       });
       setDataSource(response.stocks);
-      
+
       // 保存数据到缓存
       pageCache.saveDataSource(response.stocks);
-      
+
       message.success(`查询成功，共${response.stocks.length}条记录`);
     } catch (error: any) {
       message.error(error?.response?.data?.detail || '查询失败');
@@ -309,10 +309,18 @@ const Stocks: React.FC = () => {
 
   const columns: ColumnsType<any> = [
     {
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index' as any,
+      width: 60,
+      fixed: 'left',
+    },
+    {
       title: STOCK_FIELD_COMMENTS['ts_code'] || 'TS代码',
       dataIndex: 'ts_code',
       width: 120,
       fixed: 'left',
+      defaultSortOrder: 'ascend' as const,
       sorter: (a, b) => (a.ts_code || '').localeCompare(b.ts_code || ''),
     },
     {
@@ -386,7 +394,6 @@ const Stocks: React.FC = () => {
       title: STOCK_FIELD_COMMENTS['list_date'] || '上市日期',
       dataIndex: 'list_date',
       width: 120,
-      defaultSortOrder: 'descend' as const,
       sorter: (a, b) => {
         const dateA = a.list_date || '';
         const dateB = b.list_date || '';
@@ -575,8 +582,8 @@ const Stocks: React.FC = () => {
             <div>
               <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text strong>请求参数：</Text>
-                <Button 
-                  type="primary" 
+                <Button
+                  type="primary"
                   loading={fetchLoading}
                   onClick={handleRefetchFromApi}
                   disabled={!fetchResult}

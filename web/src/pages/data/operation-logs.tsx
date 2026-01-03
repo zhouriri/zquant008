@@ -22,12 +22,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, Button, Tag, message, Modal } from 'antd';
-import { ProForm, ProFormText, ProFormSelect, ProFormDateRangePicker } from '@ant-design/pro-components';
+import { ProForm, ProFormText, ProFormSelect, ProFormDatePicker } from '@ant-design/pro-components';
 import type { ProFormInstance } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { useLocation } from '@umijs/max';
 import dayjs from 'dayjs';
+import { formatDuration } from '@/utils/format';
 
 import { getDataOperationLogs } from '@/services/zquant/data';
 import { usePageCache } from '@/hooks/usePageCache';
@@ -80,8 +81,8 @@ const OperationLogs: React.FC = () => {
         table_name: values.table_name,
         operation_type: values.operation_type,
         operation_result: values.operation_result,
-        start_date: values.dateRange?.[0] ? dayjs(values.dateRange[0]).format('YYYY-MM-DD') : undefined,
-        end_date: values.dateRange?.[1] ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
+        start_date: values.start_date ? dayjs(values.start_date).format('YYYY-MM-DD') : undefined,
+        end_date: values.end_date ? dayjs(values.end_date).format('YYYY-MM-DD') : undefined,
         skip: 0,
         limit: 1000,
       };
@@ -133,10 +134,38 @@ const OperationLogs: React.FC = () => {
 
   const columns: ProColumns<ZQuant.DataOperationLogItem>[] = [
     {
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index',
+      width: 60,
+      fixed: 'left',
+    },
+    {
       title: 'ID',
       dataIndex: 'id',
       width: 80,
       sorter: true,
+    },
+    {
+      title: '数据源',
+      dataIndex: 'data_source',
+      width: 100,
+      sorter: true,
+      render: (text: any) => text || '-',
+    },
+    {
+      title: 'API接口',
+      dataIndex: 'api_interface',
+      width: 120,
+      sorter: true,
+      render: (text: any) => text || '-',
+    },
+    {
+      title: '接口数据量',
+      dataIndex: 'api_data_count',
+      width: 120,
+      sorter: true,
+      render: (text: any) => text !== null && text !== undefined ? text.toLocaleString() : '-',
     },
     {
       title: '数据表名',
@@ -195,14 +224,11 @@ const OperationLogs: React.FC = () => {
       render: (text: any) => text ? dayjs(text).format('YYYY-MM-DD HH:mm:ss') : '-',
     },
     {
-      title: '耗时(秒)',
+      title: '执行耗时',
       dataIndex: 'duration_seconds',
       width: 120,
       sorter: true,
-      render: (text: any) => {
-        if (text === null || text === undefined) return '-';
-        return typeof text === 'number' ? text.toFixed(2) : text;
-      },
+      render: (text: any) => formatDuration(text),
     },
     {
       title: '创建人',
@@ -253,7 +279,8 @@ const OperationLogs: React.FC = () => {
           }
         }}
         initialValues={{
-          dateRange: [dayjs().subtract(7, 'day'), dayjs()],
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
         }}
         submitter={{
           render: (props, doms) => {
@@ -294,10 +321,15 @@ const OperationLogs: React.FC = () => {
           ]}
           width="sm"
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="日期范围"
-          rules={[{ required: true, message: '请选择日期范围' }]}
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+          rules={[{ required: true, message: '请选择开始日期' }]}
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
+          rules={[{ required: true, message: '请选择结束日期' }]}
         />
       </ProForm>
 

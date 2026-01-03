@@ -43,7 +43,8 @@ def get_current_user(
 ) -> User:
     """获取当前用户（依赖注入）"""
     token = credentials.credentials
-    logger.debug(f"[AUTH] 验证Token - Token前缀: {token[:20]}...")
+    # 不记录token内容，只记录验证状态
+    logger.debug(f"[AUTH] 验证Token - Token长度: {len(token)}")
     try:
         user = AuthService.get_current_user_from_token(token, db)
         logger.debug(f"[AUTH] Token验证成功 - 用户ID: {user.id}, 用户名: {user.username}")

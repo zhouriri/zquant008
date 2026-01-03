@@ -48,7 +48,7 @@ declare namespace ZQuant {
     email: string;
     role_id: number;
     is_active: boolean;
-    created_at: string;
+    created_time: string;
   };
 
   type UserCreate = {
@@ -80,7 +80,7 @@ declare namespace ZQuant {
     name?: string;
     is_active: boolean;
     last_used_at?: string;
-    created_at: string;
+    created_time: string;
     expires_at?: string;
   };
 
@@ -89,7 +89,7 @@ declare namespace ZQuant {
     access_key: string;
     secret_key: string;
     name?: string;
-    created_at: string;
+    created_time: string;
     expires_at?: string;
     message: string;
   };
@@ -105,8 +105,8 @@ declare namespace ZQuant {
     content: string;
     is_read: boolean;
     extra_data?: Record<string, any>;
-    created_at: string;
-    updated_at: string;
+    created_time: string;
+    updated_time: string;
   };
 
   type NotificationCreate = {
@@ -259,7 +259,7 @@ declare namespace ZQuant {
     ts_code: string; // TS代码
     trade_date: string; // 交易日期
     difference_type: string; // 差异类型：missing_in_db=数据库缺失, missing_in_api=接口缺失, field_diff=字段不一致
-    field_differences: Record<string, { db_value: any; api_value: any } }; // 字段差异，格式：{字段名: {db_value: 数据库值, api_value: 接口值}}
+    field_differences: Record<string, { db_value: any; api_value: any }>; // 字段差异，格式：{字段名: {db_value: 数据库值, api_value: 接口值}}
     db_record: Record<string, any> | null; // 数据库记录（如果存在）
     api_record: Record<string, any> | null; // 接口记录（如果存在）
   };
@@ -583,6 +583,90 @@ declare namespace ZQuant {
     limit: number; // 限制返回记录数
   };
 
+  // ============ 量化选股相关 ============
+  type ColumnFilter = {
+    field: string; // 字段名
+    operator: string; // 操作符：=, !=, >, <, >=, <=, LIKE, IN, BETWEEN
+    value: any; // 值
+    not?: boolean; // 是否取反
+  };
+
+  type FilterConditionGroup = {
+    logic: 'AND' | 'OR'; // 逻辑运算符
+    conditions: Array<FilterConditionGroup | ColumnFilter>; // 条件列表（可以是条件或条件组）
+    not?: boolean; // 是否取反整个组
+  };
+
+  type SortConfig = {
+    field: string; // 字段名
+    order: string; // 排序方向：asc 或 desc
+  };
+
+  type StockFilterRequest = {
+    trade_date: string; // 交易日期（YYYY-MM-DD格式）
+    filter_conditions?: FilterConditionGroup | ColumnFilter[]; // 筛选条件（支持逻辑组合）
+    selected_columns?: string[]; // 选中的列列表
+    sort_config?: SortConfig[]; // 排序配置列表
+    skip?: number; // 跳过记录数
+    limit?: number; // 每页记录数
+    save_results?: boolean; // 是否保存查询结果到数据库
+    strategy_id?: number; // 策略ID（保存结果时必填）
+  };
+
+  type StockFilterResponse = {
+    items: Record<string, any>[]; // 结果列表
+    total: number; // 总数
+    skip: number; // 跳过记录数
+    limit: number; // 每页记录数
+  };
+
+  type ColumnInfo = {
+    field: string; // 字段名
+    label: string; // 显示标签
+    type: string; // 数据类型：string, number, date
+  };
+
+  type AvailableColumnsResponse = {
+    basic: ColumnInfo[]; // 基础信息列
+    daily_basic: ColumnInfo[]; // 每日指标列
+    daily: ColumnInfo[]; // 日线数据列
+    factor?: ColumnInfo[]; // 技术指标列
+  };
+
+  type StockFilterStrategyCreate = {
+    name: string; // 策略名称
+    description?: string; // 策略描述
+    filter_conditions?: FilterConditionGroup | ColumnFilter[]; // 筛选条件（支持逻辑组合）
+    selected_columns?: string[]; // 选中的列列表
+    sort_config?: SortConfig[]; // 排序配置列表
+  };
+
+  type StockFilterStrategyUpdate = {
+    name?: string; // 策略名称
+    description?: string; // 策略描述
+    filter_conditions?: FilterConditionGroup | ColumnFilter[]; // 筛选条件（支持逻辑组合）
+    selected_columns?: string[]; // 选中的列列表
+    sort_config?: SortConfig[]; // 排序配置列表
+  };
+
+  type StockFilterStrategyResponse = {
+    id: number; // 策略ID
+    name: string; // 策略名称
+    description?: string; // 策略描述
+    filter_conditions?: FilterConditionGroup | ColumnFilter[]; // 筛选条件（支持逻辑组合）
+    selected_columns?: string[]; // 选中的列列表
+    sort_config?: SortConfig[]; // 排序配置列表
+    created_by?: string; // 创建人
+    created_time: string; // 创建时间（ISO格式）
+    updated_by?: string; // 修改人
+    updated_time: string; // 更新时间（ISO格式）
+  };
+
+  type StockFilterStrategyListResponse = {
+    items: FilterStrategyResponse[]; // 策略列表
+    total: number; // 总数
+  };
+
   type DailyBasicRequest = {
     ts_code?: string | string[]; // TS代码，单个代码如：000001.SZ，多个代码如：['000001.SZ', '000002.SZ']，undefined表示查询所有
     start_date?: string; // 开始日期，YYYY-MM-DD
@@ -740,6 +824,9 @@ declare namespace ZQuant {
   // ============ 数据操作日志相关 ============
   type DataOperationLogItem = {
     id?: number; // 日志ID
+    data_source?: string; // 数据源
+    api_interface?: string; // API接口
+    api_data_count?: number; // API接口数据条数
     table_name?: string; // 数据表名
     operation_type?: string; // 操作类型：insert, update, delete, sync等
     insert_count?: number; // 插入记录数
@@ -799,7 +886,7 @@ declare namespace ZQuant {
     strategy_name?: string;
     status: string; // pending, running, completed, failed
     error_message?: string;
-    created_at: string;
+    created_time: string;
     started_at?: string;
     completed_at?: string;
     start_date?: string; // 回测数据开始日期（YYYY-MM-DD）
@@ -820,7 +907,7 @@ declare namespace ZQuant {
     metrics_json?: string;
     trades_json?: string;
     portfolio_json?: string;
-    created_at: string;
+    created_time: string;
   };
 
   type PerformanceResponse = {
@@ -838,8 +925,8 @@ declare namespace ZQuant {
     code: string;
     params_schema?: string;
     is_template: boolean;
-    created_at: string;
-    updated_at: string;
+    created_time: string;
+    updated_time: string;
     can_edit?: boolean; // 是否可以编辑
     can_delete?: boolean; // 是否可以删除
   };
@@ -857,7 +944,7 @@ declare namespace ZQuant {
     id: number;
     name: string;
     description?: string;
-    created_at: string;
+    created_time: string;
   };
 
   type RoleCreate = {
@@ -885,7 +972,7 @@ declare namespace ZQuant {
     resource: string;
     action: string;
     description?: string;
-    created_at: string;
+    created_time: string;
   };
 
   type PermissionCreate = {
@@ -903,14 +990,14 @@ declare namespace ZQuant {
   };
 
   // ============ 定时任务相关 ============
-  type TaskType = 
+  type TaskType =
     | 'manual_task'
     | 'common_task'
     | 'workflow';
 
-  type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'completed' | 'terminated';
-  
-  type TaskScheduleStatus = 
+  type TaskStatus = 'pending' | 'running' | 'success' | 'failed' | 'completed' | 'terminated' | 'paused';
+
+  type TaskScheduleStatus =
     | 'disabled'     // 未启用：任务未被激活或已过期
     | 'paused'       // 已暂停：任务被手动或系统暂停，暂时不执行
     | 'pending'      // 等待执行：任务已加入调度器，等待到达执行时间点
@@ -953,10 +1040,12 @@ declare namespace ZQuant {
     config: Record<string, any>;
     max_retries: number;
     retry_interval: number;
-    created_at: string;
-    updated_at: string;
+    created_time: string;
+    updated_time: string;
     latest_execution_time?: string;
     latest_execution_status?: TaskStatus;
+    latest_execution_current_item?: string;
+    latest_execution_progress?: number;
     schedule_status?: TaskScheduleStatus;
   };
 
@@ -975,7 +1064,15 @@ declare namespace ZQuant {
     result: Record<string, any>;
     error_message?: string;
     retry_count: number;
-    created_at: string;
+    created_time: string;
+    // 新增进度和控制字段
+    progress_percent?: number;
+    current_item?: string;
+    total_items?: number;
+    processed_items?: number;
+    estimated_end_time?: string;
+    is_paused: boolean;
+    terminate_requested: boolean;
   };
 
   type ExecutionListResponse = {
@@ -995,230 +1092,297 @@ declare namespace ZQuant {
     on_failure?: 'stop' | 'continue';
   };
 
-        type TaskStatsResponse = {
-          total_executions: number;
-          success_count: number;
-          failed_count: number;
-          running_count: number;
-          success_rate: number;
-          avg_duration_seconds: number;
-          latest_execution_time?: string;
-        };
+  type TaskStatsResponse = {
+    total_executions: number;
+    success_count: number;
+    failed_count: number;
+    running_count: number;
+    success_rate: number;
+    avg_duration_seconds: number;
+    latest_execution_time?: string;
+  };
 
-        // ============ 数据表统计相关 ============
-        type TableStatisticsItem = {
-          stat_date?: string; // 统计日期（YYYY-MM-DD）
-          table_name?: string; // 表名
-          is_split_table?: boolean; // 是否分表
-          split_count?: number; // 分表个数
-          total_records?: number; // 总记录数
-          daily_records?: number; // 日记录数
-          daily_insert_count?: number; // 日新增记录数
-          daily_update_count?: number; // 日更新记录数
-          created_by?: string; // 创建人
-          created_time?: string; // 创建时间（ISO格式）
-          updated_by?: string; // 修改人
-          updated_time?: string; // 修改时间（ISO格式）
-        };
-
-        type TableStatisticsRequest = {
-          skip?: number; // 跳过记录数
-          limit?: number; // 限制返回记录数
-          stat_date?: string; // 统计日期，精确查询 (YYYY-MM-DD)
-          table_name?: string; // 表名，模糊查询
-          start_date?: string; // 开始日期，用于筛选 stat_date (YYYY-MM-DD)
-          end_date?: string; // 结束日期，用于筛选 stat_date (YYYY-MM-DD)
-          order_by?: string; // 排序字段
-          order?: 'asc' | 'desc'; // 排序方式：asc或desc
-        };
-
-        type TableStatisticsResponse = {
-          items: TableStatisticsItem[]; // 数据表统计列表
-          total: number; // 总记录数
-        };
-
-        type StatisticsTableDataRequest = {
-          stat_date?: string; // 统计日期（可选，默认：当天）(YYYY-MM-DD)
-        };
-
-        type StatisticsTableDataResponse = {
-          success: boolean; // 是否成功
-          message: string; // 响应消息
-          stat_date: string; // 统计日期（YYYY-MM-DD）
-          table_count: number; // 统计的表数量
-        };
-      }
-
-  // ============ 配置管理相关 ============
-  type ConfigItem = {
-        config_key: string; // 配置键
-        config_value?: string; // 配置值（已解密或隐藏）
-        comment?: string; // 配置说明
-        created_by?: string; // 创建人
-        created_time?: string; // 创建时间（ISO格式）
-        updated_by?: string; // 修改人
-        updated_time?: string; // 修改时间（ISO格式）
-      };
-
-  type ConfigResponse = {
-    config_key: string; // 配置键
-    config_value?: string; // 配置值（已解密）
-    comment?: string; // 配置说明
+  // ============ 数据表统计相关 ============
+  type TableStatisticsItem = {
+    stat_date?: string; // 统计日期（YYYY-MM-DD）
+    table_name?: string; // 表名
+    is_split_table?: boolean; // 是否分表
+    split_count?: number; // 分表个数
+    total_records?: number; // 总记录数
+    daily_records?: number; // 日记录数
+    daily_insert_count?: number; // 日新增记录数
+    daily_update_count?: number; // 日更新记录数
     created_by?: string; // 创建人
     created_time?: string; // 创建时间（ISO格式）
     updated_by?: string; // 修改人
     updated_time?: string; // 修改时间（ISO格式）
   };
 
-  type ConfigListResponse = {
-    items: ConfigItem[]; // 配置列表
+  type TableStatisticsRequest = {
+    skip?: number; // 跳过记录数
+    limit?: number; // 限制返回记录数
+    stat_date?: string; // 统计日期，精确查询 (YYYY-MM-DD)
+    table_name?: string; // 表名，模糊查询
+    start_date?: string; // 开始日期，用于筛选 stat_date (YYYY-MM-DD)
+    end_date?: string; // 结束日期，用于筛选 stat_date (YYYY-MM-DD)
+    order_by?: string; // 排序字段
+    order?: 'asc' | 'desc'; // 排序方式：asc或desc
+  };
+
+  type TableStatisticsResponse = {
+    items: TableStatisticsItem[]; // 数据表统计列表
     total: number; // 总记录数
   };
 
-  type ConfigCreateRequest = {
-    config_key: string; // 配置键
-    config_value: string; // 配置值（明文，会自动加密）
-    comment?: string; // 配置说明
+  type StatisticsTableDataRequest = {
+    stat_date?: string; // 统计日期（可选，默认：当天）(YYYY-MM-DD)
   };
 
-  type ConfigUpdateRequest = {
-    config_value?: string; // 配置值（明文，会自动加密）
-    comment?: string; // 配置说明
+  type StatisticsTableDataResponse = {
+    success: boolean; // 是否成功
+    message: string; // 响应消息
+    stat_date: string; // 统计日期（YYYY-MM-DD）
+    table_count: number; // 统计的表数量
   };
 
-  type TushareTokenTestRequest = {
-    token?: string; // Token（可选，如果不提供则从数据库读取）
+// ============ 配置管理相关 ============
+type ConfigItem = {
+  config_key: string; // 配置键
+  config_value?: string; // 配置值（已解密或隐藏）
+  comment?: string; // 配置说明
+  created_by?: string; // 创建人
+  created_time?: string; // 创建时间（ISO格式）
+  updated_by?: string; // 修改人
+  updated_time?: string; // 修改时间（ISO格式）
+};
+
+type ConfigResponse = {
+  config_key: string; // 配置键
+  config_value?: string; // 配置值（已解密）
+  comment?: string; // 配置说明
+  created_by?: string; // 创建人
+  created_time?: string; // 创建时间（ISO格式）
+  updated_by?: string; // 修改人
+  updated_time?: string; // 修改时间（ISO格式）
+};
+
+type ConfigListResponse = {
+  items: ConfigItem[]; // 配置列表
+  total: number; // 总记录数
+};
+
+type ConfigCreateRequest = {
+  config_key: string; // 配置键
+  config_value: string; // 配置值（明文，会自动加密）
+  comment?: string; // 配置说明
+};
+
+type ConfigUpdateRequest = {
+  config_value?: string; // 配置值（明文，会自动加密）
+  comment?: string; // 配置说明
+};
+
+type TushareTokenTestRequest = {
+  token?: string; // Token（可选，如果不提供则从数据库读取）
+};
+
+type TushareTokenTestResponse = {
+  success: boolean; // 测试是否成功
+  message: string; // 测试结果消息
+  data_count?: number; // 测试接口返回的数据条数（如果成功）
+};
+
+  type FactorResultItem = {
+    id?: number;
+    ts_code: string;
+    trade_date: string;
+    factor_name: string;
+    factor_value: number;
   };
 
-  type TushareTokenTestResponse = {
-    success: boolean; // 测试是否成功
-    message: string; // 测试结果消息
-    data_count?: number; // 测试接口返回的数据条数（如果成功）
+  type FactorResultResponse = {
+    code: string;
+    factor_name?: string;
+    items: FactorResultItem[];
+    total: number;
+  };
+
+  type FactorResultQueryRequest = {
+    code: string;
+    factor_name?: string;
+    trade_date?: string;
+  };
+
+  type QuantFactorQueryRequest = {
+    ts_code?: string;
+    start_date?: string;
+    end_date?: string;
+    filter_conditions?: any;
+    skip?: number;
+    limit?: number;
+    order_by?: string;
+    order?: string;
+  };
+
+  type QuantFactorQueryResponse = {
+    items: Record<string, any>[];
+    total: number;
   };
 
   // ============ 因子定义相关 ============
-  type FactorDefinitionResponse = {
-    id: number; // 因子ID
-    factor_name: string; // 因子名称
-    cn_name: string; // 中文简称
-    en_name?: string; // 英文简称
-    column_name: string; // 因子表数据列名
-    description?: string; // 因子详细描述
+type FactorDefinitionResponse = {
+  id: number; // 因子ID
+  factor_name: string; // 因子名称
+  cn_name: string; // 中文简称
+  en_name?: string; // 英文简称
+  column_name: string; // 因子表数据列名
+  description?: string; // 因子详细描述
+  factor_type?: string; // 因子类型：单因子、组合因子
+  enabled: boolean; // 是否启用
+  factor_config?: {
+    enabled: boolean;
+    mappings: FactorConfigMappingItem[];
+  }; // 因子配置
+  created_time: string; // 创建时间
+  updated_time: string; // 更新时间
+};
+
+type FactorDefinitionCreate = {
+  factor_name: string; // 因子名称（唯一标识）
+  cn_name: string; // 中文简称
+  en_name?: string; // 英文简称
+  column_name: string; // 因子表数据列名
+  description?: string; // 因子详细描述
+  factor_type?: string; // 因子类型：单因子、组合因子，默认为"单因子"
+  enabled?: boolean; // 是否启用
+  factor_config?: {
+    enabled: boolean;
+    mappings: FactorConfigMappingItem[];
+  }; // 因子配置
+};
+
+type FactorDefinitionUpdate = {
+  cn_name?: string; // 中文简称
+  en_name?: string; // 英文简称
+  column_name?: string; // 因子表数据列名
+  description?: string; // 因子详细描述
+  factor_type?: string; // 因子类型：单因子、组合因子
+  enabled?: boolean; // 是否启用
+  factor_config?: {
+    enabled: boolean;
+    mappings: FactorConfigMappingItem[];
+  }; // 因子配置
+};
+
+// ============ 因子模型相关 ============
+type FactorModelResponse = {
+  id: number; // 模型ID
+  factor_id: number; // 因子ID
+  model_name: string; // 模型名称
+  model_code: string; // 模型代码
+  config_json?: Record<string, any>; // 模型配置
+  is_default: boolean; // 是否默认算法
+  enabled: boolean; // 是否启用
+  created_time: string; // 创建时间
+  updated_time: string; // 更新时间
+};
+
+// ============ 因子配置相关 ============
+type FactorConfigMappingItem = {
+  model_id: number; // 模型ID
+  codes: string[] | null; // 股票代码列表，null或空数组表示默认配置
+};
+
+type FactorConfigResponse = {
+  factor_id: number; // 因子ID（主键）
+  config: {
     enabled: boolean; // 是否启用
-    factor_config?: {
-      enabled: boolean;
-      mappings: FactorConfigMappingItem[];
-    }; // 因子配置
-    created_at: string; // 创建时间
-    updated_at: string; // 更新时间
-  };
-
-  // ============ 因子模型相关 ============
-  type FactorModelResponse = {
-    id: number; // 模型ID
-    factor_id: number; // 因子ID
-    model_name: string; // 模型名称
-    model_code: string; // 模型代码
-    config_json?: Record<string, any>; // 模型配置
-    is_default: boolean; // 是否默认算法
-    enabled: boolean; // 是否启用
-    created_at: string; // 创建时间
-    updated_at: string; // 更新时间
-  };
-
-  // ============ 因子配置相关 ============
-  type FactorConfigMappingItem = {
-    model_id: number; // 模型ID
-    codes: string[] | null; // 股票代码列表，null或空数组表示默认配置
-  };
-
-  type FactorConfigResponse = {
-    factor_id: number; // 因子ID（主键）
-    config: {
-      enabled: boolean; // 是否启用
-      mappings: FactorConfigMappingItem[]; // 模型-代码列表映射对列表
-    }; // 因子配置
-    enabled: boolean; // 是否启用
-    created_at: string; // 创建时间
-    updated_at: string; // 更新时间
-  };
-
-  type FactorConfigListResponse = {
-    items: FactorConfigResponse[]; // 因子配置列表
-    total: number; // 总数
-  };
-
-  type FactorConfigCreate = {
-    factor_id: number; // 因子ID
     mappings: FactorConfigMappingItem[]; // 模型-代码列表映射对列表
-    enabled: boolean; // 是否启用
-  };
+  }; // 因子配置
+  enabled: boolean; // 是否启用
+  created_by?: string | null; // 创建人
+  created_time: string; // 创建时间
+  updated_by?: string | null; // 修改人
+  updated_time: string; // 更新时间
+};
 
-  type FactorConfigUpdate = {
-    mappings?: FactorConfigMappingItem[] | null; // 模型-代码列表映射对列表（null表示不更新）
-    enabled?: boolean | null; // 是否启用（null表示不更新）
-  };
+type FactorConfigListResponse = {
+  items: FactorConfigResponse[]; // 因子配置列表
+  total: number; // 总数
+};
 
-      // ============ 系统大盘相关 ============
-      type SyncStatusResponse = {
-        tushare_connection_status: boolean; // Tushare同步链路是否正常
-        is_trading_day: boolean; // 当日是否交易日
-        latest_trade_date_from_api: string | null; // Tushare接口返回的最新日线行情数据的交易日期（YYYY-MM-DD格式）
-        today_data_ready: boolean; // 当日日线行情数据是否已准备就绪
-        latest_trade_date_in_db: string | null; // 数据库中最新日线数据的交易日期（YYYY-MM-DD格式）
-      };
+type FactorConfigCreate = {
+  factor_id: number; // 因子ID
+  mappings: FactorConfigMappingItem[]; // 模型-代码列表映射对列表
+  enabled: boolean; // 是否启用
+};
 
-      type TaskStatsResponse = {
-        total_tasks: number; // 当日总任务数（当日所有执行记录数）
-        running_tasks: number; // 进行中任务数（status=RUNNING）
-        completed_tasks: number; // 已完成任务数（status=SUCCESS）
-        pending_tasks: number; // 待运行任务数（status=PENDING）
-        failed_tasks: number; // 出错任务数（status=FAILED）
-      };
+type FactorConfigUpdate = {
+  mappings?: FactorConfigMappingItem[] | null; // 模型-代码列表映射对列表（null表示不更新）
+  enabled?: boolean | null; // 是否启用（null表示不更新）
+};
 
-      type LatestOperationLogItem = {
-        id?: number; // 日志ID
-        table_name?: string; // 数据表名
-        operation_type?: string; // 操作类型
-        operation_result?: string; // 操作结果
-        insert_count: number; // 插入记录数
-        update_count: number; // 更新记录数
-        delete_count: number; // 删除记录数
-        start_time?: string; // 开始时间（ISO格式）
-        end_time?: string; // 结束时间（ISO格式）
-        duration_seconds?: number; // 耗时(秒)
-        created_by?: string; // 创建人
-        created_time?: string; // 创建时间（ISO格式）
-      };
+// ============ 系统大盘相关 ============
+type SyncStatusResponse = {
+  tushare_connection_status: boolean; // Tushare同步链路是否正常
+  is_trading_day: boolean; // 当日是否交易日
+  latest_trade_date_from_api: string | null; // Tushare接口返回的最新日线行情数据的交易日期（YYYY-MM-DD格式）
+  today_data_ready: boolean; // 当日日线行情数据是否已准备就绪
+  latest_trade_date_in_db: string | null; // 数据库中最新日线数据的交易日期（YYYY-MM-DD格式）
+};
 
-      type LatestTableStatisticsItem = {
-        stat_date?: string; // 统计日期（ISO格式）
-        table_name: string; // 表名
-        is_split_table: boolean; // 是否分表
-        split_count: number; // 分表个数
-        total_records: number; // 总记录数
-        daily_records: number; // 日记录数
-        daily_insert_count: number; // 日新增记录数
-        daily_update_count: number; // 日更新记录数
-        created_by?: string; // 创建人
-        created_time?: string; // 创建时间（ISO格式）
-        updated_time?: string; // 更新时间（ISO格式）
-      };
+type TaskStatsResponse = {
+  total_tasks: number; // 当日总任务数（当日所有执行记录数）
+  running_tasks: number; // 进行中任务数（status=RUNNING）
+  completed_tasks: number; // 已完成任务数（status=SUCCESS）
+  pending_tasks: number; // 待运行任务数（status=PENDING）
+  failed_tasks: number; // 出错任务数（status=FAILED）
+};
 
-      type LatestDataResponse = {
-        latest_operation_logs: LatestOperationLogItem[]; // 数据操作日志表中，按table_name分组，每个表的最新记录列表
-        latest_table_statistics: LatestTableStatisticsItem[]; // 数据表统计表中，按table_name分组，每个表的最新记录列表
-      };
+type LatestOperationLogItem = {
+  id?: number; // 日志ID
+  table_name?: string; // 数据表名
+  operation_type?: string; // 操作类型
+  operation_result?: string; // 操作结果
+  insert_count: number; // 插入记录数
+  update_count: number; // 更新记录数
+  delete_count: number; // 删除记录数
+  start_time?: string; // 开始时间（ISO格式）
+  end_time?: string; // 结束时间（ISO格式）
+  duration_seconds?: number; // 耗时(秒)
+  created_by?: string; // 创建人
+  created_time?: string; // 创建时间（ISO格式）
+};
 
-      type LocalDataStatsResponse = {
-        total_tables: number; // 总表数（有操作日志或统计的表数量，去重）
-        success_operations: number; // 成功操作数（操作结果为success的记录数）
-        failed_operations: number; // 失败操作数（操作结果为failed的记录数）
-        total_insert_count: number; // 总插入记录数（所有操作日志的插入记录数之和）
-        total_update_count: number; // 总更新记录数（所有操作日志的更新记录数之和）
-        split_tables_count: number; // 分表数量（is_split_table=true的表数）
-        total_records_sum: number; // 总记录数（所有表统计的总记录数之和）
-        daily_records_sum: number; // 日记录数（所有表统计的日记录数之和）
-      };
+type LatestTableStatisticsItem = {
+  stat_date?: string; // 统计日期（ISO格式）
+  table_name: string; // 表名
+  is_split_table: boolean; // 是否分表
+  split_count: number; // 分表个数
+  total_records: number; // 总记录数
+  daily_records: number; // 日记录数
+  daily_insert_count: number; // 日新增记录数
+  daily_update_count: number; // 日更新记录数
+  created_by?: string; // 创建人
+  created_time?: string; // 创建时间（ISO格式）
+  updated_time?: string; // 更新时间（ISO格式）
+};
+
+type LatestDataResponse = {
+  latest_operation_logs: LatestOperationLogItem[]; // 数据操作日志表中，按table_name分组，每个表的最新记录列表
+  latest_table_statistics: LatestTableStatisticsItem[]; // 数据表统计表中，按table_name分组，每个表的最新记录列表
+};
+
+type LocalDataStatsResponse = {
+  total_tables: number; // 总表数（有操作日志或统计的表数量，去重）
+  success_operations: number; // 成功操作数（操作结果为success的记录数）
+  failed_operations: number; // 失败操作数（操作结果为failed的记录数）
+  total_insert_count: number; // 总插入记录数（所有操作日志的插入记录数之和）
+  total_update_count: number; // 总更新记录数（所有操作日志的更新记录数之和）
+  split_tables_count: number; // 分表数量（is_split_table=true的表数）
+  total_records_sum: number; // 总记录数（所有表统计的总记录数之和）
+  daily_records_sum: number; // 日记录数（所有表统计的日记录数之和）
+};
     }
+
 

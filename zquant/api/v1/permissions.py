@@ -24,7 +24,8 @@
 权限管理API
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from zquant.api.deps import get_current_active_user
@@ -32,42 +33,55 @@ from zquant.core.exceptions import NotFoundError, ValidationError
 from zquant.core.permissions import check_permission
 from zquant.database import get_db
 from zquant.models.user import User
-from zquant.schemas.user import PageResponse, PermissionCreate, PermissionResponse, PermissionUpdate
+from zquant.schemas.common import QueryRequest
+from zquant.schemas.user import (
+    PageResponse,
+    PermissionCreate,
+    PermissionDeleteRequest,
+    PermissionGetRequest,
+    PermissionListRequest,
+    PermissionResponse,
+    PermissionUpdate,
+)
 from zquant.services.permission import PermissionService
 
 router = APIRouter()
 
 
-@router.get("", response_model=PageResponse, summary="查询权限列表")
+@router.post("", response_model=PageResponse, summary="查询权限列表")
 @check_permission("permission", "read")
 def get_permissions(
-    skip: int = Query(0, ge=0, description="跳过记录数"),
-    limit: int = Query(100, ge=1, le=1000, description="每页记录数"),
-    resource: str | None = Query(None, description="资源类型筛选"),
-    order_by: str | None = Query(None, description="排序字段：id, name, resource, action, created_at"),
-    order: str | None = Query("desc", description="排序方向：asc 或 desc"),
+    request: PermissionListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """查询权限列表（分页、筛选、排序）"""
     permissions = PermissionService.get_all_permissions(
-        db, skip=skip, limit=limit, resource=resource, order_by=order_by, order=order
+        db,
+        skip=request.skip,
+        limit=request.limit,
+        resource=request.resource,
+        order_by=request.order_by,
+        order=request.order,
     )
-    total = PermissionService.count_permissions(db, resource=resource)
+    total = PermissionService.count_permissions(db, resource=request.resource)
     return PageResponse(
-        items=[PermissionResponse.model_validate(p) for p in permissions], total=total, skip=skip, limit=limit
+        items=[PermissionResponse.model_validate(p) for p in permissions],
+        total=total,
+        skip=request.skip,
+        limit=request.limit,
     )
 
 
-@router.get("/{permission_id}", response_model=PermissionResponse, summary="查询权限详情")
+@router.post("/get", response_model=PermissionResponse, summary="查询权限详情")
 @check_permission("permission", "read")
 def get_permission(
-    permission_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: PermissionGetRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """根据ID查询权限详情"""
-    permission = PermissionService.get_permission_by_id(db, permission_id)
+    permission = PermissionService.get_permission_by_id(db, request.permission_id)
     if not permission:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"权限ID {permission_id} 不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"权限ID {request.permission_id} 不存在")
     return permission
 
 
@@ -86,17 +100,16 @@ def create_permission(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.put("/{permission_id}", response_model=PermissionResponse, summary="更新权限")
+@router.post("/update", response_model=PermissionResponse, summary="更新权限")
 @check_permission("permission", "update")
 def update_permission(
-    permission_id: int,
     permission_data: PermissionUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """更新权限信息（需要permission:update权限）"""
     try:
-        permission = PermissionService.update_permission(db, permission_id, permission_data)
+        permission = PermissionService.update_permission(db, permission_data.id, permission_data)
         return permission
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -104,14 +117,14 @@ def update_permission(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.delete("/{permission_id}", summary="删除权限")
+@router.post("/delete", summary="删除权限")
 @check_permission("permission", "delete")
 def delete_permission(
-    permission_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: PermissionDeleteRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """删除权限（需要permission:delete权限）"""
     try:
-        PermissionService.delete_permission(db, permission_id)
+        PermissionService.delete_permission(db, request.permission_id)
         return {"message": "权限已删除"}
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

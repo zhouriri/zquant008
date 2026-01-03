@@ -104,8 +104,106 @@ class CommonTaskExecutor(TaskExecutor):
             executor = FactorCalculatorExecutor()
             return executor.execute(db, config, execution)
 
+        if task_action == "batch_stock_filter":
+            from zquant.services.stock_filter_task import StockFilterTaskService
+            from zquant.utils.date_helper import DateHelper
+            from datetime import date
+
+            start_date_str = config.get("start_date")
+            end_date_str = config.get("end_date")
+            trade_date_str = config.get("trade_date")  # 向后兼容
+
+            # 统一日期处理逻辑
+            if not start_date_str and not end_date_str and trade_date_str:
+                # 如果只有旧的 trade_date，则使用它作为单日范围
+                try:
+                    start_date = date.fromisoformat(trade_date_str)
+                    end_date = start_date
+                except ValueError:
+                    raise ValueError(f"无效的 trade_date 格式: {trade_date_str}")
+            else:
+                # 否则使用标准日期范围逻辑
+                try:
+                    start_date = date.fromisoformat(start_date_str) if start_date_str else None
+                    end_date = date.fromisoformat(end_date_str) if end_date_str else None
+                except ValueError:
+                    raise ValueError(f"日期格式错误: start_date={start_date_str}, end_date={end_date_str}，应为YYYY-MM-DD")
+                
+                # 如果都没有提供，DateHelper.format_date_range 会处理默认值（规则一：今日；规则二：2025-01-01至今）
+                # 这里我们希望如果没传日期，默认只跑今日（最新交易日）
+                start_date, end_date = DateHelper.format_date_range(start_date, end_date, db=db)
+
+            # 获取日期范围内的所有交易日
+            trading_dates = DateHelper.get_trading_dates(db, start_date, end_date)
+            
+            if not trading_dates:
+                return {
+                    "success": True, 
+                    "message": f"{start_date} 至 {end_date} 期间没有交易日", 
+                    "total_results": 0
+                }
+
+            # 处理恢复模式
+            resume_from_id = config.get("resume_from_execution_id")
+            successful_dates = set()
+            if resume_from_id:
+                old_execution = db.query(TaskExecution).filter(TaskExecution.id == resume_from_id).first()
+                if old_execution:
+                    old_result = old_execution.get_result()
+                    details = old_result.get("summary", {}).get("details", [])
+                    for detail in details:
+                        if detail.get("success"):
+                            successful_dates.add(detail.get("date"))
+                    logger.info(f"[通用任务] 从执行记录 {resume_from_id} 恢复，将跳过 {len(successful_dates)} 个已成功交易日")
+
+            total_summary = {
+                "total_days": len(trading_dates),
+                "success_days": 0,
+                "failed_days": 0,
+                "total_results": 0,
+                "details": []
+            }
+
+            for trade_date in trading_dates:
+                trade_date_iso = trade_date.isoformat()
+                
+                # 跳过已成功的日期
+                if trade_date_iso in successful_dates:
+                    logger.info(f"[通用任务] 跳过已成功交易日: {trade_date_iso}")
+                    total_summary["success_days"] += 1
+                    total_summary["details"].append({
+                        "date": trade_date_iso,
+                        "success": True,
+                        "message": "跳过已成功交易日（恢复模式）",
+                        "skipped": True
+                    })
+                    continue
+
+                res = StockFilterTaskService.batch_execute_all_strategies(
+                    db=db, trade_date=trade_date, extra_info={"created_by": "scheduler"}, execution=execution
+                )
+                if res.get("success", False):
+                    total_summary["success_days"] += 1
+                    total_summary["total_results"] += res.get("total_results", 0)
+                else:
+                    total_summary["failed_days"] += 1
+                
+                total_summary["details"].append({
+                    "date": trade_date.isoformat(),
+                    "success": res.get("success", False),
+                    "message": res.get("message", ""),
+                    "total_results": res.get("total_results", 0)
+                })
+
+            message = f"批量选股完成: 总交易日={total_summary['total_days']}, 成功天数={total_summary['success_days']}, 失败天数={total_summary['failed_days']}, 累计结果数={total_summary['total_results']}"
+            return {
+                "success": total_summary["failed_days"] == 0,
+                "message": message,
+                "summary": total_summary
+            }
+
         raise ValueError(
-            f"不支持的 task_action: {task_action}。支持的 action: example_task, sync_stock_list, sync_trading_calendar, sync_daily_data, sync_all_daily_data, calculate_factor"
+            f"不支持的 task_action: {task_action}。支持的 action: example_task, sync_stock_list, sync_trading_calendar, sync_daily_data, sync_all_daily_data, calculate_factor, batch_stock_filter"
         )
 
     def _infer_task_action_from_type(self, task_type: TaskType) -> str | None:

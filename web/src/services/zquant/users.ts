@@ -26,11 +26,15 @@ import { request } from '@umijs/max';
 
 /**
  * 获取当前用户信息
- * GET /api/v1/users/me
+ * POST /api/v1/users/me
  */
 export async function getCurrentUser() {
   return request<ZQuant.UserResponse>('/api/v1/users/me', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
@@ -50,11 +54,15 @@ export async function createUser(body: ZQuant.UserCreate) {
 
 /**
  * 获取API密钥列表
- * GET /api/v1/users/me/apikeys
+ * POST /api/v1/users/me/apikeys
  */
 export async function getAPIKeys() {
   return request<ZQuant.APIKeyResponse[]>('/api/v1/users/me/apikeys', {
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: {},
   });
 }
 
@@ -74,17 +82,21 @@ export async function createAPIKey(body: ZQuant.APIKeyCreate) {
 
 /**
  * 删除API密钥
- * DELETE /api/v1/users/me/apikeys/{key_id}
+ * POST /api/v1/users/me/apikeys/delete
  */
 export async function deleteAPIKey(keyId: number) {
-  return request<{ message: string }>(`/api/v1/users/me/apikeys/${keyId}`, {
-    method: 'DELETE',
+  return request<{ message: string }>('/api/v1/users/me/apikeys/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { key_id: keyId },
   });
 }
 
 /**
  * 查询用户列表（分页、筛选）
- * GET /api/v1/users
+ * POST /api/v1/users/query
  */
 export async function getUsers(params?: {
   skip?: number;
@@ -95,57 +107,68 @@ export async function getUsers(params?: {
   order_by?: string;
   order?: 'asc' | 'desc';
 }) {
-  return request<ZQuant.PageResponse<ZQuant.UserResponse>>('/api/v1/users', {
-    method: 'GET',
-    params,
+  return request<ZQuant.PageResponse<ZQuant.UserResponse>>('/api/v1/users/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 查询用户详情
- * GET /api/v1/users/{user_id}
+ * POST /api/v1/users/get
  */
 export async function getUser(userId: number) {
-  return request<ZQuant.UserResponse>(`/api/v1/users/${userId}`, {
-    method: 'GET',
+  return request<ZQuant.UserResponse>('/api/v1/users/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { user_id: userId },
   });
 }
 
 /**
  * 更新用户
- * PUT /api/v1/users/{user_id}
+ * POST /api/v1/users/update
  */
 export async function updateUser(userId: number, body: ZQuant.UserUpdate) {
-  return request<ZQuant.UserResponse>(`/api/v1/users/${userId}`, {
-    method: 'PUT',
+  return request<ZQuant.UserResponse>('/api/v1/users/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, user_id: userId },
   });
 }
 
 /**
  * 重置用户密码
- * POST /api/v1/users/{user_id}/reset-password
+ * POST /api/v1/users/reset-password
  */
 export async function resetUserPassword(userId: number, body: ZQuant.PasswordReset) {
-  return request<{ message: string }>(`/api/v1/users/${userId}/reset-password`, {
+  return request<{ message: string }>('/api/v1/users/reset-password', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, user_id: userId },
   });
 }
 
 /**
  * 删除用户
- * DELETE /api/v1/users/{user_id}
+ * POST /api/v1/users/delete
  */
 export async function deleteUser(userId: number) {
-  return request<{ message: string }>(`/api/v1/users/${userId}`, {
-    method: 'DELETE',
+  return request<{ message: string }>('/api/v1/users/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { user_id: userId },
   });
 }
 

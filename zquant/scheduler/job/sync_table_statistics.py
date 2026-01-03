@@ -37,6 +37,7 @@
 """
 
 import argparse
+import os
 from datetime import date, datetime
 from pathlib import Path
 import sys
@@ -53,6 +54,7 @@ from loguru import logger
 
 from zquant.scheduler.job.base import BaseSyncJob
 from zquant.services.data import DataService
+from zquant.models.scheduler import TaskExecution
 
 __job_name__ = "sync_table_statistics"
 
@@ -68,6 +70,28 @@ class SyncTableStatisticsJob(BaseSyncJob):
         parser = argparse.ArgumentParser(description=self.description)
         parser.add_argument("--stat-date", type=str, help="统计日期（YYYY-MM-DD格式，可选，默认：当天）")
         return parser
+
+    def get_execution(self, db) -> TaskExecution | None:
+        """
+        从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+        """
+        execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+        if not execution_id_str:
+            logger.debug("环境变量 ZQUANT_EXECUTION_ID 未设置，无法更新进度")
+            return None
+
+        try:
+            execution_id = int(execution_id_str)
+            execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+            if execution:
+                logger.debug(f"获取到执行记录: {execution_id}")
+                return execution
+            else:
+                logger.warning(f"执行记录 {execution_id} 不存在")
+                return None
+        except (ValueError, Exception) as e:
+            logger.warning(f"获取执行记录失败: {e}")
+            return None
 
     def execute(self, args: argparse.Namespace) -> int:
         extra_info = self.build_extra_info()
@@ -92,12 +116,17 @@ class SyncTableStatisticsJob(BaseSyncJob):
                 logger.error(f"统计日期不能超过今天: {stat_date}")
                 return 1
 
+            # 获取执行记录（用于进度更新）
+            execution = self.get_execution(db)
+
             # 打印开始信息
             self.print_start_info(统计日期=f"{stat_date.strftime('%Y-%m-%d')}")
             logger.info(f"开始统计数据表入库情况，统计日期: {stat_date}")
 
             try:
-                results = DataService.statistics_table_data(db=db, stat_date=stat_date, created_by=created_by)
+                results = DataService.statistics_table_data(
+                    db=db, stat_date=stat_date, created_by=created_by, execution=execution
+                )
 
                 self.print_end_info(统计表数=str(len(results)))
                 logger.info(f"数据表统计完成，共统计 {len(results)} 个表")

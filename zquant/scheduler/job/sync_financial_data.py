@@ -40,6 +40,7 @@
 """
 
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -56,6 +57,7 @@ from loguru import logger
 
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.scheduler.job.base import BaseSyncJob
+from zquant.models.scheduler import TaskExecution
 
 __job_name__ = "sync_financial_data"
 
@@ -77,6 +79,28 @@ class SyncFinancialDataJob(BaseSyncJob):
             help="报表类型（income=利润表，balance=资产负债表，cashflow=现金流量表，默认：income）",
         )
         return parser
+
+    def get_execution(self, db) -> TaskExecution | None:
+        """
+        从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+        """
+        execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+        if not execution_id_str:
+            logger.debug("环境变量 ZQUANT_EXECUTION_ID 未设置，无法更新进度")
+            return None
+
+        try:
+            execution_id = int(execution_id_str)
+            execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+            if execution:
+                logger.debug(f"获取到执行记录: {execution_id}")
+                return execution
+            else:
+                logger.warning(f"执行记录 {execution_id} 不存在")
+                return None
+        except (ValueError, Exception) as e:
+            logger.warning(f"获取执行记录失败: {e}")
+            return None
 
     def execute(self, args: argparse.Namespace) -> int:
         # 处理日期参数（可选）
@@ -100,6 +124,9 @@ class SyncFinancialDataJob(BaseSyncJob):
                 logger.error(f"日期参数验证失败: {e}")
                 return 1
 
+            # 获取执行记录（用于进度更新）
+            execution = self.get_execution(db)
+
             # 打印开始信息
             info_kwargs = {
                 "报表类型": f"{args.statement_type} ({statement_type_map.get(args.statement_type, args.statement_type)})",
@@ -117,14 +144,14 @@ class SyncFinancialDataJob(BaseSyncJob):
                 # 同步单只股票
                 logger.info(f"开始同步 {args.symbol} 财务数据（{args.statement_type}）...")
                 count = scheduler.sync_financial_data(
-                    db, args.symbol, args.statement_type, start_date, end_date, extra_info
+                    db, args.symbol, args.statement_type, start_date, end_date, extra_info, execution=execution
                 )
                 self.print_end_info(同步记录数=str(count))
             else:
                 # 同步所有股票
                 logger.info(f"开始同步所有股票财务数据（{args.statement_type}）...")
                 result_summary = scheduler.sync_all_financial_data(
-                    db, args.statement_type, start_date, end_date, extra_info
+                    db, args.statement_type, start_date, end_date, extra_info, execution=execution
                 )
 
                 end_kwargs = {

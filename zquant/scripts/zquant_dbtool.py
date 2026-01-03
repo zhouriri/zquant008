@@ -23,17 +23,16 @@ from sqlalchemy import inspect as sql_inspect
 from sqlalchemy import text
 
 from zquant.config import settings
-from zquant.data.tablestructure import TABLE_CN_TUSTOCK_LOG
 from zquant.database import SessionLocal, engine
-
+from zquant.models.data import DataOperationLog
 
 class ZQuantDBTool:
     """数据库操作工具类"""
 
     def __init__(self, table_prefix: str = "zq_data_tustock"):
         self.table_prefix = table_prefix
-        self.log_table_name = TABLE_CN_TUSTOCK_LOG["name"]
-        self.log_table_structure = TABLE_CN_TUSTOCK_LOG
+        self.log_table_name = DataOperationLog.__tablename__
+        self.log_table_structure = {"name": DataOperationLog.__tablename__}
         self.db = SessionLocal()
 
     def __del__(self):
@@ -1017,44 +1016,71 @@ class ZQuantDBTool:
 
 def main():
     """主函数 - 命令行入口"""
-    tool = ZQuantDBTool()
-
+    # 表类型配置
+    table_types = {
+        "1": {"prefix": "zq_data_tustock", "name": "zq_data_tustock表"},
+        "2": {"prefix": "zq_quant_factor_spacex_", "name": "zq_quant_factor_spacex_表"},
+    }
+    
+    # 选择表类型
     while True:
         print("\n" + "=" * 60)
-        print("数据库操作工具 - zq_data_tustock表管理")
+        print("数据库操作工具 - 选择表类型")
         print("=" * 60)
-        print("1. 列举表名为zq_data_tustock开头的表")
-        print("2. 查看分表概况")
-        print("3. 按时间段删除分表数据")
-        print("4. 删除数据表")
-        print("5. 退出操作")
+        print("1. zq_data_tustock 表管理")
+        print("2. zq_quant_factor_spacex_ 表管理")
+        print("3. 退出程序")
         print("-" * 60)
-
-        choice = input("请选择操作 (1-5): ").strip()
-
-        if choice == "1":
-            print("\n正在列举zq_data_tustock开头的表...")
-            tool.list_tustock_tables()
-
-        elif choice == "2":
-            print("\n正在获取分表概况...")
-            tool.show_table_overview()
-
-        elif choice == "3":
-            print("\n正在准备删除数据...")
-            # 先列出表，然后通过交互选择删除
-            tool.list_tustock_tables()
-
-        elif choice == "4":
-            print("\n正在准备删除表...")
-            tool.drop_table_interactive()
-
-        elif choice == "5":
+        
+        table_type_choice = input("请选择表类型 (1-3): ").strip()
+        
+        if table_type_choice == "3":
             print("退出程序")
-            break
-
-        else:
+            return
+        
+        if table_type_choice not in table_types:
             print("无效选择，请重新输入")
+            continue
+        
+        selected_type = table_types[table_type_choice]
+        tool = ZQuantDBTool(table_prefix=selected_type["prefix"])
+        
+        # 进入表操作菜单
+        while True:
+            print("\n" + "=" * 60)
+            print(f"数据库操作工具 - {selected_type['name']}管理")
+            print("=" * 60)
+            print("1. 列举表名")
+            print("2. 查看分表概况")
+            print("3. 按时间段删除分表数据")
+            print("4. 删除数据表")
+            print("5. 返回表类型选择")
+            print("-" * 60)
+
+            choice = input("请选择操作 (1-5): ").strip()
+
+            if choice == "1":
+                print(f"\n正在列举{selected_type['prefix']}开头的表...")
+                tool.list_tustock_tables()
+
+            elif choice == "2":
+                print("\n正在获取分表概况...")
+                tool.show_table_overview()
+
+            elif choice == "3":
+                print("\n正在准备删除数据...")
+                # 先列出表，然后通过交互选择删除
+                tool.list_tustock_tables()
+
+            elif choice == "4":
+                print("\n正在准备删除表...")
+                tool.drop_table_interactive()
+
+            elif choice == "5":
+                break  # 返回表类型选择
+
+            else:
+                print("无效选择，请重新输入")
 
 
 if __name__ == "__main__":

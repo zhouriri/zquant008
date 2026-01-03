@@ -24,6 +24,8 @@
 定时任务管理服务
 """
 
+import threading
+import time
 from datetime import datetime
 from typing import Any
 
@@ -51,6 +53,7 @@ class SchedulerService:
         max_retries: int = 3,
         retry_interval: int = 60,
         enabled: bool = True,
+        created_by: str | None = None,
     ) -> ScheduledTask:
         """
         创建定时任务
@@ -66,6 +69,7 @@ class SchedulerService:
             max_retries: 最大重试次数
             retry_interval: 重试间隔（秒）
             enabled: 是否启用
+            created_by: 创建人
 
         Returns:
             创建的任务对象
@@ -93,6 +97,8 @@ class SchedulerService:
             max_retries=max_retries,
             retry_interval=retry_interval,
             enabled=enabled,
+            created_by=created_by,
+            updated_by=created_by,  # 创建时 updated_by 和 created_by 一致
         )
         task.set_config(config or {})
 
@@ -175,8 +181,8 @@ class SchedulerService:
                 "enabled": ScheduledTask.enabled,
                 "paused": ScheduledTask.paused,
                 "max_retries": ScheduledTask.max_retries,
-                "created_at": ScheduledTask.created_at,
-                "updated_at": ScheduledTask.updated_at,
+                "created_time": ScheduledTask.created_time,
+                "updated_time": ScheduledTask.updated_time,
             }
 
             if order_by in sortable_fields:
@@ -220,18 +226,27 @@ class SchedulerService:
             )
 
             latest_statuses = (
-                db.query(TaskExecution.task_id, TaskExecution.status.label("latest_status"))
+                db.query(
+                    TaskExecution.task_id,
+                    TaskExecution.status.label("latest_status"),
+                    TaskExecution.current_item.label("latest_current_item"),
+                    TaskExecution.progress_percent.label("latest_progress"),
+                )
                 .join(subquery, (TaskExecution.task_id == subquery.c.task_id) & (TaskExecution.id == subquery.c.max_id))
                 .all()
             )
 
-            latest_status_map = {tid: status for tid, status in latest_statuses}
+            latest_status_map = {tid: status for tid, status, _, _ in latest_statuses}
+            latest_current_item_map = {tid: item for tid, _, item, _ in latest_statuses}
+            latest_progress_map = {tid: progress for tid, _, _, progress in latest_statuses}
 
             # 将最新执行时间和状态附加到任务对象，并计算调度状态
             scheduler_manager = get_scheduler_manager()
             for task in tasks:
                 task.latest_execution_time = latest_time_map.get(task.id)
                 task.latest_execution_status = latest_status_map.get(task.id)
+                task.latest_execution_current_item = latest_current_item_map.get(task.id)
+                task.latest_execution_progress = latest_progress_map.get(task.id)
                 # 计算并附加调度状态
                 job_status = scheduler_manager.get_job_status(task.job_id)
                 task.schedule_status = SchedulerService.calculate_task_status(task, job_status, db)
@@ -249,6 +264,7 @@ class SchedulerService:
         config: dict[str, Any] | None = None,
         max_retries: int | None = None,
         retry_interval: int | None = None,
+        updated_by: str | None = None,
     ) -> ScheduledTask:
         """更新任务"""
         task = SchedulerService.get_task(db, task_id)
@@ -274,8 +290,10 @@ class SchedulerService:
             task.max_retries = max_retries
         if retry_interval is not None:
             task.retry_interval = retry_interval
+        if updated_by is not None:
+            task.updated_by = updated_by
 
-        task.updated_at = datetime.now()
+        task.updated_time = datetime.now()
         db.commit()
         db.refresh(task)
 
@@ -317,7 +335,7 @@ class SchedulerService:
 
         if not task.enabled:
             task.enabled = True
-            task.updated_at = datetime.now()
+            task.updated_time = datetime.now()
             db.commit()
 
             # 添加到调度器
@@ -357,7 +375,7 @@ class SchedulerService:
 
         if not task.paused:
             task.paused = True
-            task.updated_at = datetime.now()
+            task.updated_time = datetime.now()
             db.commit()
 
             # 如果任务已启用且在调度器中，暂停调度器中的任务
@@ -376,7 +394,7 @@ class SchedulerService:
 
         if task.paused:
             task.paused = False
-            task.updated_at = datetime.now()
+            task.updated_time = datetime.now()
             db.commit()
 
             # 如果任务已启用且在调度器中，恢复调度器中的任务
@@ -396,6 +414,18 @@ class SchedulerService:
         from zquant.scheduler.executor import get_executor
 
         task = SchedulerService.get_task(db, task_id)
+
+        # 检查是否已有正在运行或暂停的任务
+        active_execution = (
+            db.query(TaskExecution)
+            .filter(
+                TaskExecution.task_id == task_id,
+                TaskExecution.status.in_([TaskStatus.RUNNING, TaskStatus.PAUSED])
+            )
+            .first()
+        )
+        if active_execution:
+            raise ValueError(f"任务 '{task.name}' 正在运行中(ID: {active_execution.id})，请勿重复触发")
 
         scheduler_manager = get_scheduler_manager()
         
@@ -421,9 +451,20 @@ class SchedulerService:
                         return
 
                     # 创建执行记录
-                    execution = TaskExecution(task_id=task_obj.id, status=TaskStatus.RUNNING, start_time=datetime.now())
+                    execution = TaskExecution(
+                        task_id=task_obj.id, 
+                        status=TaskStatus.RUNNING, 
+                        start_time=datetime.now(),
+                        created_by="scheduler",  # 手动触发任务由调度器创建
+                        updated_by="scheduler",
+                    )
                     db_thread.add(execution)
                     db_thread.commit()
+                    db_thread.refresh(execution)
+
+                    # 重命名线程，包含执行记录ID，便于后续存活检查
+                    thread_name = f"TaskThread-{task_id_for_thread}-Exec-{execution.id}"
+                    threading.current_thread().name = thread_name
 
                     logger.info(f"[线程 {thread_name}] 手动任务 {task_obj.name} 开始执行")
 
@@ -510,6 +551,211 @@ class SchedulerService:
         )
         if not execution:
             raise NotFoundError(f"执行记录 {execution_id} 不存在")
+        return execution
+
+    @staticmethod
+    def pause_execution(db: Session, execution_id: int) -> TaskExecution:
+        """暂停执行记录（设置暂停标志）"""
+        execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+        if not execution:
+            raise NotFoundError(f"执行记录 {execution_id} 不存在")
+
+        if execution.status == TaskStatus.RUNNING:
+            execution.is_paused = True
+            db.commit()
+            db.refresh(execution)
+            logger.info(f"设置执行记录暂停标志: {execution_id}")
+
+        return execution
+
+    @staticmethod
+    def resume_execution(db: Session, execution_id: int) -> TaskExecution:
+        """恢复执行记录（物理存活检查，支持断点续传或从失败点重启）"""
+        execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+        if not execution:
+            raise NotFoundError(f"执行记录 {execution_id} 不存在")
+
+        # 1. 物理存活检查：搜索包含此执行ID的活跃线程
+        is_thread_alive = False
+        execution_tag = f"Exec-{execution_id}"
+        for thread in threading.enumerate():
+            if execution_tag in thread.name:
+                is_thread_alive = True
+                break
+
+        # 2. 处理活跃线程场景
+        if is_thread_alive:
+            if execution.is_paused:
+                execution.is_paused = False
+                execution.status = TaskStatus.RUNNING  # 显式恢复状态
+                db.commit()
+                db.refresh(execution)
+                logger.info(f"活跃任务检测到暂停标志，已清除并恢复状态: {execution_id}")
+                return execution
+            
+            if execution.status == TaskStatus.RUNNING:
+                logger.warning(f"任务执行记录 {execution_id} 已在活跃运行中，无需恢复")
+                return execution
+
+        # 3. 处理线程丢失场景（僵尸任务）
+        if not is_thread_alive and execution.status in [TaskStatus.RUNNING, TaskStatus.PAUSED]:
+            logger.warning(f"检测到僵尸任务(线程丢失)，标记为终止: {execution_id}")
+            execution.status = TaskStatus.TERMINATED
+            execution.end_time = datetime.now()
+            execution.error_message = "运行线程已丢失（可能由于系统重启）"
+            execution.is_paused = False
+            db.commit()
+            db.refresh(execution)
+
+        # 4. 重新触发任务（断点续传）
+        # 此时任务状态必然是 FAILED 或 TERMINATED
+        if execution.status in [TaskStatus.FAILED, TaskStatus.TERMINATED]:
+            task_id = execution.task_id
+            task = SchedulerService.get_task(db, task_id)
+            
+            # 准备配置，携带上下文信息
+            config = task.get_config()
+            config["resume_from_execution_id"] = execution_id
+            
+            def execute_resumed_task():
+                """在独立线程中执行恢复任务（支持断点续传）"""
+                from zquant.database import SessionLocal
+                from zquant.scheduler.executor import get_executor
+                
+                db_thread = SessionLocal()
+                new_execution = None
+                try:
+                    # 重新从数据库加载任务对象
+                    task_obj = db_thread.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
+                    if not task_obj:
+                        logger.error(f"任务 {task_id} 不存在，无法恢复")
+                        return
+
+                    # 二次检查：确保没有正在运行的相同任务实例
+                    active_execution = (
+                        db_thread.query(TaskExecution)
+                        .filter(
+                            TaskExecution.task_id == task_id,
+                            TaskExecution.status.in_([TaskStatus.RUNNING, TaskStatus.PAUSED])
+                        )
+                        .first()
+                    )
+                    if active_execution:
+                        # 检查该活跃执行是否真的存活
+                        active_tag = f"Exec-{active_execution.id}"
+                        if any(active_tag in t.name for t in threading.enumerate()):
+                            logger.warning(f"任务 {task_obj.name} 已有活跃执行记录(ID: {active_execution.id})，跳过恢复")
+                            return
+
+                    # 创建新的执行记录
+                    new_execution = TaskExecution(
+                        task_id=task_obj.id, 
+                        status=TaskStatus.RUNNING, 
+                        start_time=datetime.now(),
+                        created_by="scheduler",  # 恢复续传任务由调度器创建
+                        updated_by="scheduler",
+                    )
+                    # 记录来源信息
+                    new_execution.set_result({
+                        "resume_from_execution_id": execution_id, 
+                        "message": f"从执行记录 {execution_id} 恢复续传"
+                    })
+                    db_thread.add(new_execution)
+                    db_thread.commit()
+                    db_thread.refresh(new_execution)
+
+                    # 重命名线程
+                    thread_name = f"TaskThread-{task_id}-Exec-{new_execution.id}"
+                    threading.current_thread().name = thread_name
+
+                    logger.info(f"[线程 {thread_name}] 任务 {task_obj.name} 恢复执行开始 (源自记录: {execution_id})")
+
+                    # 执行任务，传递新execution对象
+                    executor = get_executor(task_obj.task_type)
+                    
+                    # 运行配置中加入恢复ID，供具体的执行器（如DataScheduler/WorkflowExecutor）处理续传
+                    run_config = task_obj.get_config()
+                    run_config["task_type"] = task_obj.task_type
+                    run_config["resume_from_execution_id"] = execution_id
+
+                    result = executor.execute(db_thread, run_config, new_execution)
+
+                    # 更新执行记录为成功
+                    new_execution.status = TaskStatus.SUCCESS
+                    new_execution.end_time = datetime.now()
+                    new_execution.duration_seconds = int((new_execution.end_time - new_execution.start_time).total_seconds())
+                    
+                    final_result = new_execution.get_result()
+                    final_result.update(result)
+                    new_execution.set_result(final_result)
+                    db_thread.commit()
+
+                    logger.info(f"[线程 {thread_name}] 恢复任务 {task_obj.name} 续传成功")
+
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"恢复任务执行异常: {error_msg}")
+
+                    if new_execution:
+                        new_execution.status = TaskStatus.FAILED
+                        new_execution.end_time = datetime.now()
+                        if new_execution.start_time:
+                            new_execution.duration_seconds = int(
+                                (new_execution.end_time - new_execution.start_time).total_seconds()
+                            )
+                        new_execution.error_message = error_msg
+                        db_thread.commit()
+
+                finally:
+                    db_thread.close()
+
+            # 启动独立线程
+            resume_thread = threading.Thread(
+                target=execute_resumed_task, 
+                name=f"Initial-Resume-{task_id}", 
+                daemon=False
+            )
+            resume_thread.start()
+            logger.info(f"已发起断点续传线程: {task.name} (目标记录 {execution_id})")
+            
+            return execution
+
+        return execution
+
+    @staticmethod
+    def terminate_execution(db: Session, execution_id: int) -> TaskExecution:
+        """终止执行记录（设置终止请求标志，或强制清理）"""
+        execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+        if not execution:
+            raise NotFoundError(f"执行记录 {execution_id} 不存在")
+
+        if execution.status in [TaskStatus.RUNNING, TaskStatus.PAUSED]:
+            # 1. 检查对应线程是否还存活
+            # 线程命名规则参考 TaskSchedulerManager._run_job_wrapper，包含 Exec-{execution_id}
+            exec_tag = f"Exec-{execution.id}"
+            is_thread_alive = any(exec_tag in t.name for t in threading.enumerate())
+
+            # 2. 如果线程已丢失，或者已经请求过终止（说明正常终止途径失效），执行强制状态更新
+            if not is_thread_alive or execution.terminate_requested:
+                reason = "运行线程已丢失" if not is_thread_alive else "正常终止请求无响应，强制终止"
+                logger.warning(f"执行记录 {execution_id} ({reason})，执行强制状态更新")
+                
+                execution.status = TaskStatus.TERMINATED
+                execution.terminate_requested = True
+                execution.end_time = datetime.now()
+                if execution.start_time:
+                    execution.duration_seconds = int((execution.end_time - execution.start_time).total_seconds())
+                execution.error_message = f"{reason}（可能已崩溃或被外部强制结束），系统已回收状态"
+                db.commit()
+                db.refresh(execution)
+                return execution
+
+            # 3. 线程还存活且未请求过终止，设置标志位让其自行退出
+            execution.terminate_requested = True
+            db.commit()
+            db.refresh(execution)
+            logger.info(f"设置执行记录终止请求标志: {execution_id}")
+
         return execution
 
     @staticmethod

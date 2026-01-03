@@ -43,8 +43,10 @@ type FactorConfigRow = {
   cn_name: string;
   mapping_count: number;
   enabled: boolean;
-  created_at: string;
-  updated_at: string;
+  created_by?: string | null;
+  created_time: string;
+  updated_by?: string | null;
+  updated_time: string;
 };
 
 const FactorConfigs: React.FC = () => {
@@ -127,18 +129,30 @@ const FactorConfigs: React.FC = () => {
       ),
     },
     {
+      title: '创建人',
+      dataIndex: 'created_by',
+      width: 100,
+      render: (_, record) => record.created_by || '-',
+    },
+    {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       sorter: true,
-      render: (_, record) => dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) => dayjs(record.created_time).format('YYYY-MM-DD HH:mm:ss'),
+    },
+    {
+      title: '修改人',
+      dataIndex: 'updated_by',
+      width: 100,
+      render: (_, record) => record.updated_by || '-',
     },
     {
       title: '更新时间',
-      dataIndex: 'updated_at',
+      dataIndex: 'updated_time',
       width: 180,
       sorter: true,
-      render: (_, record) => dayjs(record.updated_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) => dayjs(record.updated_time).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '操作',
@@ -355,8 +369,10 @@ const FactorConfigs: React.FC = () => {
                 cn_name: factor?.cn_name || '',
                 mapping_count: config.config.mappings ? config.config.mappings.length : 0,
                 enabled: config.enabled,
-                created_at: config.created_at,
-                updated_at: config.updated_at,
+                created_by: config.created_by,
+                created_time: config.created_time,
+                updated_by: config.updated_by,
+                updated_time: config.updated_time,
               };
             });
 

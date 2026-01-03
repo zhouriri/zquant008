@@ -29,13 +29,16 @@
 from abc import ABC, abstractmethod
 from typing import Any
 from sqlalchemy.orm import Session
+from zquant.models.scheduler import TaskExecution
 
 
 class DataSyncStrategy(ABC):
     """数据同步策略接口"""
 
     @abstractmethod
-    def sync(self, db: Session, config: dict[str, Any], extra_info: dict | None = None) -> dict[str, Any]:
+    def sync(
+        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+    ) -> dict[str, Any]:
         """
         执行数据同步
 
@@ -43,6 +46,7 @@ class DataSyncStrategy(ABC):
             db: 数据库会话
             config: 同步配置
             extra_info: 额外信息字典，可包含 created_by 和 updated_by 字段
+            execution: 执行记录对象（可选），用于更新进度和检查控制标志
 
         Returns:
             同步结果字典，包含 success, count, message 等字段

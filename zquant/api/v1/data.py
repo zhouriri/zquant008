@@ -25,6 +25,7 @@
 """
 
 from fastapi import APIRouter, Depends
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from zquant.api.decorators import convert_to_response_items, handle_data_api_error
@@ -114,7 +115,6 @@ def fetch_fundamentals_from_api(
     current_user: User = Depends(get_current_active_user),
 ):
     """从Tushare接口获取财务数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
 
     symbols = [s.strip() for s in request.symbols.split(",") if s.strip()]
@@ -144,7 +144,7 @@ def fetch_fundamentals_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return FundamentalsFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data={},
             total_count=0,
@@ -202,7 +202,6 @@ def validate_fundamentals(
     current_user: User = Depends(get_current_active_user),
 ):
     """财务数据校验：对比数据库数据和接口数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
 
@@ -229,7 +228,7 @@ def validate_fundamentals(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return FundamentalsValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             symbols=symbols,
             total_db_records=0,
             total_api_records=0,
@@ -347,7 +346,6 @@ def fetch_calendar_from_api(
     request: CalendarFetchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """从Tushare接口获取交易日历"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
 
     start_date_str = request.start_date.strftime("%Y%m%d")
@@ -365,7 +363,7 @@ def fetch_calendar_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return CalendarFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data=[],
             total_count=0,
@@ -397,7 +395,7 @@ def fetch_calendar_from_api(
     except Exception as e:
         logger.error(f"获取交易日历失败: {e}")
         return CalendarFetchResponse(
-            success=False, message=f"获取交易日历失败: {str(e)}", request_params=request_params, data=[], total_count=0
+            success=False, message="获取交易日历失败", request_params=request_params, data=[], total_count=0
         )
 
 
@@ -409,7 +407,6 @@ def validate_calendar(
     current_user: User = Depends(get_current_active_user),
 ):
     """交易日历数据校验：对比数据库数据和接口数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
 
@@ -423,7 +420,7 @@ def validate_calendar(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return CalendarValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             total_db_records=0,
             total_api_records=0,
             consistent_count=0,
@@ -448,7 +445,7 @@ def validate_calendar(
         logger.error(f"获取接口数据失败: {e}")
         return CalendarValidateResponse(
             success=False,
-            message=f"获取接口数据失败: {str(e)}",
+            message="获取接口数据失败",
             total_db_records=len(db_records),
             total_api_records=0,
             consistent_count=0,
@@ -553,7 +550,6 @@ def fetch_stock_list_from_api(
     request: StockListFetchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """从Tushare接口获取股票列表"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
 
     request_params = {
@@ -567,7 +563,7 @@ def fetch_stock_list_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return StockListFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data=[],
             total_count=0,
@@ -592,7 +588,7 @@ def fetch_stock_list_from_api(
     except Exception as e:
         logger.error(f"获取股票列表失败: {e}")
         return StockListFetchResponse(
-            success=False, message=f"获取股票列表失败: {str(e)}", request_params=request_params, data=[], total_count=0
+            success=False, message="获取股票列表失败", request_params=request_params, data=[], total_count=0
         )
 
 
@@ -604,7 +600,6 @@ def validate_stock_list(
     current_user: User = Depends(get_current_active_user),
 ):
     """股票列表数据校验：对比数据库数据和接口数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
 
@@ -614,7 +609,7 @@ def validate_stock_list(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return StockListValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             total_db_records=0,
             total_api_records=0,
             consistent_count=0,
@@ -631,7 +626,7 @@ def validate_stock_list(
         logger.error(f"获取接口数据失败: {e}")
         return StockListValidateResponse(
             success=False,
-            message=f"获取接口数据失败: {str(e)}",
+            message="获取接口数据失败",
             total_db_records=len(db_stocks),
             total_api_records=0,
             consistent_count=0,
@@ -725,7 +720,14 @@ def get_daily_data(
     request: DailyDataRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """获取日线数据（返回所有字段）"""
-    records = DataService.get_daily_data(db, request.ts_code, request.start_date, request.end_date)
+    records = DataService.get_daily_data(
+        db,
+        request.ts_code,
+        request.start_date,
+        request.end_date,
+        request.trading_day_filter,
+        request.exchange,
+    )
     items = convert_to_response_items(records, DailyDataItem)
     return DailyDataResponse(items=items)
 
@@ -741,7 +743,6 @@ def fetch_daily_data_from_api(
     - 支持多个股票代码同时查询（用逗号分隔）
     - 返回原始JSON数据和请求参数
     """
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     import pandas as pd
 
@@ -775,7 +776,7 @@ def fetch_daily_data_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return DailyDataFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data=[],
             total_count=0,
@@ -847,7 +848,6 @@ def validate_daily_data(
     - 支持多个股票代码同时校验（用逗号分隔）
     - 返回差异统计和详情
     """
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
     import math
@@ -880,7 +880,7 @@ def validate_daily_data(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return DailyDataValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             ts_codes=ts_codes,
             total_db_records=0,
             total_api_records=0,
@@ -1082,7 +1082,14 @@ def get_daily_basic_data(
     request: DailyBasicRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """获取每日指标数据（返回所有字段）"""
-    records = DataService.get_daily_basic_data(db, request.ts_code, request.start_date, request.end_date)
+    records = DataService.get_daily_basic_data(
+        db,
+        request.ts_code,
+        request.start_date,
+        request.end_date,
+        request.trading_day_filter,
+        request.exchange,
+    )
     items = convert_to_response_items(records, DailyBasicItem)
     return DailyBasicResponse(items=items)
 
@@ -1102,7 +1109,6 @@ def fetch_daily_basic_data_from_api(
     - 支持多个股票代码同时查询（用逗号分隔）
     - 返回原始JSON数据和请求参数
     """
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
 
     # 解析股票代码列表
@@ -1134,7 +1140,7 @@ def fetch_daily_basic_data_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return DailyBasicFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data=[],
             total_count=0,
@@ -1194,7 +1200,6 @@ def validate_daily_basic_data(
     - 支持多个股票代码同时校验（用逗号分隔）
     - 返回差异统计和详情
     """
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
 
@@ -1224,7 +1229,7 @@ def validate_daily_basic_data(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return DailyBasicValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             ts_codes=ts_codes,
             total_db_records=0,
             total_api_records=0,
@@ -1435,7 +1440,14 @@ def get_factor_data(
     request: FactorDataRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """获取因子数据（返回所有字段）"""
-    records = DataService.get_factor_data(db, request.ts_code, request.start_date, request.end_date)
+    records = DataService.get_factor_data(
+        db,
+        request.ts_code,
+        request.start_date,
+        request.end_date,
+        request.trading_day_filter,
+        request.exchange,
+    )
     items = convert_to_response_items(records, FactorDataItem)
     return FactorDataResponse(items=items)
 
@@ -1448,7 +1460,6 @@ def fetch_factor_data_from_api(
     current_user: User = Depends(get_current_active_user),
 ):
     """从Tushare接口获取技术因子数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
 
     ts_codes = [code.strip() for code in request.ts_codes.split(",") if code.strip()]
@@ -1477,7 +1488,7 @@ def fetch_factor_data_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return FactorDataFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data=[],
             total_count=0,
@@ -1529,7 +1540,6 @@ def validate_factor_data(
     current_user: User = Depends(get_current_active_user),
 ):
     """技术因子数据校验：对比数据库数据和接口数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
 
@@ -1556,7 +1566,7 @@ def validate_factor_data(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return FactorDataValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             ts_codes=ts_codes,
             total_db_records=0,
             total_api_records=0,
@@ -1738,7 +1748,14 @@ def get_stkfactorpro_data(
     current_user: User = Depends(get_current_active_user),
 ):
     """获取专业版因子数据（返回所有字段）"""
-    records = DataService.get_stkfactorpro_data(db, request.ts_code, request.start_date, request.end_date)
+    records = DataService.get_stkfactorpro_data(
+        db,
+        request.ts_code,
+        request.start_date,
+        request.end_date,
+        request.trading_day_filter,
+        request.exchange,
+    )
     items = convert_to_response_items(records, StkFactorProDataItem)
     return StkFactorProDataResponse(items=items)
 
@@ -1755,7 +1772,6 @@ def fetch_stkfactorpro_data_from_api(
     current_user: User = Depends(get_current_active_user),
 ):
     """从Tushare接口获取专业版因子数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
 
     ts_codes = [code.strip() for code in request.ts_codes.split(",") if code.strip()]
@@ -1784,7 +1800,7 @@ def fetch_stkfactorpro_data_from_api(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return StkFactorProDataFetchResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             request_params=request_params,
             data=[],
             total_count=0,
@@ -1836,7 +1852,6 @@ def validate_stkfactorpro_data(
     current_user: User = Depends(get_current_active_user),
 ):
     """专业版因子数据校验：对比数据库数据和接口数据"""
-    from loguru import logger
     from zquant.data.etl.tushare import TushareClient
     from zquant.schemas.data import DataDifferenceItem
 
@@ -1863,7 +1878,7 @@ def validate_stkfactorpro_data(
         logger.error(f"初始化Tushare客户端失败: {e}")
         return StkFactorProDataValidateResponse(
             success=False,
-            message=f"初始化Tushare客户端失败: {str(e)}",
+            message="初始化Tushare客户端失败",
             ts_codes=ts_codes,
             total_db_records=0,
             total_api_records=0,
@@ -2121,8 +2136,9 @@ def statistics_table_data(
             table_count=len(results),
         )
     except Exception as e:
+        logger.error(f"统计数据表失败: {e}")
         return StatisticsTableDataResponse(
-            success=False, message=f"统计数据表失败: {e!s}", stat_date=stat_date, table_count=0
+            success=False, message="统计数据表失败", stat_date=stat_date, table_count=0
         )
 
 

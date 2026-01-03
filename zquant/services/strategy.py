@@ -45,6 +45,7 @@ class StrategyService:
         category: str | None = None,
         params_schema: str | None = None,
         is_template: bool = False,
+        created_by: str | None = None,
     ) -> Strategy:
         """创建策略"""
         strategy = Strategy(
@@ -55,6 +56,8 @@ class StrategyService:
             code=code,
             params_schema=params_schema,
             is_template=is_template,
+            created_by=created_by,
+            updated_by=created_by,  # 创建时 updated_by 和 created_by 一致
         )
 
         db.add(strategy)
@@ -65,9 +68,30 @@ class StrategyService:
         return strategy
 
     @staticmethod
-    def get_strategy(db: Session, strategy_id: int, user_id: int) -> Strategy | None:
-        """获取策略详情（资源隔离）"""
-        strategy = db.query(Strategy).filter(Strategy.id == strategy_id, Strategy.user_id == user_id).first()
+    def get_strategy(db: Session, strategy_id: int, user_id: int | None = None) -> Strategy | None:
+        """
+        获取策略详情
+
+        Args:
+            db: 数据库会话
+            strategy_id: 策略ID
+            user_id: 当前用户ID（可选，如果提供则进行权限检查）
+
+        Returns:
+            策略对象或None
+        """
+        query = db.query(Strategy).filter(Strategy.id == strategy_id)
+        strategy = query.first()
+
+        if not strategy:
+            return None
+
+        # 如果提供了 user_id，则进行权限检查
+        # 权限逻辑：用户自己的策略 OR 模板策略 对所有用户可见
+        if user_id is not None:
+            if strategy.user_id != user_id and not strategy.is_template:
+                return None
+
         return strategy
 
     @staticmethod
@@ -80,6 +104,7 @@ class StrategyService:
         category: str | None = None,
         code: str | None = None,
         params_schema: str | None = None,
+        updated_by: str | None = None,
     ) -> Strategy | None:
         """更新策略"""
         strategy = StrategyService.get_strategy(db, strategy_id, user_id)
@@ -89,6 +114,9 @@ class StrategyService:
         # 模板策略不允许普通用户修改
         if strategy.is_template and strategy.user_id != user_id:
             raise ValueError("模板策略不允许修改")
+
+        if updated_by is not None:
+            strategy.updated_by = updated_by
 
         if name is not None:
             strategy.name = name
@@ -157,8 +185,8 @@ class StrategyService:
                 "id": Strategy.id,
                 "name": Strategy.name,
                 "category": Strategy.category,
-                "created_at": Strategy.created_at,
-                "updated_at": Strategy.updated_at,
+                "created_time": Strategy.created_time,
+                "updated_time": Strategy.updated_time,
             }
 
             if order_by in sortable_fields:
@@ -168,9 +196,9 @@ class StrategyService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(Strategy.created_at))
+                query = query.order_by(desc(Strategy.created_time))
         else:
-            query = query.order_by(desc(Strategy.created_at))
+            query = query.order_by(desc(Strategy.created_time))
 
         return query.offset(skip).limit(limit).all()
 
@@ -185,7 +213,7 @@ class StrategyService:
         if category:
             query = query.filter(Strategy.category == category)
 
-        return query.order_by(desc(Strategy.created_at)).offset(skip).limit(limit).all()
+        return query.order_by(desc(Strategy.created_time)).offset(skip).limit(limit).all()
 
     @staticmethod
     def list_all_operable_strategies(
@@ -246,8 +274,8 @@ class StrategyService:
                 "id": Strategy.id,
                 "name": Strategy.name,
                 "category": Strategy.category,
-                "created_at": Strategy.created_at,
-                "updated_at": Strategy.updated_at,
+                "created_time": Strategy.created_time,
+                "updated_time": Strategy.updated_time,
             }
 
             if order_by in sortable_fields:
@@ -257,8 +285,8 @@ class StrategyService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(Strategy.created_at))
+                query = query.order_by(desc(Strategy.created_time))
         else:
-            query = query.order_by(desc(Strategy.created_at))
+            query = query.order_by(desc(Strategy.created_time))
 
         return query.offset(skip).limit(limit).all()

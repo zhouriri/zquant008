@@ -192,7 +192,7 @@ class TradingDateRepository:
             if exchange:
                 query = query.filter(TustockTradecal.exchange == exchange)
 
-            records = query.order_by(TustockTradecal.cal_date).all()
+            records = query.order_by(desc(TustockTradecal.cal_date)).all()
 
             # 转换为字典列表
             result = []

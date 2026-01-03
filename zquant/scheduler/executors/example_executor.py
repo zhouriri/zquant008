@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from zquant.models.scheduler import TaskExecution, TaskType
 from zquant.scheduler.base import TaskExecutor
+from zquant.utils.date_helper import DateHelper
 
 
 class ExampleExecutor(TaskExecutor):
@@ -70,7 +71,7 @@ class ExampleExecutor(TaskExecutor):
         custom_message = config.get("message", "示例任务执行完成")
         steps = config.get("steps", 5)
 
-        logger.info(f"[示例任务] 开始执行，预计耗时 {duration_seconds} 秒")
+        logger.info(f"[示例任务] 开始执行，预计耗时 {DateHelper.format_duration(duration_seconds)} ({duration_seconds} 秒)")
 
         # 模拟处理步骤
         processed_steps = []
@@ -85,15 +86,13 @@ class ExampleExecutor(TaskExecutor):
 
             # 更新执行进度
             if execution:
-                progress = {
-                    "current_step": i,
-                    "total_steps": steps,
-                    "progress_percent": int((i / steps) * 100),
-                    "steps": processed_steps,
-                    "status": "running",
-                    "message": f"正在执行步骤 {i}/{steps}",
-                }
-                self.update_progress(execution, progress, db)
+                self.update_progress(
+                    db=db,
+                    execution=execution,
+                    processed_items=i,
+                    total_items=steps,
+                    message=f"正在执行步骤 {i}/{steps}",
+                )
 
         # 根据成功概率决定是否成功
         is_success = random.random() < success_rate

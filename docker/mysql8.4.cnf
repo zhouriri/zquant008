@@ -1,0 +1,64 @@
+# MySQL 8.4.7 配置文件
+# 用于从 MySQL 5.6.29 迁移的兼容性配置
+
+[mysqld]
+# 基本配置
+port = 3307
+datadir = /var/lib/mysql
+socket = /var/run/mysqld/mysqld.sock
+pid-file = /var/run/mysqld/mysqld.pid
+
+# 字符集配置（推荐使用utf8mb4）
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+init_connect = 'SET NAMES utf8mb4'
+
+# 兼容性配置：使用旧的密码认证方式（兼容MySQL 5.6客户端）
+default-authentication-plugin = mysql_native_password
+
+# SQL模式配置（兼容MySQL 5.6）
+sql_mode = STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+
+# 时区配置
+default-time-zone = '+08:00'
+
+# 连接配置
+max_connections = 500
+max_connect_errors = 10000
+wait_timeout = 28800
+interactive_timeout = 28800
+
+# 缓冲区配置
+innodb_buffer_pool_size = 1G
+innodb_log_file_size = 256M
+innodb_log_buffer_size = 64M
+innodb_flush_log_at_trx_commit = 1
+innodb_file_per_table = 1
+
+# 查询缓存（MySQL 8.0已移除，但保留配置不会报错）
+# query_cache_type = 0
+# query_cache_size = 0
+
+# 日志配置
+log_error = /var/log/mysql/error.log
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+
+# 二进制日志（用于主从复制）
+log_bin = /var/log/mysql/mysql-bin
+binlog_format = ROW
+expire_logs_days = 7
+max_binlog_size = 100M
+
+# 其他配置
+lower_case_table_names = 0
+skip-name-resolve
+
+[mysql]
+default-character-set = utf8mb4
+
+[client]
+default-character-set = utf8mb4
+port = 3307
+socket = /var/run/mysqld/mysqld.sock

@@ -57,12 +57,15 @@ from zquant.scripts.init_view import (
     create_factor_view,
     create_stkfactorpro_view_procedure,
     create_stkfactorpro_view,
+    create_spacex_factor_view_procedure,
+    create_spacex_factor_view,
 )
 from zquant.scripts.init_factor import (
     create_tables as create_factor_tables,
     create_turnover_rate_factor,
     create_example_config,
 )
+from zquant.scripts.init_stock_filter import init_stock_filter_strategies
 from zquant.scripts.init_strategies import init_strategies
 
 from zquant.database import SessionLocal
@@ -88,92 +91,11 @@ def init_database_step(force: bool = False) -> bool:
         return False
 
 
-def init_scheduler_step(force: bool = False) -> bool:
-    """步骤2: 初始化定时任务系统"""
-    logger.info("")
-    logger.info("=" * 60)
-    logger.info("步骤 2/5: 定时任务系统初始化")
-    logger.info("=" * 60)
-    try:
-        # 创建定时任务表
-        if not create_scheduler_tables():
-            logger.error("✗ 创建定时任务表失败")
-            return False
-        
-        # 创建ZQuant任务
-        if not create_zquant_tasks(force=force):
-            logger.error("✗ 创建ZQuant任务失败")
-            return False
-        
-        logger.info("✓ 定时任务系统初始化完成")
-        return True
-    except Exception as e:
-        logger.error(f"✗ 定时任务系统初始化异常: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-def init_view_step(force: bool = False) -> bool:
-    """步骤3: 初始化数据视图"""
-    logger.info("")
-    logger.info("=" * 60)
-    logger.info("步骤 3/5: 数据视图初始化")
-    logger.info("=" * 60)
-    db = SessionLocal()
-    try:
-        # 创建日线数据视图存储过程
-        if not create_daily_view_procedure(db):
-            logger.error("✗ 创建日线数据视图存储过程失败")
-            return False
-        
-        # 创建每日指标数据视图存储过程
-        if not create_daily_basic_view_procedure(db):
-            logger.error("✗ 创建每日指标数据视图存储过程失败")
-            return False
-        
-        # 创建因子数据视图存储过程
-        if not create_factor_view_procedure(db):
-            logger.error("✗ 创建因子数据视图存储过程失败")
-            return False
-        
-        # 创建专业版因子数据视图存储过程
-        if not create_stkfactorpro_view_procedure(db):
-            logger.error("✗ 创建专业版因子数据视图存储过程失败")
-            return False
-        
-        # 调用存储过程创建日线数据视图
-        if not create_daily_view(db):
-            logger.warning("⚠ 创建日线数据视图失败（可能没有数据表）")
-        
-        # 调用存储过程创建每日指标数据视图
-        if not create_daily_basic_view(db):
-            logger.warning("⚠ 创建每日指标数据视图失败（可能没有数据表）")
-        
-        # 调用存储过程创建因子数据视图
-        if not create_factor_view(db):
-            logger.warning("⚠ 创建因子数据视图失败（可能没有数据表）")
-        
-        # 调用存储过程创建专业版因子数据视图
-        if not create_stkfactorpro_view(db):
-            logger.warning("⚠ 创建专业版因子数据视图失败（可能没有数据表）")
-        
-        logger.info("✓ 数据视图初始化完成")
-        return True
-    except Exception as e:
-        logger.error(f"✗ 数据视图初始化异常: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-    finally:
-        db.close()
-
-
 def init_factor_step(force: bool = False) -> bool:
-    """步骤4: 初始化因子系统"""
+    """步骤2: 初始化因子系统"""
     logger.info("")
     logger.info("=" * 60)
-    logger.info("步骤 4/5: 因子系统初始化")
+    logger.info("步骤 2/6: 因子系统初始化")
     logger.info("=" * 60)
     try:
         # 创建因子相关表
@@ -199,11 +121,121 @@ def init_factor_step(force: bool = False) -> bool:
         return False
 
 
-def init_strategies_step(force: bool = False) -> bool:
-    """步骤5: 初始化策略模板"""
+def init_stock_filter_step(force: bool = False) -> bool:
+    """步骤3: 初始化选股系统"""
     logger.info("")
     logger.info("=" * 60)
-    logger.info("步骤 5/5: 策略模板初始化")
+    logger.info("步骤 3/6: 选股系统初始化")
+    logger.info("=" * 60)
+    try:
+        if init_stock_filter_strategies(force=force):
+            logger.info("✓ 选股系统初始化完成")
+            return True
+        else:
+            logger.error("✗ 选股系统初始化失败")
+            return False
+    except Exception as e:
+        logger.error(f"✗ 选股系统初始化异常: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def init_scheduler_step(force: bool = False) -> bool:
+    """步骤4: 初始化定时任务系统"""
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("步骤 4/6: 定时任务系统初始化")
+    logger.info("=" * 60)
+    try:
+        # 创建定时任务表
+        if not create_scheduler_tables():
+            logger.error("✗ 创建定时任务表失败")
+            return False
+        
+        # 创建ZQuant任务
+        if not create_zquant_tasks(force=force):
+            logger.error("✗ 创建ZQuant任务失败")
+            return False
+        
+        logger.info("✓ 定时任务系统初始化完成")
+        return True
+    except Exception as e:
+        logger.error(f"✗ 定时任务系统初始化异常: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def init_view_step(force: bool = False) -> bool:
+    """步骤5: 初始化数据视图"""
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("步骤 5/6: 数据视图初始化")
+    logger.info("=" * 60)
+    db = SessionLocal()
+    try:
+        # 创建日线数据视图存储过程
+        if not create_daily_view_procedure(db):
+            logger.error("✗ 创建日线数据视图存储过程失败")
+            return False
+        
+        # 创建每日指标数据视图存储过程
+        if not create_daily_basic_view_procedure(db):
+            logger.error("✗ 创建每日指标数据视图存储过程失败")
+            return False
+        
+        # 创建因子数据视图存储过程
+        if not create_factor_view_procedure(db):
+            logger.error("✗ 创建因子数据视图存储过程失败")
+            return False
+        
+        # 创建专业版因子数据视图存储过程
+        if not create_stkfactorpro_view_procedure(db):
+            logger.error("✗ 创建专业版因子数据视图存储过程失败")
+            return False
+        
+        # 创建自定义量化因子结果视图存储过程
+        if not create_spacex_factor_view_procedure(db):
+            logger.error("✗ 创建自定义量化因子结果视图存储过程失败")
+            return False
+        
+        # 调用存储过程创建日线数据视图
+        if not create_daily_view(db):
+            logger.warning("⚠ 创建日线数据视图失败（可能没有数据表）")
+        
+        # 调用存储过程创建每日指标数据视图
+        if not create_daily_basic_view(db):
+            logger.warning("⚠ 创建每日指标数据视图失败（可能没有数据表）")
+        
+        # 调用存储过程创建因子数据视图
+        if not create_factor_view(db):
+            logger.warning("⚠ 创建因子数据视图失败（可能没有数据表）")
+        
+        # 调用存储过程创建专业版因子数据视图
+        if not create_stkfactorpro_view(db):
+            logger.warning("⚠ 创建专业版因子数据视图失败（可能没有数据表）")
+        
+        # 调用存储过程创建自定义量化因子结果视图
+        if not create_spacex_factor_view(db):
+            logger.warning("⚠ 创建自定义量化因子结果视图失败（可能没有数据表）")
+        
+        logger.info("✓ 数据视图初始化完成")
+        return True
+    except Exception as e:
+        logger.error(f"✗ 数据视图初始化异常: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    finally:
+        db.close()
+
+
+def init_strategies_step(force: bool = False) -> bool:
+    """步骤6: 初始化策略模板"""
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("步骤 6/6: 策略模板初始化")
     logger.info("=" * 60)
     db = SessionLocal()
     try:
@@ -246,9 +278,10 @@ def main():
     )
     
     parser.add_argument("--skip-db", action="store_true", help="跳过数据库初始化")
+    parser.add_argument("--skip-factor", action="store_true", help="跳过因子初始化")
+    parser.add_argument("--skip-stock-filter", action="store_true", help="跳过选股系统初始化")
     parser.add_argument("--skip-scheduler", action="store_true", help="跳过定时任务初始化")
     parser.add_argument("--skip-view", action="store_true", help="跳过视图初始化")
-    parser.add_argument("--skip-factor", action="store_true", help="跳过因子初始化")
     parser.add_argument("--skip-strategies", action="store_true", help="跳过策略模板初始化")
     parser.add_argument("--force", action="store_true", help="强制模式（传递给子脚本）")
     parser.add_argument("--stop-on-error", action="store_true", help="遇到错误立即停止")
@@ -276,7 +309,31 @@ def main():
     else:
         logger.warning("⚠ 跳过数据库初始化（不推荐）")
     
-    # 步骤2: 定时任务初始化
+    # 步骤2: 因子初始化
+    if not args.skip_factor:
+        success = init_factor_step(force=args.force)
+        steps_executed.append(("因子初始化", success))
+        if not success:
+            steps_failed.append("因子初始化")
+            if args.stop_on_error:
+                logger.error("遇到错误，停止执行")
+                sys.exit(1)
+    else:
+        logger.info("⊘ 跳过因子初始化")
+
+    # 步骤3: 选股系统初始化
+    if not args.skip_stock_filter:
+        success = init_stock_filter_step(force=args.force)
+        steps_executed.append(("选股系统初始化", success))
+        if not success:
+            steps_failed.append("选股系统初始化")
+            if args.stop_on_error:
+                logger.error("遇到错误，停止执行")
+                sys.exit(1)
+    else:
+        logger.info("⊘ 跳过选股系统初始化")
+    
+    # 步骤4: 定时任务初始化
     if not args.skip_scheduler:
         success = init_scheduler_step(force=args.force)
         steps_executed.append(("定时任务初始化", success))
@@ -288,7 +345,7 @@ def main():
     else:
         logger.info("⊘ 跳过定时任务初始化")
     
-    # 步骤3: 视图初始化
+    # 步骤5: 视图初始化
     if not args.skip_view:
         success = init_view_step(force=args.force)
         steps_executed.append(("视图初始化", success))
@@ -300,19 +357,7 @@ def main():
     else:
         logger.info("⊘ 跳过视图初始化")
     
-    # 步骤4: 因子初始化
-    if not args.skip_factor:
-        success = init_factor_step(force=args.force)
-        steps_executed.append(("因子初始化", success))
-        if not success:
-            steps_failed.append("因子初始化")
-            if args.stop_on_error:
-                logger.error("遇到错误，停止执行")
-                sys.exit(1)
-    else:
-        logger.info("⊘ 跳过因子初始化")
-    
-    # 步骤5: 策略模板初始化
+    # 步骤6: 策略模板初始化
     if not args.skip_strategies:
         success = init_strategies_step(force=args.force)
         steps_executed.append(("策略模板初始化", success))
@@ -351,6 +396,12 @@ def main():
         logger.info("  - 访问 http://localhost:8000/admin/scheduler 管理定时任务")
         logger.info("  - 访问 http://localhost:8000/factor 管理因子")
         logger.info("  - 访问 http://localhost:8000/backtest/strategies 查看策略模板")
+        logger.info("")
+        logger.info("数据同步提示：")
+        logger.info("  - 初始化脚本仅创建了表结构和基本配置。")
+        logger.info("  - 如果您需要同步 Tushare 历史数据进行测试，请运行：")
+        logger.info("    python zquant/scripts/seed_data.py")
+        logger.info("  - 或者使用定时任务系统进行数据同步。")
 
 
 if __name__ == "__main__":

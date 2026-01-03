@@ -25,11 +25,13 @@
 """
 
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from zquant.models.scheduler import TaskExecution, TaskType
+from zquant.models.scheduler import TaskExecution, TaskStatus, TaskType
+from zquant.scheduler.utils import update_execution_progress
 
 
 class TaskExecutor(ABC):
@@ -53,19 +55,25 @@ class TaskExecutor(ABC):
     def get_task_type(self) -> TaskType:
         """获取任务类型"""
 
-    def update_progress(self, execution: TaskExecution, progress: dict[str, Any], db: Session):
+    def update_progress(
+        self,
+        db: Session,
+        execution: TaskExecution | None,
+        processed_items: int | None = None,
+        total_items: int | None = None,
+        current_item: str | None = None,
+        progress_percent: float | None = None,
+        message: str | None = None,
+    ):
         """
-        更新执行进度
-
-        Args:
-            execution: 执行记录对象
-            progress: 进度信息字典
-            db: 数据库会话
+        更新执行进度并检查控制标志 (转发到工具函数)
         """
-        if execution:
-            # 合并当前结果和进度信息
-            current_result = execution.get_result()
-            current_result.update(progress)
-            execution.set_result(current_result)
-            db.commit()
-            db.refresh(execution)
+        update_execution_progress(
+            db=db,
+            execution=execution,
+            processed_items=processed_items,
+            total_items=total_items,
+            current_item=current_item,
+            progress_percent=progress_percent,
+            message=message,
+        )

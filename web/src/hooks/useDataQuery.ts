@@ -81,12 +81,10 @@ export function useDataQuery<TItem extends Record<string, any>>(
       setDataSource([]);
       setRawData([]);
       
-      const [startDate, endDate] = values.dateRange || [];
+      const { dateRange, ...otherValues } = values;
+      const [startDate, endDate] = dateRange || [];
       
-      const params: any = {};
-      if (values.ts_code) {
-        params.ts_code = values.ts_code;
-      }
+      const params: any = { ...otherValues };
       if (startDate) {
         params.start_date = dayjs(startDate).format('YYYY-MM-DD');
       }

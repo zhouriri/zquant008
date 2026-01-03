@@ -90,10 +90,10 @@ const FactorModels: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       sorter: true,
-      render: (_, record) => dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) => dayjs(record.created_time).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '操作',

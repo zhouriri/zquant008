@@ -41,6 +41,7 @@
 """
 
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -57,6 +58,7 @@ from loguru import logger
 
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.scheduler.job.base import BaseSyncJob
+from zquant.models.scheduler import TaskExecution
 
 __job_name__ = "sync_factor_data"
 
@@ -72,6 +74,28 @@ class SyncFactorDataJob(BaseSyncJob):
         parser.add_argument("--ts-code", type=str, dest="ts_code", help="TS代码，如：000001.SZ，不指定则同步所有股票")
         parser.add_argument("--symbol", type=str, help="股票代码（兼容旧参数），如：000001.SZ")
         return parser
+
+    def get_execution(self, db) -> TaskExecution | None:
+        """
+        从环境变量获取执行记录ID，并查询数据库获取执行记录对象
+        """
+        execution_id_str = os.environ.get("ZQUANT_EXECUTION_ID")
+        if not execution_id_str:
+            logger.debug("环境变量 ZQUANT_EXECUTION_ID 未设置，无法更新进度")
+            return None
+
+        try:
+            execution_id = int(execution_id_str)
+            execution = db.query(TaskExecution).filter(TaskExecution.id == execution_id).first()
+            if execution:
+                logger.debug(f"获取到执行记录: {execution_id}")
+                return execution
+            else:
+                logger.warning(f"执行记录 {execution_id} 不存在")
+                return None
+        except (ValueError, Exception) as e:
+            logger.warning(f"获取执行记录失败: {e}")
+            return None
 
     def execute(self, args: argparse.Namespace) -> int:
         # 确定 ts_code
@@ -94,6 +118,9 @@ class SyncFactorDataJob(BaseSyncJob):
                 logger.error(f"日期参数验证失败: {e}")
                 return 1
 
+            # 获取执行记录（用于进度更新）
+            execution = self.get_execution(db)
+
             # 打印开始信息
             self.print_start_info(
                 TS代码=ts_code or "全部（同步所有股票）",
@@ -103,13 +130,13 @@ class SyncFactorDataJob(BaseSyncJob):
             if ts_code:
                 # 同步单只股票
                 logger.info(f"开始同步 {ts_code} 的因子数据...")
-                count = scheduler.sync_factor_data(db, ts_code, start_date, end_date, extra_info=extra_info)
+                count = scheduler.sync_factor_data(db, ts_code, start_date, end_date, extra_info=extra_info, execution=execution)
                 logger.info(f"同步完成，更新 {count} 条记录")
                 self.print_end_info(TS代码=ts_code, 同步记录数=str(count))
             else:
                 # 同步所有股票
                 logger.info("开始同步所有股票的因子数据...")
-                result_summary = scheduler.sync_all_factor_data(db, start_date, end_date, extra_info=extra_info)
+                result_summary = scheduler.sync_all_factor_data(db, start_date, end_date, extra_info=extra_info, execution=execution)
                 logger.info(
                     f"同步完成：总计 {result_summary['total']} 只股票，"
                     f"成功 {result_summary['success']} 只，"

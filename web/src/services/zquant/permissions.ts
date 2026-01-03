@@ -26,7 +26,7 @@ import { request } from '@umijs/max';
 
 /**
  * 查询权限列表（支持筛选）
- * GET /api/v1/permissions
+ * POST /api/v1/permissions
  */
 export async function getPermissions(params?: {
   skip?: number;
@@ -36,18 +36,25 @@ export async function getPermissions(params?: {
   order?: 'asc' | 'desc';
 }) {
   return request<ZQuant.PageResponse<ZQuant.PermissionResponse>>('/api/v1/permissions', {
-    method: 'GET',
-    params,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params || {},
   });
 }
 
 /**
  * 查询权限详情
- * GET /api/v1/permissions/{permission_id}
+ * POST /api/v1/permissions/get
  */
 export async function getPermission(permissionId: number) {
-  return request<ZQuant.PermissionResponse>(`/api/v1/permissions/${permissionId}`, {
-    method: 'GET',
+  return request<ZQuant.PermissionResponse>('/api/v1/permissions/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { permission_id: permissionId },
   });
 }
 
@@ -67,25 +74,29 @@ export async function createPermission(body: ZQuant.PermissionCreate) {
 
 /**
  * 更新权限
- * PUT /api/v1/permissions/{permission_id}
+ * POST /api/v1/permissions/update
  */
 export async function updatePermission(permissionId: number, body: ZQuant.PermissionUpdate) {
-  return request<ZQuant.PermissionResponse>(`/api/v1/permissions/${permissionId}`, {
-    method: 'PUT',
+  return request<ZQuant.PermissionResponse>('/api/v1/permissions/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, id: permissionId },
   });
 }
 
 /**
  * 删除权限
- * DELETE /api/v1/permissions/{permission_id}
+ * POST /api/v1/permissions/delete
  */
 export async function deletePermission(permissionId: number) {
-  return request<{ message: string }>(`/api/v1/permissions/${permissionId}`, {
-    method: 'DELETE',
+  return request<{ message: string }>('/api/v1/permissions/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { permission_id: permissionId },
   });
 }
 

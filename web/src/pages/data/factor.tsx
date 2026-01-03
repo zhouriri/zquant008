@@ -20,7 +20,7 @@
 //     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 //     - Repository: https://github.com/yoyoung/zquant
 
-import { ProForm, ProFormDateRangePicker, ProFormText } from '@ant-design/pro-components';
+import { ProForm, ProFormDatePicker, ProFormText, ProFormSelect } from '@ant-design/pro-components';
 import type { ProColumns, ProFormInstance } from '@ant-design/pro-components';
 import { Button, Card, Modal, Table, Tag, Typography, Space, message, Spin, Input } from 'antd';
 import { useLocation } from '@umijs/max';
@@ -32,6 +32,7 @@ import { usePageCache } from '@/hooks/usePageCache';
 import { DataTable, renderDate, renderDateTime, renderNumber, renderChange, renderFormattedNumber } from '@/components/DataTable';
 import { validateTsCode, validateTsCodes, getTsCodeValidationError } from '@/utils/tsCodeValidator';
 import { formatRequestParamsForDisplay } from '@/utils/requestParamsFormatter';
+import { getExchangeFromTsCode } from '@/utils/codeConverter';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -94,12 +95,12 @@ const Factor: React.FC = () => {
   }, [fetchResult]);
 
   const handleFetchFromApi = async (formValues: any) => {
-    const { ts_code, dateRange } = formValues;
+    const { ts_code, start_date, end_date } = formValues;
     if (!ts_code || !ts_code.trim()) {
       message.error('请输入TS代码');
       return;
     }
-    if (!dateRange || dateRange.length !== 2) {
+    if (!start_date || !end_date) {
       message.error('请选择日期范围');
       return;
     }
@@ -124,8 +125,8 @@ const Factor: React.FC = () => {
     try {
       const response = await fetchFactorDataFromApi({
         ts_codes: tsCodesStr,
-        start_date: dayjs(dateRange[0]).format('YYYY-MM-DD'),
-        end_date: dayjs(dateRange[1]).format('YYYY-MM-DD'),
+        start_date: dayjs(start_date).format('YYYY-MM-DD'),
+        end_date: dayjs(end_date).format('YYYY-MM-DD'),
       });
       setFetchResult(response);
       // 保存到缓存
@@ -187,12 +188,12 @@ const Factor: React.FC = () => {
   };
 
   const handleValidate = async (formValues: any) => {
-    const { ts_code, dateRange } = formValues;
+    const { ts_code, start_date, end_date } = formValues;
     if (!ts_code || !ts_code.trim()) {
       message.error('请输入TS代码');
       return;
     }
-    if (!dateRange || dateRange.length !== 2) {
+    if (!start_date || !end_date) {
       message.error('请选择日期范围');
       return;
     }
@@ -230,8 +231,8 @@ const Factor: React.FC = () => {
     }
 
     // 限制2：时间范围必须在一个月内（30天）
-    const startDate = dayjs(dateRange[0]);
-    const endDate = dayjs(dateRange[1]);
+    const startDate = dayjs(start_date);
+    const endDate = dayjs(end_date);
     const daysDiff = endDate.diff(startDate, 'day');
     if (daysDiff > 30) {
       message.error('数据校验功能的时间范围不能超过一个月（30天），请缩小查询范围');
@@ -242,8 +243,8 @@ const Factor: React.FC = () => {
     try {
       const response = await validateFactorData({
         ts_codes: tsCodesStr,
-        start_date: dayjs(dateRange[0]).format('YYYY-MM-DD'),
-        end_date: dayjs(dateRange[1]).format('YYYY-MM-DD'),
+        start_date: dayjs(start_date).format('YYYY-MM-DD'),
+        end_date: dayjs(end_date).format('YYYY-MM-DD'),
       });
       setValidateResult(response);
       // 保存到缓存
@@ -351,6 +352,13 @@ const Factor: React.FC = () => {
 
   const columns: ProColumns<any>[] = [
     {
+      title: '序号',
+      dataIndex: 'index',
+      valueType: 'index',
+      width: 60,
+      fixed: 'left',
+    },
+    {
       title: 'TS代码',
       dataIndex: 'ts_code',
       width: 120,
@@ -367,163 +375,163 @@ const Factor: React.FC = () => {
       title: '收盘价',
       dataIndex: 'close',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.close),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.close),
     },
     {
       title: '开盘价',
       dataIndex: 'open',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.open),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.open),
     },
     {
       title: '最高价',
       dataIndex: 'high',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.high),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.high),
     },
     {
       title: '最低价',
       dataIndex: 'low',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.low),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.low),
     },
     {
       title: '昨收价',
       dataIndex: 'pre_close',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.pre_close),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.pre_close),
     },
     {
       title: '涨跌额',
       dataIndex: 'change',
       width: 100,
-      render: (_: any, record: any) => renderChange(record.change, false),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderChange(record.change, false),
     },
     {
       title: '涨跌幅',
       dataIndex: 'pct_change',
       width: 100,
-      render: (_: any, record: any) => renderChange(record.pct_change, true),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderChange(record.pct_change, true),
     },
     {
       title: '成交量（手）',
       dataIndex: 'vol',
       width: 120,
-      render: (_: any, record: any) => renderFormattedNumber(record.vol),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.vol),
     },
     {
       title: '成交额（千元）',
       dataIndex: 'amount',
       width: 120,
-      render: (_: any, record: any) => renderFormattedNumber(record.amount),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderFormattedNumber(record.amount),
     },
     {
       title: '复权因子',
       dataIndex: 'adj_factor',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.adj_factor),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.adj_factor),
     },
     {
       title: 'MACD_DIF',
       dataIndex: 'macd_dif',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.macd_dif),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.macd_dif),
     },
     {
       title: 'MACD_DEA',
       dataIndex: 'macd_dea',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.macd_dea),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.macd_dea),
     },
     {
       title: 'MACD',
       dataIndex: 'macd',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.macd),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.macd),
     },
     {
       title: 'KDJ_K',
       dataIndex: 'kdj_k',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.kdj_k),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.kdj_k),
     },
     {
       title: 'KDJ_D',
       dataIndex: 'kdj_d',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.kdj_d),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.kdj_d),
     },
     {
       title: 'KDJ_J',
       dataIndex: 'kdj_j',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.kdj_j),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.kdj_j),
     },
     {
       title: 'RSI_6',
       dataIndex: 'rsi_6',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.rsi_6),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.rsi_6),
     },
     {
       title: 'RSI_12',
       dataIndex: 'rsi_12',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.rsi_12),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.rsi_12),
     },
     {
       title: 'RSI_24',
       dataIndex: 'rsi_24',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.rsi_24),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.rsi_24),
     },
     {
       title: 'BOLL_UPPER',
       dataIndex: 'boll_upper',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.boll_upper),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.boll_upper),
     },
     {
       title: 'BOLL_MID',
       dataIndex: 'boll_mid',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.boll_mid),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.boll_mid),
     },
     {
       title: 'BOLL_LOWER',
       dataIndex: 'boll_lower',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.boll_lower),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.boll_lower),
     },
     {
       title: 'CCI',
       dataIndex: 'cci',
       width: 100,
-      render: (_: any, record: any) => renderNumber(record.cci),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderNumber(record.cci),
     },
     {
       title: '创建人',
       dataIndex: 'created_by',
       width: 100,
-      render: (_: any, record: any) => record.created_by || '-',
+      render: (_: any, record: any) => record.is_missing ? '-' : (record.created_by || '-'),
     },
     {
       title: '创建时间',
       dataIndex: 'created_time',
       width: 180,
-      render: (_: any, record: any) => renderDateTime(record.created_time),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderDateTime(record.created_time),
     },
     {
       title: '修改人',
       dataIndex: 'updated_by',
       width: 100,
-      render: (_: any, record: any) => record.updated_by || '-',
+      render: (_: any, record: any) => record.is_missing ? '-' : (record.updated_by || '-'),
     },
     {
       title: '修改时间',
       dataIndex: 'updated_time',
       width: 180,
-      render: (_: any, record: any) => renderDateTime(record.updated_time),
+      render: (_: any, record: any) => record.is_missing ? '-' : renderDateTime(record.updated_time),
     },
   ];
 
@@ -577,10 +585,13 @@ const Factor: React.FC = () => {
         return;
       }
     }
+
+    const exchange = getExchangeFromTsCode(parsedTsCode);
     
     const parsedValues = {
       ...values,
       ts_code: parsedTsCode,
+      exchange: exchange,
     };
     
     await handleQuery(parsedValues);
@@ -595,7 +606,9 @@ const Factor: React.FC = () => {
         onValuesChange={handleFormValuesChange}
         initialValues={{
           ts_code: '000001.SZ,000002.SZ',
-          dateRange: [dayjs().subtract(30, 'day'), dayjs()],
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
+          trading_day_filter: 'all',
         }}
         submitter={{
           render: (props, doms) => {
@@ -639,10 +652,26 @@ const Factor: React.FC = () => {
           placeholder="请输入TS代码，多个代码用逗号分隔，如：000001.SZ,000002.SZ，留空查询所有"
           width="sm"
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="日期范围"
-          rules={[{ required: true, message: '请选择日期范围' }]}
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+          rules={[{ required: true, message: '请选择开始日期' }]}
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
+          rules={[{ required: true, message: '请选择结束日期' }]}
+        />
+        <ProFormSelect
+          name="trading_day_filter"
+          label="匹配交易日"
+          initialValue="all"
+          options={[
+            { label: '全交易日', value: 'all' },
+            { label: '有交易日', value: 'has_data' },
+            { label: '无交易日', value: 'no_data' },
+          ]}
+          width="xs"
         />
       </ProForm>
 
@@ -651,6 +680,12 @@ const Factor: React.FC = () => {
         dataSource={dataSource}
         loading={loading}
         scrollX={2800}
+        rowClassName={(record: any) => {
+          if (record.is_missing) {
+            return 'row-missing-data';
+          }
+          return '';
+        }}
       />
 
       <Modal
@@ -687,7 +722,7 @@ const Factor: React.FC = () => {
                 <Text strong>请求参数：</Text>
                 <Button 
                   type="primary" 
-                  loading={fetchLoading}
+                  loading={fetchLoading} 
                   onClick={handleRefetchFromApi}
                   disabled={!fetchResult}
                   size="small"
@@ -792,6 +827,12 @@ const Factor: React.FC = () => {
           background-color: #fff1f0 !important;
         }
         .row-difference:hover {
+          background-color: #ffccc7 !important;
+        }
+        .row-missing-data {
+          background-color: #fff2f0 !important;
+        }
+        .row-missing-data:hover {
           background-color: #ffccc7 !important;
         }
       `}</style>

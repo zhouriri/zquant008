@@ -20,7 +20,7 @@
 //     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 //     - Repository: https://github.com/yoyoung/zquant
 
-import { ProForm, ProFormDateRangePicker, ProFormText, ProFormTextArea, ProFormDigit, ProFormSelect, ProFormSwitch } from '@ant-design/pro-components';
+import { ProForm, ProFormDatePicker, ProFormText, ProFormTextArea, ProFormDigit, ProFormSelect, ProFormSwitch } from '@ant-design/pro-components';
 import { Card, message, Button, Space } from 'antd';
 import { history } from '@umijs/max';
 import React, { useEffect, useState, useMemo } from 'react';
@@ -160,14 +160,14 @@ const CreateBacktest: React.FC = () => {
 
   const handleSubmit = async (values: any) => {
     try {
-      const [startDate, endDate] = values.dateRange || [];
+      const { start_date, end_date } = values;
       
       await runBacktest({
         strategy_code: values.strategy_code || '',
         strategy_name: values.strategy_name || '未命名策略',
         config: {
-          start_date: startDate ? dayjs(startDate).format('YYYY-MM-DD') : dayjs().subtract(1, 'year').format('YYYY-MM-DD'),
-          end_date: endDate ? dayjs(endDate).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+          start_date: start_date ? dayjs(start_date).format('YYYY-MM-DD') : dayjs().subtract(1, 'month').format('YYYY-MM-DD'),
+          end_date: end_date ? dayjs(end_date).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
           initial_capital: values.initial_capital || 1000000,
           symbols: values.symbols ? values.symbols.split(',').map((s: string) => s.trim()) : [],
           frequency: values.frequency || 'daily',
@@ -195,6 +195,7 @@ const CreateBacktest: React.FC = () => {
         layout="vertical"
         onFinish={handleSubmit}
         initialValues={{
+          symbols: '000001.SZ',
           initial_capital: 1000000,
           frequency: 'daily',
           adjust_type: 'qfq',
@@ -203,7 +204,8 @@ const CreateBacktest: React.FC = () => {
           tax_rate: 0.001,
           slippage_rate: 0.001,
           use_daily_basic: false,
-          dateRange: [dayjs().subtract(1, 'year'), dayjs()],
+          start_date: dayjs().subtract(1, 'month'),
+          end_date: dayjs(),
         }}
       >
         <ProFormText
@@ -278,9 +280,9 @@ const CreateBacktest: React.FC = () => {
         />
         <ProFormText
           name="symbols"
-          label="股票代码"
+          label="TS代码"
           placeholder="多个代码用逗号分隔，如：000001.SZ,600000.SH"
-          rules={[{ required: true, message: '请输入股票代码' }]}
+          rules={[{ required: true, message: '请输入TS代码' }]}
           width="md"
           extra={
             <Space>
@@ -300,10 +302,15 @@ const CreateBacktest: React.FC = () => {
             </Space>
           }
         />
-        <ProFormDateRangePicker
-          name="dateRange"
-          label="回测日期范围"
-          rules={[{ required: true, message: '请选择日期范围' }]}
+        <ProFormDatePicker
+          name="start_date"
+          label="开始日期"
+          rules={[{ required: true, message: '请选择开始日期' }]}
+        />
+        <ProFormDatePicker
+          name="end_date"
+          label="结束日期"
+          rules={[{ required: true, message: '请选择结束日期' }]}
         />
         <ProFormDigit
           name="initial_capital"

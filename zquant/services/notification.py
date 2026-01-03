@@ -38,7 +38,9 @@ class NotificationService:
     """通知服务类"""
 
     @staticmethod
-    def create_notification(db: Session, notification_data: NotificationCreate) -> Notification:
+    def create_notification(
+        db: Session, notification_data: NotificationCreate, created_by: str | None = None
+    ) -> Notification:
         """创建通知"""
         # 检查用户是否存在
         user = db.query(User).filter(User.id == notification_data.user_id).first()
@@ -58,6 +60,8 @@ class NotificationService:
             content=notification_data.content,
             extra_data=extra_data_str,
             is_read=False,
+            created_by=created_by,
+            updated_by=created_by,  # 创建时 updated_by 和 created_by 一致
         )
 
         db.add(notification)
@@ -73,7 +77,7 @@ class NotificationService:
         limit: int = 20,
         is_read: bool | None = None,
         type: NotificationType | None = None,
-        order_by: str = "created_at",
+        order_by: str = "created_time",
         order: str = "desc",
     ) -> tuple[list[Notification], int]:
         """获取用户通知列表（分页、筛选）"""
@@ -86,12 +90,12 @@ class NotificationService:
             query = query.filter(Notification.type == type)
 
         # 排序
-        if order_by == "created_at":
-            order_column = Notification.created_at
-        elif order_by == "updated_at":
-            order_column = Notification.updated_at
+        if order_by == "created_time":
+            order_column = Notification.created_time
+        elif order_by == "updated_time":
+            order_column = Notification.updated_time
         else:
-            order_column = Notification.created_at
+            order_column = Notification.created_time
 
         if order == "desc":
             query = query.order_by(desc(order_column))

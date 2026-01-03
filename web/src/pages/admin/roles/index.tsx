@@ -159,7 +159,7 @@ const Roles: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       search: false,
       sorter: true,

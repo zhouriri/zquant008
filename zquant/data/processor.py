@@ -651,7 +651,7 @@ class DataProcessor:
                             pass  # 已经是字符串格式
                     # 处理所有浮点数字段（可能为 None）
                     for key, value in row_dict.items():
-                        if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by"]:
+                        if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by", "created_time", "updated_time"]:
                             if value is not None:
                                 try:
                                     row_dict[key] = float(value)
@@ -730,7 +730,7 @@ class DataProcessor:
                         pass  # 已经是字符串格式
                 # 处理所有浮点数字段（可能为 None）
                 for key, value in row_dict.items():
-                    if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by"]:
+                    if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by", "created_time", "updated_time"]:
                         if value is not None:
                             try:
                                 row_dict[key] = float(value)
@@ -824,7 +824,7 @@ class DataProcessor:
                             pass  # 已经是字符串格式
                     # 处理所有浮点数字段（可能为 None）
                     for key, value in row_dict.items():
-                        if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by"]:
+                        if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by", "created_time", "updated_time"]:
                             if value is not None:
                                 try:
                                     row_dict[key] = float(value)
@@ -902,7 +902,7 @@ class DataProcessor:
                         pass  # 已经是字符串格式
                 # 处理所有浮点数字段（可能为 None）
                 for key, value in row_dict.items():
-                    if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by"]:
+                    if key not in ["id", "ts_code", "trade_date", "created_by", "updated_by", "created_time", "updated_time"]:
                         if value is not None:
                             try:
                                 row_dict[key] = float(value)

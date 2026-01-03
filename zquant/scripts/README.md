@@ -124,6 +124,55 @@ python zquant/scripts/zquant_dbtool.py
 
 ## 迁移脚本
 
+### migrate_mysql_5.6_to_8.4.py
+
+MySQL 5.6.29 → 8.4.7 数据迁移脚本，用于将数据库从MySQL 5.6迁移到MySQL 8.4。
+
+**功能：**
+- 检查源数据库和目标数据库版本
+- 自动备份所有数据
+- 检查兼容性问题
+- 迁移数据到MySQL 8.4
+- 更新用户认证方式
+- 验证迁移结果
+
+**使用方法：**
+```bash
+# 基本用法
+python zquant/scripts/migrate_mysql_5.6_to_8.4.py \
+    --source-host localhost \
+    --source-port 3306 \
+    --source-user root \
+    --source-password your_password \
+    --source-database zquant \
+    --target-host localhost \
+    --target-port 3307 \
+    --target-user root \
+    --target-password your_password \
+    --target-database zquant \
+    --backup-dir backups
+```
+
+**注意事项：**
+- 迁移前必须完整备份数据
+- 建议在测试环境先验证
+- 详细文档请参考：`docs/mysql_migration_guide.md`
+
+### check_mysql_compatibility.py
+
+MySQL 8.4.7 兼容性检查脚本，检查项目中的SQL语句是否兼容MySQL 8.4。
+
+**使用方法：**
+```bash
+python zquant/scripts/check_mysql_compatibility.py
+```
+
+**功能：**
+- 检查窗口函数语法
+- 检查GROUP BY隐式排序
+- 检查已废弃的函数
+- 生成兼容性报告
+
 ### migrate_enum_to_varchar.py
 
 将枚举类型字段迁移为VARCHAR类型的脚本。

@@ -24,7 +24,8 @@
 通知API
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from zquant.api.deps import get_current_active_user
@@ -33,9 +34,14 @@ from zquant.core.permissions import check_permission
 from zquant.database import get_db
 from zquant.models.notification import NotificationType
 from zquant.models.user import User
+from zquant.schemas.common import QueryRequest
 from zquant.schemas.notification import (
     NotificationCreate,
+    NotificationDeleteRequest,
+    NotificationGetRequest,
+    NotificationListRequest,
     NotificationListResponse,
+    NotificationReadRequest,
     NotificationResponse,
     NotificationStatsResponse,
 )
@@ -44,27 +50,32 @@ from zquant.services.notification import NotificationService
 router = APIRouter()
 
 
-@router.get("", response_model=NotificationListResponse, summary="获取通知列表")
+@router.post("/query", response_model=NotificationListResponse, summary="获取通知列表")
 def get_notifications(
-    skip: int = Query(0, ge=0, description="跳过记录数"),
-    limit: int = Query(20, ge=1, le=100, description="每页记录数"),
-    is_read: bool | None = Query(None, description="是否已读"),
-    type: NotificationType | None = Query(None, description="通知类型"),
-    order_by: str = Query("created_at", description="排序字段：created_at, updated_at"),
-    order: str = Query("desc", description="排序方向：asc 或 desc"),
+    request: NotificationListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """获取用户通知列表（分页、筛选、排序）"""
     notifications, total = NotificationService.get_user_notifications(
-        db, user_id=current_user.id, skip=skip, limit=limit, is_read=is_read, type=type, order_by=order_by, order=order
+        db,
+        user_id=current_user.id,
+        skip=request.skip,
+        limit=request.limit,
+        is_read=request.is_read,
+        type=request.type,
+        order_by=request.order_by,
+        order=request.order,
     )
     return NotificationListResponse(
-        items=[NotificationResponse.model_validate(n) for n in notifications], total=total, skip=skip, limit=limit
+        items=[NotificationResponse.model_validate(n) for n in notifications],
+        total=total,
+        skip=request.skip,
+        limit=request.limit,
     )
 
 
-@router.get("/stats", response_model=NotificationStatsResponse, summary="获取未读统计")
+@router.post("/stats", response_model=NotificationStatsResponse, summary="获取未读统计")
 def get_notification_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """获取通知统计（未读数量、总数量）"""
     unread_count = NotificationService.get_unread_count(db, current_user.id)
@@ -72,25 +83,25 @@ def get_notification_stats(db: Session = Depends(get_db), current_user: User = D
     return NotificationStatsResponse(unread_count=unread_count, total_count=total_count)
 
 
-@router.get("/{notification_id}", response_model=NotificationResponse, summary="获取通知详情")
+@router.post("/get", response_model=NotificationResponse, summary="获取通知详情")
 def get_notification(
-    notification_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: NotificationGetRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """获取通知详情"""
     try:
-        notification = NotificationService.get_notification(db, notification_id, current_user.id)
+        notification = NotificationService.get_notification(db, request.notification_id, current_user.id)
         return NotificationResponse.model_validate(notification)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@router.put("/{notification_id}/read", response_model=NotificationResponse, summary="标记为已读")
+@router.post("/read", response_model=NotificationResponse, summary="标记为已读")
 def mark_notification_as_read(
-    notification_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: NotificationReadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """标记单个通知为已读"""
     try:
-        notification = NotificationService.mark_as_read(db, notification_id, current_user.id)
+        notification = NotificationService.mark_as_read(db, request.notification_id, current_user.id)
         return NotificationResponse.model_validate(notification)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -105,13 +116,13 @@ def mark_all_notifications_as_read(
     return {"message": f"已标记 {count} 条通知为已读", "count": count}
 
 
-@router.delete("/{notification_id}", summary="删除通知")
+@router.post("/delete", summary="删除通知")
 def delete_notification(
-    notification_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+    request: NotificationDeleteRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ):
     """删除通知"""
     try:
-        NotificationService.delete_notification(db, notification_id, current_user.id)
+        NotificationService.delete_notification(db, request.notification_id, current_user.id)
         return {"message": "通知已删除"}
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -125,5 +136,5 @@ def create_notification(
     current_user: User = Depends(get_current_active_user),
 ):
     """创建通知（管理员或系统）"""
-    notification = NotificationService.create_notification(db, notification_data)
+    notification = NotificationService.create_notification(db, notification_data, created_by=current_user.username)
     return NotificationResponse.model_validate(notification)

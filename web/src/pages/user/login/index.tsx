@@ -187,19 +187,7 @@ const LoginMessage: React.FC<{
 // localStorage key
 const REMEMBERED_USERNAME_KEY = 'remembered_username';
 const REMEMBERED_PASSWORD_KEY = 'remembered_password';
-
-// 简单的 base64 编码/解码（不是真正的加密，只是避免明文存储）
-const encodePassword = (password: string): string => {
-  return btoa(unescape(encodeURIComponent(password)));
-};
-
-const decodePassword = (encoded: string): string => {
-  try {
-    return decodeURIComponent(escape(atob(encoded)));
-  } catch {
-    return '';
-  }
-};
+// 注意：不再保存密码，出于安全考虑
 
 const Login: React.FC = () => {
   const [loginError, setLoginError] = useState<string>('');
@@ -207,21 +195,20 @@ const Login: React.FC = () => {
   const { styles } = useStyles();
   const { message } = App.useApp();
   const intl = useIntl();
-  const formRef = useRef<ProFormInstance>();
+  const formRef = useRef<ProFormInstance>(null);
 
   // 页面加载时，从 localStorage 读取保存的账号密码并填充
   useEffect(() => {
     const rememberedUsername = localStorage.getItem(REMEMBERED_USERNAME_KEY);
     const rememberedPassword = localStorage.getItem(REMEMBERED_PASSWORD_KEY);
 
-    if (rememberedUsername && rememberedPassword) {
+    if (rememberedUsername) {
       // 使用 setTimeout 确保 formRef 已经初始化
       setTimeout(() => {
         if (formRef.current) {
-          const decodedPassword = decodePassword(rememberedPassword);
           formRef.current.setFieldsValue({
             username: rememberedUsername,
-            password: decodedPassword,
+            password: rememberedPassword || undefined,
             rememberCredentials: true,
           });
         }
@@ -231,14 +218,11 @@ const Login: React.FC = () => {
 
   const fetchUserInfo = async () => {
     try {
-      console.log('[Login] fetchUserInfo: 开始获取用户信息');
       // 检查token是否存在
       const token = localStorage.getItem('access_token');
-      console.log('[Login] fetchUserInfo: token存在?', !!token);
       
       // 直接调用getCurrentUser，避免使用initialState?.fetchUserInfo（它会在失败时清除token）
       const userInfo = await getCurrentUser();
-      console.log('[Login] fetchUserInfo: 用户信息获取成功', userInfo);
       
       // 根据role_id判断是否为管理员
       const isAdmin = userInfo.role_id === ADMIN_ROLE_ID;
@@ -253,17 +237,14 @@ const Login: React.FC = () => {
         role_id: userInfo.role_id, // 保存role_id以便后续使用
       };
       
-      console.log('[Login] fetchUserInfo: 更新initialState');
       flushSync(() => {
         setInitialState((s) => ({
           ...s,
           currentUser,
         }));
       });
-      console.log('[Login] fetchUserInfo: initialState已更新');
       return currentUser;
     } catch (error) {
-      console.error('[Login] fetchUserInfo: 获取用户信息失败', error);
       // 登录成功后获取用户信息失败，抛出错误
       throw error;
     }
@@ -275,42 +256,30 @@ const Login: React.FC = () => {
     rememberCredentials?: boolean;
   }) => {
     try {
-      console.log('[Login] 开始登录流程', values.username);
       setLoginError('');
       
       // 调用zquant登录接口
-      console.log('[Login] 调用登录API...');
       const tokenData = await zquantLogin({
         username: values.username,
         password: values.password,
-      });
-      console.log('[Login] 登录API成功，收到token:', {
-        hasAccessToken: !!tokenData.access_token,
-        hasRefreshToken: !!tokenData.refresh_token,
       });
       
       // 保存token到localStorage
       localStorage.setItem('access_token', tokenData.access_token);
       localStorage.setItem('refresh_token', tokenData.refresh_token);
-      console.log('[Login] Token已保存到localStorage');
       
       // 处理记住账号密码
       if (values.rememberCredentials) {
-        // 保存用户名和密码（密码使用base64编码）
         localStorage.setItem(REMEMBERED_USERNAME_KEY, values.username);
-        localStorage.setItem(REMEMBERED_PASSWORD_KEY, encodePassword(values.password));
-        console.log('[Login] 账号密码已保存');
+        localStorage.setItem(REMEMBERED_PASSWORD_KEY, values.password);
       } else {
         // 清除保存的账号密码
         localStorage.removeItem(REMEMBERED_USERNAME_KEY);
         localStorage.removeItem(REMEMBERED_PASSWORD_KEY);
-        console.log('[Login] 已清除保存的账号密码');
       }
       
       // 获取用户信息
-      console.log('[Login] 开始获取用户信息...');
       await fetchUserInfo();
-      console.log('[Login] 用户信息获取成功');
       
       const defaultLoginSuccessMessage = intl.formatMessage({
         id: 'pages.login.success',
@@ -321,20 +290,13 @@ const Login: React.FC = () => {
       // 获取跳转目标
       const urlParams = new URL(window.location.href).searchParams;
       const redirect = urlParams.get('redirect') || '/welcome';
-      console.log('[Login] 准备跳转到:', redirect);
-      console.log('[Login] 当前路径:', window.location.pathname);
-      console.log('[Login] initialState.currentUser:', initialState?.currentUser);
-      console.log('[Login] token存在?', !!localStorage.getItem('access_token'));
       
       // 使用setTimeout确保状态更新完成后再跳转
       // 使用history.push跳转
       setTimeout(() => {
-        console.log('[Login] 执行跳转，目标:', redirect);
         history.push(redirect);
-        console.log('[Login] history.push已执行');
       }, 50);
     } catch (error: any) {
-      console.error('[Login] 登录失败:', error);
       const errorMessage = error?.response?.data?.detail || error?.message || '登录失败，请重试！';
       setLoginError(errorMessage);
       const defaultLoginFailureMessage = intl.formatMessage({
@@ -444,7 +406,9 @@ const Login: React.FC = () => {
             <div className={styles.checkboxWrapper}>
               <ProFormCheckbox 
                 name="rememberCredentials"
-                onChange={(e) => handleRememberChange(e.target.checked)}
+                fieldProps={{
+                  onChange: (e) => handleRememberChange(e.target.checked),
+                }}
                 style={{ margin: 0 }}
               >
                 <span className={styles.checkboxLabel}>

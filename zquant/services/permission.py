@@ -92,7 +92,7 @@ class PermissionService:
                 "name": Permission.name,
                 "resource": Permission.resource,
                 "action": Permission.action,
-                "created_at": Permission.created_at,
+                "created_time": Permission.created_time,
             }
 
             if order_by in sortable_fields:
@@ -102,9 +102,9 @@ class PermissionService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(Permission.created_at))
+                query = query.order_by(desc(Permission.created_time))
         else:
-            query = query.order_by(desc(Permission.created_at))
+            query = query.order_by(desc(Permission.created_time))
 
         return query.offset(skip).limit(limit).all()
 

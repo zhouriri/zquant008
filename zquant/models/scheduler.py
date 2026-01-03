@@ -27,12 +27,12 @@
 import enum
 import json
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, Float
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from zquant.database import Base
+from zquant.database import AuditMixin, Base
 
 
 class TaskStatus(str, enum.Enum):
@@ -40,6 +40,7 @@ class TaskStatus(str, enum.Enum):
 
     PENDING = "pending"  # 等待中
     RUNNING = "running"  # 运行中
+    PAUSED = "paused"  # 已暂停
     SUCCESS = "success"  # 成功
     FAILED = "failed"  # 失败
     COMPLETED = "completed"  # 已完成
@@ -65,7 +66,7 @@ class TaskType(str, enum.Enum):
     WORKFLOW = "workflow"  # 编排任务（多个任务的组合执行，执行有先后顺序，可以并行、串行执行）
 
 
-class ScheduledTask(Base):
+class ScheduledTask(Base, AuditMixin):
     """定时任务配置表"""
 
     __tablename__ = "zq_task_scheduled_tasks"
@@ -82,8 +83,6 @@ class ScheduledTask(Base):
     config_json = Column(Text, nullable=True)  # 任务配置（JSON格式）
     max_retries = Column(Integer, default=3, nullable=False)  # 最大重试次数
     retry_interval = Column(Integer, default=60, nullable=False)  # 重试间隔（秒）
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     # 关系
     executions = relationship(
@@ -105,7 +104,7 @@ class ScheduledTask(Base):
         self.config_json = json.dumps(config) if config else None
 
 
-class TaskExecution(Base):
+class TaskExecution(Base, AuditMixin):
     """任务执行历史表"""
 
     __tablename__ = "zq_task_task_executions"
@@ -119,7 +118,13 @@ class TaskExecution(Base):
     result_json = Column(Text, nullable=True)  # 执行结果（JSON格式）
     error_message = Column(Text, nullable=True)  # 错误信息
     retry_count = Column(Integer, default=0, nullable=False)  # 重试次数
-    created_at = Column(DateTime, default=func.now(), nullable=False)
+    progress_percent = Column(Float, default=0, nullable=False)  # 进度百分比
+    current_item = Column(String(255), nullable=True)  # 当前处理的数据标识
+    total_items = Column(Integer, default=0, nullable=False)  # 总处理数量
+    processed_items = Column(Integer, default=0, nullable=False)  # 已处理数量
+    estimated_end_time = Column(DateTime, nullable=True)  # 预估完成时间
+    is_paused = Column(Boolean, default=False, nullable=False)  # 是否暂停标志
+    terminate_requested = Column(Boolean, default=False, nullable=False)  # 是否请求终止标志
 
     # 关系
     task = relationship(
@@ -152,12 +157,12 @@ class TaskExecution(Base):
         essential_result = {}
         
         # 1. 保留执行状态和关键信息
-        for key in ['success', 'exit_code', 'message', 'command', 'work_dir', 'duration_seconds']:
+        for key in ['success', 'exit_code', 'message', 'command', 'work_dir', 'duration_seconds', 'resume_from_execution_id']:
             if key in result:
                 essential_result[key] = result[key]
         
         # 2. 保留进度信息（如果有）
-        for key in ['progress_percent', 'current_step', 'total_steps']:
+        for key in ['progress_percent', 'current_step', 'total_steps', 'current_item']:
             if key in result:
                 essential_result[key] = result[key]
         

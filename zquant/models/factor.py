@@ -29,10 +29,14 @@ from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Str
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from zquant.database import Base
+from zquant.database import AuditMixin, Base
+
+# 因子类型常量
+FACTOR_TYPE_SINGLE = "单因子"
+FACTOR_TYPE_COMBINED = "组合因子"
 
 
-class FactorDefinition(Base):
+class FactorDefinition(Base, AuditMixin):
     """因子定义表"""
 
     __tablename__ = "zq_quant_factor_definitions"
@@ -43,9 +47,8 @@ class FactorDefinition(Base):
     en_name = Column(String(100), nullable=True, comment="英文简称")
     column_name = Column(String(100), nullable=False, comment="因子表数据列名")
     description = Column(Text, nullable=True, comment="因子详细描述")
+    factor_type = Column(String(20), nullable=True, default=FACTOR_TYPE_SINGLE, index=True, comment="因子类型：单因子、组合因子")
     enabled = Column(Boolean, default=True, nullable=False, index=True, comment="是否启用")
-    created_at = Column(DateTime, default=func.now(), nullable=False, comment="创建时间")
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False, comment="更新时间")
 
     # 关系
     models = relationship("FactorModel", back_populates="factor", cascade="all, delete-orphan")
@@ -54,6 +57,7 @@ class FactorDefinition(Base):
     __table_args__ = (
         Index("idx_factor_name", "factor_name"),
         Index("idx_enabled", "enabled"),
+        Index("idx_factor_type", "factor_type"),
     )
 
     def get_factor_config(self) -> dict:
@@ -108,7 +112,7 @@ class FactorDefinition(Base):
                 self.config.set_config({"enabled": True, "mappings": []})
 
 
-class FactorModel(Base):
+class FactorModel(Base, AuditMixin):
     """因子模型表"""
 
     __tablename__ = "zq_quant_factor_models"
@@ -120,8 +124,6 @@ class FactorModel(Base):
     config_json = Column(Text, nullable=True, comment="模型配置（JSON格式）")
     is_default = Column(Boolean, default=False, nullable=False, index=True, comment="是否默认算法")
     enabled = Column(Boolean, default=True, nullable=False, index=True, comment="是否启用")
-    created_at = Column(DateTime, default=func.now(), nullable=False, comment="创建时间")
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False, comment="更新时间")
 
     # 关系
     factor = relationship("FactorDefinition", back_populates="models")
@@ -144,7 +146,7 @@ class FactorModel(Base):
         self.config_json = json.dumps(config) if config else None
 
 
-class FactorConfig(Base):
+class FactorConfig(Base, AuditMixin):
     """
     因子配置表
     
@@ -157,10 +159,6 @@ class FactorConfig(Base):
     factor_id = Column(Integer, ForeignKey("zq_quant_factor_definitions.id"), primary_key=True, index=True, comment="因子ID（主键）")
     config_json = Column(Text, nullable=True, comment="因子配置（JSON格式）：{\"enabled\": true, \"mappings\": [{\"model_id\": 1, \"codes\": [...]}]}")
     enabled = Column(Boolean, default=True, nullable=False, index=True, comment="是否启用")
-    created_by = Column(String(50), nullable=True, info={"name": "创建人"}, comment="创建人")
-    created_at = Column(DateTime, default=func.now(), nullable=False, comment="创建时间")
-    updated_by = Column(String(50), nullable=True, info={"name": "修改人"}, comment="修改人")
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False, comment="更新时间")
 
     # 关系
     factor = relationship("FactorDefinition", back_populates="config")

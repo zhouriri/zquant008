@@ -24,7 +24,7 @@
 我的自选API
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,8 @@ from zquant.models.data import StockFavorite, Tustock
 from zquant.models.user import User
 from zquant.schemas.user import (
     FavoriteCreate,
+    FavoriteDeleteRequest,
+    FavoriteGetRequest,
     FavoriteListRequest,
     FavoriteListResponse,
     FavoriteResponse,
@@ -90,75 +92,62 @@ def create_favorite(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"创建自选失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建自选失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="创建自选失败")
 
 
-@router.get("", response_model=FavoriteListResponse, summary="查询自选列表")
+@router.post("/query", response_model=FavoriteListResponse, summary="查询自选列表")
 def get_favorites(
-    code: str | None = Query(None, description="股票代码（精确查询）"),
-    start_date: str | None = Query(None, description="开始日期（自选日期范围，YYYY-MM-DD格式）"),
-    end_date: str | None = Query(None, description="结束日期（自选日期范围，YYYY-MM-DD格式）"),
-    skip: int = Query(0, ge=0, description="跳过记录数"),
-    limit: int = Query(100, ge=1, le=1000, description="每页记录数"),
-    order_by: str | None = Query("created_time", description="排序字段：id, code, fav_datettime, created_time"),
-    order: str | None = Query("desc", description="排序方向：asc 或 desc"),
+    request: FavoriteListRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """查询自选列表（支持分页、筛选）"""
     try:
-        from datetime import date as date_type
-
-        start_date_obj = None
-        end_date_obj = None
-        if start_date:
-            start_date_obj = date_type.fromisoformat(start_date)
-        if end_date:
-            end_date_obj = date_type.fromisoformat(end_date)
-
         favorites, total = FavoriteService.get_favorites(
             db,
             current_user.id,
-            code=code,
-            start_date=start_date_obj,
-            end_date=end_date_obj,
-            skip=skip,
-            limit=limit,
-            order_by=order_by or "created_time",
-            order=order or "desc",
+            code=request.code,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            skip=request.skip,
+            limit=request.limit,
+            order_by=request.order_by or "created_time",
+            order=request.order or "desc",
         )
 
         # 丰富响应数据
         items = [_enrich_favorite_response(fav, db) for fav in favorites]
 
-        return FavoriteListResponse(items=items, total=total, skip=skip, limit=limit)
+        return FavoriteListResponse(
+            items=items, total=total, skip=request.skip, limit=request.limit
+        )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"日期格式错误: {str(e)}")
+        logger.error(f"日期格式错误: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="日期格式错误")
     except Exception as e:
         logger.error(f"查询自选列表失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"查询自选列表失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询自选列表失败")
 
 
-@router.get("/{favorite_id}", response_model=FavoriteResponse, summary="查询单个自选详情")
+@router.post("/get", response_model=FavoriteResponse, summary="查询单个自选详情")
 def get_favorite(
-    favorite_id: int,
+    request: FavoriteGetRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """查询单个自选详情"""
     try:
-        favorite = FavoriteService.get_favorite_by_id(db, favorite_id, current_user.id)
+        favorite = FavoriteService.get_favorite_by_id(db, request.favorite_id, current_user.id)
         return _enrich_favorite_response(favorite, db)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"查询自选详情失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"查询自选详情失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="查询自选详情失败")
 
 
-@router.put("/{favorite_id}", response_model=FavoriteResponse, summary="更新自选")
+@router.post("/update", response_model=FavoriteResponse, summary="更新自选")
 def update_favorite(
-    favorite_id: int,
     favorite_data: FavoriteUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -166,28 +155,28 @@ def update_favorite(
     """更新自选"""
     try:
         favorite = FavoriteService.update_favorite(
-            db, favorite_id, current_user.id, favorite_data, updated_by=current_user.username
+            db, favorite_data.favorite_id, current_user.id, favorite_data, updated_by=current_user.username
         )
         return _enrich_favorite_response(favorite, db)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"更新自选失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"更新自选失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="更新自选失败")
 
 
-@router.delete("/{favorite_id}", status_code=status.HTTP_204_NO_CONTENT, summary="删除自选")
+@router.post("/delete", status_code=status.HTTP_204_NO_CONTENT, summary="删除自选")
 def delete_favorite(
-    favorite_id: int,
+    request: FavoriteDeleteRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """删除自选"""
     try:
-        FavoriteService.delete_favorite(db, favorite_id, current_user.id)
+        FavoriteService.delete_favorite(db, request.favorite_id, current_user.id)
     except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"删除自选失败: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"删除自选失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="删除自选失败")
 

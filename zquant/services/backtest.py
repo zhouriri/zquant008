@@ -51,6 +51,7 @@ class BacktestService:
         config: dict[str, Any],
         strategy_id: int | None = None,
         strategy_code: str | None = None,
+        created_by: str | None = None,
     ) -> BacktestTask:
         """
         创建回测任务
@@ -62,6 +63,7 @@ class BacktestService:
             config: 回测配置
             strategy_id: 策略ID（从策略库选择，可选）
             strategy_code: 策略代码（当strategy_id为空时必填）
+            created_by: 创建人
         """
         # 如果提供了strategy_id，从策略库加载策略代码
         if strategy_id:
@@ -88,6 +90,8 @@ class BacktestService:
             strategy_name=strategy_name,
             config_json=json.dumps(config, default=str),
             status=BacktestStatus.PENDING,
+            created_by=created_by,
+            updated_by=created_by,  # 创建时 updated_by 和 created_by 一致
         )
 
         db.add(task)
@@ -98,7 +102,7 @@ class BacktestService:
         return task
 
     @staticmethod
-    def run_backtest(db: Session, task_id: int) -> BacktestResult:
+    def run_backtest(db: Session, task_id: int, updated_by: str | None = None) -> BacktestResult:
         """运行回测"""
         # 获取任务
         task = db.query(BacktestTask).filter(BacktestTask.id == task_id).first()
@@ -108,6 +112,8 @@ class BacktestService:
         # 更新状态和开始时间
         task.status = BacktestStatus.RUNNING
         task.started_at = datetime.now()
+        if updated_by:
+            task.updated_by = updated_by
         db.commit()
 
         try:
@@ -139,6 +145,8 @@ class BacktestService:
                 metrics_json=json.dumps(metrics, default=str),
                 trades_json=json.dumps(results.get("orders", []), default=str),
                 portfolio_json=json.dumps(results.get("portfolio", {}), default=str),
+                created_by=task.created_by,  # 结果的创建人跟随任务
+                updated_by=task.created_by,
             )
 
             db.add(result)
@@ -195,8 +203,8 @@ class BacktestService:
                 "id": BacktestTask.id,
                 "name": BacktestTask.name,
                 "status": BacktestTask.status,
-                "created_at": BacktestTask.created_at,
-                "updated_at": BacktestTask.updated_at,
+                "created_time": BacktestTask.created_time,
+                "updated_time": BacktestTask.updated_time,
             }
 
             if order_by in sortable_fields:
@@ -206,9 +214,9 @@ class BacktestService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(BacktestTask.created_at))
+                query = query.order_by(desc(BacktestTask.created_time))
         else:
-            query = query.order_by(desc(BacktestTask.created_at))
+            query = query.order_by(desc(BacktestTask.created_time))
 
         return query.offset(skip).limit(limit).all()
 
@@ -240,7 +248,7 @@ class BacktestService:
                 "total_return": BacktestResult.total_return,
                 "annual_return": BacktestResult.annual_return,
                 "sharpe_ratio": BacktestResult.sharpe_ratio,
-                "created_at": BacktestResult.created_at,
+                "created_time": BacktestResult.created_time,
             }
 
             if order_by in sortable_fields:
@@ -250,9 +258,9 @@ class BacktestService:
                 else:
                     query = query.order_by(desc(sort_field))
             else:
-                query = query.order_by(desc(BacktestResult.created_at))
+                query = query.order_by(desc(BacktestResult.created_time))
         else:
-            query = query.order_by(desc(BacktestResult.created_at))
+            query = query.order_by(desc(BacktestResult.created_time))
 
         return query.offset(skip).limit(limit).all()
 

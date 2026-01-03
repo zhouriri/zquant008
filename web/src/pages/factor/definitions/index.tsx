@@ -21,7 +21,7 @@
 //     - Repository: https://github.com/yoyoung/zquant
 
 import { ProTable } from '@ant-design/pro-components';
-import { Button, Tag, Popconfirm, message, Modal, Form, Input, Switch } from 'antd';
+import { Button, Tag, Popconfirm, message, Modal, Form, Input, Switch, Select } from 'antd';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import React, { useRef, useState } from 'react';
 import {
@@ -67,6 +67,19 @@ const FactorDefinitions: React.FC = () => {
       width: 150,
     },
     {
+      title: '因子类型',
+      dataIndex: 'factor_type',
+      width: 120,
+      render: (_, record) => {
+        const factorType = record.factor_type || '单因子';
+        return (
+          <Tag color={factorType === '组合因子' ? 'blue' : 'default'}>
+            {factorType}
+          </Tag>
+        );
+      },
+    },
+    {
       title: '描述',
       dataIndex: 'description',
       ellipsis: true,
@@ -81,10 +94,10 @@ const FactorDefinitions: React.FC = () => {
     },
     {
       title: '创建时间',
-      dataIndex: 'created_at',
+      dataIndex: 'created_time',
       width: 180,
       sorter: true,
-      render: (_, record) => dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss'),
+      render: (_, record) => dayjs(record.created_time).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '操作',
@@ -218,6 +231,17 @@ const FactorDefinitions: React.FC = () => {
           </Form.Item>
           <Form.Item name="column_name" label="列名" rules={[{ required: true, message: '请输入列名' }]}>
             <Input placeholder="因子表数据列名" />
+          </Form.Item>
+          <Form.Item
+            name="factor_type"
+            label="因子类型"
+            initialValue="单因子"
+            rules={[{ required: true, message: '请选择因子类型' }]}
+          >
+            <Select placeholder="请选择因子类型">
+              <Select.Option value="单因子">单因子</Select.Option>
+              <Select.Option value="组合因子">组合因子</Select.Option>
+            </Select>
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={4} placeholder="因子详细描述" />

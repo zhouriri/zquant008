@@ -26,7 +26,7 @@ import { request } from '@umijs/max';
 
 /**
  * 查询持仓列表
- * GET /api/v1/positions
+ * POST /api/v1/positions/query
  */
 export async function getPositions(params: {
   code?: string;
@@ -37,9 +37,12 @@ export async function getPositions(params: {
   order_by?: string;
   order?: string;
 }) {
-  return request<ZQuant.PositionListResponse>('/api/v1/positions', {
-    method: 'GET',
-    params,
+  return request<ZQuant.PositionListResponse>('/api/v1/positions/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params,
   });
 }
 
@@ -59,35 +62,43 @@ export async function createPosition(body: ZQuant.PositionCreate) {
 
 /**
  * 查询单个持仓详情
- * GET /api/v1/positions/{id}
+ * POST /api/v1/positions/get
  */
 export async function getPositionById(id: number) {
-  return request<ZQuant.PositionResponse>(`/api/v1/positions/${id}`, {
-    method: 'GET',
+  return request<ZQuant.PositionResponse>('/api/v1/positions/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { position_id: id },
   });
 }
 
 /**
  * 更新持仓
- * PUT /api/v1/positions/{id}
+ * POST /api/v1/positions/update
  */
 export async function updatePosition(id: number, body: ZQuant.PositionUpdate) {
-  return request<ZQuant.PositionResponse>(`/api/v1/positions/${id}`, {
-    method: 'PUT',
+  return request<ZQuant.PositionResponse>('/api/v1/positions/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, position_id: id },
   });
 }
 
 /**
  * 删除持仓
- * DELETE /api/v1/positions/{id}
+ * POST /api/v1/positions/delete
  */
 export async function deletePosition(id: number) {
-  return request(`/api/v1/positions/${id}`, {
-    method: 'DELETE',
+  return request('/api/v1/positions/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { position_id: id },
   });
 }
 

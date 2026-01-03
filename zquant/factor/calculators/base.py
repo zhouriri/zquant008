@@ -26,7 +26,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import date
-from typing import Any
+from typing import Any, Union
 
 from sqlalchemy.orm import Session
 
@@ -46,7 +46,7 @@ class BaseFactorCalculator(ABC):
         self.config = config or {}
 
     @abstractmethod
-    def calculate(self, db: Session, code: str, trade_date: date) -> float | None:
+    def calculate(self, db: Session, code: str, trade_date: date) -> Union[float, dict[str, Any], None]:
         """
         计算因子值
 
@@ -56,7 +56,7 @@ class BaseFactorCalculator(ABC):
             trade_date: 交易日期
 
         Returns:
-            因子值，如果无法计算则返回None
+            单因子返回 float 值，组合因子返回 dict，如果无法计算则返回 None
         """
         pass
 

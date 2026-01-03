@@ -26,7 +26,7 @@ import { request } from '@umijs/max';
 
 /**
  * 查询自选列表
- * GET /api/v1/favorites
+ * POST /api/v1/favorites/query
  */
 export async function getFavorites(params: {
   code?: string;
@@ -37,9 +37,12 @@ export async function getFavorites(params: {
   order_by?: string;
   order?: string;
 }) {
-  return request<ZQuant.FavoriteListResponse>('/api/v1/favorites', {
-    method: 'GET',
-    params,
+  return request<ZQuant.FavoriteListResponse>('/api/v1/favorites/query', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: params,
   });
 }
 
@@ -59,35 +62,43 @@ export async function createFavorite(body: ZQuant.FavoriteCreate) {
 
 /**
  * 查询单个自选详情
- * GET /api/v1/favorites/{id}
+ * POST /api/v1/favorites/get
  */
 export async function getFavoriteById(id: number) {
-  return request<ZQuant.FavoriteResponse>(`/api/v1/favorites/${id}`, {
-    method: 'GET',
+  return request<ZQuant.FavoriteResponse>('/api/v1/favorites/get', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { favorite_id: id },
   });
 }
 
 /**
  * 更新自选
- * PUT /api/v1/favorites/{id}
+ * POST /api/v1/favorites/update
  */
 export async function updateFavorite(id: number, body: ZQuant.FavoriteUpdate) {
-  return request<ZQuant.FavoriteResponse>(`/api/v1/favorites/${id}`, {
-    method: 'PUT',
+  return request<ZQuant.FavoriteResponse>('/api/v1/favorites/update', {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    data: body,
+    data: { ...body, favorite_id: id },
   });
 }
 
 /**
  * 删除自选
- * DELETE /api/v1/favorites/{id}
+ * POST /api/v1/favorites/delete
  */
 export async function deleteFavorite(id: number) {
-  return request(`/api/v1/favorites/${id}`, {
-    method: 'DELETE',
+  return request('/api/v1/favorites/delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: { favorite_id: id },
   });
 }
 

@@ -139,6 +139,7 @@ def init_strategies(db: Session, admin_user_id: int):
                 code=code,
                 description=template["description"],
                 category=template["category"],
+                updated_by="admin",
             )
             updated_count += 1
             print(f"更新策略模板: {template['name']}")
@@ -152,6 +153,7 @@ def init_strategies(db: Session, admin_user_id: int):
                 description=template["description"],
                 category=template["category"],
                 is_template=True,
+                created_by="admin",
             )
             created_count += 1
             print(f"创建策略模板: {template['name']}")

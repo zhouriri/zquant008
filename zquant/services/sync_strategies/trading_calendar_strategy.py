@@ -27,6 +27,7 @@
 from typing import Any
 from sqlalchemy.orm import Session
 
+from zquant.models.scheduler import TaskExecution
 from zquant.data.etl.scheduler import DataScheduler
 from zquant.services.sync_strategies.base import DataSyncStrategy
 
@@ -37,7 +38,9 @@ class TradingCalendarSyncStrategy(DataSyncStrategy):
     def __init__(self):
         self.data_scheduler = DataScheduler()
 
-    def sync(self, db: Session, config: dict[str, Any], extra_info: dict | None = None) -> dict[str, Any]:
+    def sync(
+        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+    ) -> dict[str, Any]:
         """
         同步交易日历
 
@@ -45,18 +48,17 @@ class TradingCalendarSyncStrategy(DataSyncStrategy):
             db: 数据库会话
             config: 同步配置，可包含 start_date, end_date
             extra_info: 额外信息字典
+            execution: 执行记录对象（可选）
 
         Returns:
             同步结果字典
         """
         start_date = config.get("start_date")
         end_date = config.get("end_date")
-        count = self.data_scheduler.sync_trading_calendar(db, start_date, end_date, extra_info=extra_info)
-        return {
-            "success": True,
-            "count": count,
-            "message": f"成功同步 {count} 条交易日历"
-        }
+        count = self.data_scheduler.sync_trading_calendar(
+            db, start_date, end_date, extra_info=extra_info, execution=execution
+        )
+        return {"success": True, "count": count, "message": f"成功同步 {count} 条交易日历"}
 
     def get_strategy_name(self) -> str:
         return "sync_trading_calendar"

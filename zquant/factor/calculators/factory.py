@@ -29,12 +29,15 @@ from typing import Any
 from loguru import logger
 
 from zquant.factor.calculators.base import BaseFactorCalculator
+from zquant.factor.calculators.hyper_activity import HyperActivityCalculator
 from zquant.factor.calculators.turnover_rate import TurnoverRateCalculator
 
 # 注册的计算器映射
 CALCULATOR_REGISTRY: dict[str, type[BaseFactorCalculator]] = {
     TurnoverRateCalculator.MODEL_CODE: TurnoverRateCalculator,
     "turnover_rate_ma": TurnoverRateCalculator,  # 移动平均换手率使用相同的计算器类
+    HyperActivityCalculator.MODEL_CODE: HyperActivityCalculator,
+    "combined_factor": HyperActivityCalculator,  # 组合因子使用超活跃组合因子计算器
 }
 
 
