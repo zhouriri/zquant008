@@ -24,7 +24,9 @@
 加密货币工具类
 """
 
-from typing import Tuple, Optional
+import time
+from datetime import datetime, timedelta
+from typing import Tuple, Optional, Dict, Any, List
 
 
 class CryptoHelper:
@@ -279,3 +281,320 @@ class CryptoHelper:
         # 检查是否包含非字母字符(允许字母和常见分隔符)
         allowed_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZ/-')
         return all(c in allowed_chars for c in symbol.upper())
+
+    @staticmethod
+    def calculate_ma(prices: List[float], period: int) -> Optional[float]:
+        """
+        计算移动平均线
+
+        Args:
+            prices: 价格列表
+            period: 周期
+
+        Returns:
+            MA值
+        """
+        if len(prices) < period:
+            return None
+        return sum(prices[-period:]) / period
+
+    @staticmethod
+    def calculate_rsi(prices: List[float], period: int = 14) -> Optional[float]:
+        """
+        计算RSI指标
+
+        Args:
+            prices: 价格列表
+            period: 周期
+
+        Returns:
+            RSI值
+        """
+        if len(prices) < period + 1:
+            return None
+
+        gains = []
+        losses = []
+
+        for i in range(1, len(prices)):
+            change = prices[i] - prices[i - 1]
+            if change > 0:
+                gains.append(change)
+                losses.append(0)
+            else:
+                gains.append(0)
+                losses.append(abs(change))
+
+        avg_gain = sum(gains[-period:]) / period
+        avg_loss = sum(losses[-period:]) / period
+
+        if avg_loss == 0:
+            return 100.0
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+
+    @staticmethod
+    def calculate_volatility(prices: List[float], period: int = 20) -> Optional[float]:
+        """
+        计算波动率
+
+        Args:
+            prices: 价格列表
+            period: 周期
+
+        Returns:
+            波动率
+        """
+        if len(prices) < period:
+            return None
+
+        recent_prices = prices[-period:]
+        mean_price = sum(recent_prices) / period
+        variance = sum((p - mean_price) ** 2 for p in recent_prices) / period
+        return (variance ** 0.5) / mean_price * 100 if mean_price > 0 else 0
+
+    @staticmethod
+    def get_time_range_for_days(days: int, interval: str = '1h') -> Tuple[datetime, datetime]:
+        """
+        根据天数和时间周期获取时间范围
+
+        Args:
+            days: 天数
+            interval: K线周期
+
+        Returns:
+            (start_time, end_time)
+        """
+        end_time = datetime.utcnow()
+        seconds = CryptoHelper.get_interval_seconds(interval)
+        start_time = end_time - timedelta(days=days)
+
+        return start_time, end_time
+
+    @staticmethod
+    def estimate_records(days: int, interval: str) -> int:
+        """
+        估算记录数量
+
+        Args:
+            days: 天数
+            interval: K线周期
+
+        Returns:
+            预估记录数
+        """
+        seconds = CryptoHelper.get_interval_seconds(interval)
+        total_seconds = days * 86400
+        return int(total_seconds / seconds)
+
+    @staticmethod
+    def get_supported_exchanges() -> List[str]:
+        """
+        获取支持的交易所列表
+
+        Returns:
+            交易所列表
+        """
+        return ['binance', 'okx', 'bybit']
+
+    @staticmethod
+    def is_valid_exchange(exchange: str) -> bool:
+        """
+        检查交易所是否有效
+
+        Args:
+            exchange: 交易所名称
+
+        Returns:
+            是否有效
+        """
+        return exchange.lower() in CryptoHelper.get_supported_exchanges()
+
+
+def measure_performance(func):
+    """
+    性能监控装饰器
+
+    记录函数执行时间和内存使用情况
+
+    Usage:
+        @measure_performance
+        def some_function():
+            pass
+    """
+    def wrapper(*args, **kwargs):
+        import tracemalloc
+
+        # 开始监控
+        tracemalloc.start()
+        start_time = time.time()
+
+        try:
+            result = func(*args, **kwargs)
+
+            # 结束监控
+            end_time = time.time()
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            # 记录性能数据
+            execution_time = end_time - start_time
+            memory_usage = current / 10**6  # MB
+            memory_peak = peak / 10**6  # MB
+
+            from loguru import logger
+            logger.info(
+                f"性能监控 [{func.__name__}]: "
+                f"执行时间={execution_time:.3f}s, "
+                f"内存使用={memory_usage:.2f}MB, "
+                f"峰值内存={memory_peak:.2f}MB"
+            )
+
+            return result
+
+        except Exception as e:
+            # 发生异常时也要停止监控
+            tracemalloc.stop()
+            raise
+
+    return wrapper
+
+
+def retry_on_failure(max_retries: int = 3, delay: float = 1.0, backoff: float = 2.0):
+    """
+    重试装饰器
+
+    在函数失败时自动重试
+
+    Args:
+        max_retries: 最大重试次数
+        delay: 初始延迟(秒)
+        backoff: 退避因子
+
+    Usage:
+        @retry_on_failure(max_retries=3, delay=1.0)
+        def fetch_data():
+            pass
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            from loguru import logger
+
+            last_exception = None
+            current_delay = delay
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+
+                    if attempt == max_retries:
+                        logger.error(
+                            f"重试失败 [{func.__name__}]: "
+                            f"已达到最大重试次数{max_retries}, "
+                            f"错误: {str(e)}"
+                        )
+                        raise
+
+                    logger.warning(
+                        f"重试中 [{func.__name__}]: "
+                        f"第{attempt + 1}次尝试失败, "
+                        f"等待{current_delay:.1f}秒后重试, "
+                        f"错误: {str(e)}"
+                    )
+
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+
+            raise last_exception
+
+        return wrapper
+    return decorator
+
+
+def cache_result(ttl: int = 300):
+    """
+    缓存装饰器
+
+    缓存函数结果
+
+    Args:
+        ttl: 缓存生存时间(秒)
+
+    Usage:
+        @cache_result(ttl=300)
+        def fetch_data():
+            pass
+    """
+    def decorator(func):
+        cache: Dict[str, Tuple[Any, float]] = {}
+
+        def wrapper(*args, **kwargs):
+            # 生成缓存key
+            key = f"{func.__name__}_{args}_{kwargs}"
+            current_time = time.time()
+
+            # 检查缓存
+            if key in cache:
+                result, timestamp = cache[key]
+                if current_time - timestamp < ttl:
+                    return result
+
+            # 执行函数并缓存结果
+            result = func(*args, **kwargs)
+            cache[key] = (result, current_time)
+
+            return result
+
+        wrapper.cache_clear = cache.clear
+        return wrapper
+
+    return decorator
+
+
+def async_measure_performance(func):
+    """
+    异步性能监控装饰器
+
+    记录异步函数执行时间和内存使用情况
+
+    Usage:
+        @async_measure_performance
+        async def async_function():
+            pass
+    """
+    async def wrapper(*args, **kwargs):
+        import tracemalloc
+
+        tracemalloc.start()
+        start_time = time.time()
+
+        try:
+            result = await func(*args, **kwargs)
+
+            end_time = time.time()
+            current, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            execution_time = end_time - start_time
+            memory_usage = current / 10**6
+            memory_peak = peak / 10**6
+
+            from loguru import logger
+            logger.info(
+                f"性能监控 [{func.__name__}]: "
+                f"执行时间={execution_time:.3f}s, "
+                f"内存使用={memory_usage:.2f}MB, "
+                f"峰值内存={memory_peak:.2f}MB"
+            )
+
+            return result
+
+        except Exception as e:
+            tracemalloc.stop()
+            raise
+
+    return wrapper

@@ -34,6 +34,7 @@ from zquant.models.crypto import (
     get_kline_table_name,
 )
 from zquant.repositories import CryptoPairRepository, CryptoKlineRepository
+from zquant.middleware.performance import get_performance_stats
 
 
 router = APIRouter(prefix="/crypto", tags=["加密货币"])
@@ -280,3 +281,24 @@ async def get_supported_intervals():
         },
         message="获取支持的K线周期成功",
     )
+
+
+@router.get("/performance/stats")
+@handle_errors
+async def get_crypto_performance_stats():
+    """
+    获取加密货币API性能统计
+
+    Returns:
+        性能统计数据
+    """
+    stats = get_performance_stats()
+
+    # 过滤出加密货币相关的API
+    crypto_stats = {k: v for k, v in stats.items() if '/crypto' in k}
+
+    return success_response(
+        data=crypto_stats,
+        message="获取性能统计成功",
+    )
+

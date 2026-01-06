@@ -56,6 +56,7 @@ from zquant.middleware.audit import AuditMiddleware
 from zquant.middleware.logging import LoggingMiddleware
 from zquant.middleware.rate_limit import RateLimitMiddleware
 from zquant.middleware.security import CSRFProtectionMiddleware, SecurityHeadersMiddleware, XSSProtectionMiddleware
+from zquant.middleware.performance import performance_middleware, get_performance_stats
 from zquant.models.scheduler import ScheduledTask
 from zquant.schemas.response import ErrorResponse
 from zquant.scheduler.manager import get_scheduler_manager
@@ -166,6 +167,8 @@ if settings.RATE_LIMIT_ENABLED:
 app.add_middleware(AuditMiddleware)
 # 6. 请求日志中间件
 app.add_middleware(LoggingMiddleware)
+# 6.5. 性能监控中间件
+app.middleware('http')(performance_middleware)
 # 7. CORS中间件（最后添加，确保最先执行，优先处理OPTIONS请求）
 app.add_middleware(
     CORSMiddleware,
