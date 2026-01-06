@@ -7,7 +7,7 @@
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the Apache License is distributed on an "AS IS" BASIS,
+# distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -21,19 +21,17 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
-Repository层
+Repository模块
 
-统一数据访问接口，提供缓存和批量查询优化
+统一数据访问层,提供批量查询和缓存优化
 """
 
-from zquant.repositories.trading_date_repository import TradingDateRepository
+from zquant.repositories.crypto_pair_repository import CryptoPairRepository
 from zquant.repositories.stock_repository import StockRepository
-from zquant.repositories.price_data_repository import PriceDataRepository
-from zquant.repositories.factor_repository import FactorRepository
+from zquant.repositories.trading_date_repository import TradingDateRepository
 
 __all__ = [
-    "TradingDateRepository",
+    "CryptoPairRepository",
     "StockRepository",
-    "PriceDataRepository",
-    "FactorRepository",
+    "TradingDateRepository",
 ]

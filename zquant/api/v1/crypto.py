@@ -26,12 +26,14 @@ from sqlalchemy.orm import Session
 
 from zquant.common.database import get_db
 from zquant.common.response import success_response
+from zquant.api.decorators import handle_errors, log_request
 from zquant.data.crypto_sync import CryptoDataSyncService
 from zquant.models.crypto import (
     CryptoPair,
     create_kline_table_class,
     get_kline_table_name,
 )
+from zquant.repositories import CryptoPairRepository, CryptoKlineRepository
 
 
 router = APIRouter(prefix="/crypto", tags=["加密货币"])
@@ -70,6 +72,8 @@ class ExchangeConfigRequest(BaseModel):
 
 
 @router.get("/pairs")
+@handle_errors
+@log_request
 async def get_crypto_pairs(
     quote_asset: str | None = Query(default=None, description="计价资产"),
     exchange: str | None = Query(default=None, description="交易所"),
@@ -80,36 +84,40 @@ async def get_crypto_pairs(
     """
     获取加密货币交易对列表
     """
-    try:
-        query = db.query(CryptoPair)
-        
-        if quote_asset:
-            query = query.filter(CryptoPair.quote_asset == quote_asset)
-        if exchange:
-            query = query.filter(CryptoPair.exchange == exchange)
-        if status:
-            query = query.filter(CryptoPair.status == status)
-        
-        pairs = query.order_by(CryptoPair.volume_24h.desc()).limit(limit).all()
-        
-        return success_response(
-            data=[{
-                "symbol": pair.symbol,
-                "base_asset": pair.base_asset,
-                "quote_asset": pair.quote_asset,
-                "exchange": pair.exchange,
-                "status": pair.status,
-                "created_at": pair.created_at.isoformat() if pair.created_at else None,
-            } for pair in pairs],
-            message="获取交易对列表成功",
-        )
-        
-    except Exception as e:
+    repo = CryptoPairRepository(db)
+    
+    # 根据条件获取交易对
+    if exchange:
+        pairs = repo.get_by_exchange(exchange, limit=limit)
+    else:
+        pairs = repo.get_all(skip=0, limit=limit)
+    
+    # 过滤状态
+    if status:
+        pairs = [p for p in pairs if p.status == status]
+    
+    # 过滤计价资产
+    if quote_asset:
+        pairs = [p for p in pairs if p.quote_asset == quote_asset]
+    
+    return success_response(
+        data=[{
+            "symbol": pair.symbol,
+            "base_asset": pair.base_asset,
+            "quote_asset": pair.quote_asset,
+            "exchange": pair.exchange,
+            "status": pair.status,
+            "created_at": pair.created_at.isoformat() if pair.created_at else None,
+        } for pair in pairs],
+        message="获取交易对列表成功",
+    )
         logger.error(f"获取交易对列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/klines/{symbol}")
+@handle_errors
+@log_request
 async def get_crypto_klines(
     symbol: str,
     interval: str = Query(default="1h", description="K线周期"),
@@ -121,41 +129,18 @@ async def get_crypto_klines(
     """
     获取加密货币K线数据
     """
-    try:
-        # 获取K线表
-        KlineTable = create_kline_table_class(interval)
-        
-        # 查询K线数据
-        query = db.query(KlineTable).filter_by(symbol=symbol)
-        
-        if start_time:
-            query = query.filter(KlineTable.timestamp >= start_time)
-        if end_time:
-            query = query.filter(KlineTable.timestamp <= end_time)
-        
-        klines = query.order_by(KlineTable.timestamp.desc()).limit(limit).all()
-        
-        # 转换为DataFrame格式
-        data = [
-            {
-                "timestamp": kline.timestamp.isoformat(),
-                "open": kline.open,
-                "high": kline.high,
-                "low": kline.low,
-                "close": kline.close,
-                "volume": kline.volume,
-                "quote_volume": kline.quote_volume,
-            }
-            for kline in reversed(klines)
-        ]
-        
-        return success_response(
-            data=data,
-            message=f"获取K线数据成功: {symbol}, {len(data)}条",
-        )
-        
-    except Exception as e:
-        logger.error(f"获取K线数据失败: {e}")
+    repo = CryptoKlineRepository(db)
+    
+    # 获取K线数据
+    if start_time and end_time:
+        klines = repo.get_by_time_range(symbol, interval, start_time, end_time)
+    else:
+        klines = repo.get_latest(symbol, interval, limit)
+    
+    return success_response(
+        data=klines,
+        message=f"获取K线数据成功: {symbol}, {len(klines)}条",
+    )
         raise HTTPException(status_code=500, detail=str(e))
 
 
