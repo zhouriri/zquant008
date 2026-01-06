@@ -1,0 +1,7 @@
+# 加密货币量化平台额外依赖
+
+# 交易所SDK
+ccxt>=4.0.0  # 统一的加密货币交易所SDK,支持Binance/OKX/Bybit等
+
+# Websocket(可选,用于实时行情)
+websockets>=13.0

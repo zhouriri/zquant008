@@ -30,6 +30,19 @@ from zquant.models.factor import FactorConfig, FactorDefinition, FactorModel
 from zquant.models.notification import Notification, NotificationType
 from zquant.models.scheduler import ScheduledTask, TaskExecution, TaskScheduleStatus, TaskStatus, TaskType
 from zquant.models.user import APIKey, Permission, Role, RolePermission, User
+from zquant.models.crypto import (
+    CryptoPair,
+    CryptoKline,
+    CryptoTicker,
+    CryptoOrderBook,
+    CryptoFundingRate,
+    CryptoFavorite,
+    CryptoPosition,
+    CryptoTransaction,
+    ExchangeConfig,
+    create_kline_table_class,
+    get_kline_table_name,
+)
 
 __all__ = [
     "APIKey",
@@ -61,4 +74,16 @@ __all__ = [
     "TustockTradecal",
     "User",
     "HslChoice",
+    # Crypto models
+    "CryptoPair",
+    "CryptoKline",
+    "CryptoTicker",
+    "CryptoOrderBook",
+    "CryptoFundingRate",
+    "CryptoFavorite",
+    "CryptoPosition",
+    "CryptoTransaction",
+    "ExchangeConfig",
+    "create_kline_table_class",
+    "get_kline_table_name",
 ]

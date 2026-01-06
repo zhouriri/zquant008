@@ -48,6 +48,7 @@ from zquant.api.v1 import (
     stock_filter,
     users,
     hsl_choice,
+    crypto,
 )
 from zquant.config import settings
 from zquant.database import SessionLocal
@@ -317,6 +318,7 @@ app.include_router(positions.router, prefix="/api/v1/positions", tags=["我的�
 app.include_router(stock_filter.router, prefix="/api/v1/stock-filter", tags=["量化选股"])
 app.include_router(hsl_choice.router, prefix="/api/v1/hsl-choice", tags=["ZQ精选数据"])
 app.include_router(factor.router, prefix="/api/v1/factor", tags=["因子管理"])
+app.include_router(crypto.router, prefix="/api/v1", tags=["加密货币"])
 
 
 @app.get("/")

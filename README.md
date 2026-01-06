@@ -7,9 +7,9 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](https://github.com/yoyoung/zquant)
 
-ZQuant量化分析平台是一个基于FastAPI的股票量化分析系统，提供数据服务、回测引擎、策略管理等功能。
+ZQuant量化分析平台是一个基于FastAPI的全能量量分析系统，支持股票和加密货币，提供数据服务、回测引擎、策略管理等功能。
 
-[功能特性](#功能特性) • [快速开始](#快速开始) • [文档](#文档) • [常见问题](#常见问题) • [贡献指南](CONTRIBUTING.md) • [许可证](LICENSE)
+[功能特性](#功能特性) • [快速开始](#快速开始) • [加密货币](#加密货币模块) • [文档](#文档) • [常见问题](#常见问题) • [贡献指南](CONTRIBUTING.md) • [许可证](LICENSE)
 
 </div>
 
@@ -17,43 +17,59 @@ ZQuant量化分析平台是一个基于FastAPI的股票量化分析系统，提�
 
 ## 📖 项目简介
 
-ZQuant量化分析平台是一个功能完整的股票量化分析系统，旨在为量化分析者提供从数据采集、策略开发、回测分析到结果管理的一站式解决方案。
+ZQuant量化分析平台是一个功能完整的全能量量分析系统，支持**股票**和**加密货币**两大领域，旨在为量化分析者提供从数据采集、策略开发、回测分析到结果管理的一站式解决方案。
 
 ### ✨ 核心亮点
 
-- 🚀 **开箱即用**：完整的量化分析系统，无需从零开始搭建
-- 📊 **数据驱动**：集成Tushare专业数据源，自动采集和清洗股票数据
-- 🔬 **回测引擎**：事件驱动的回测系统，支持多种策略类型和全面的绩效分析
-- 🎯 **策略模板**：内置8种常用策略模板，快速上手量化分析
-- 🔐 **安全可靠**：基于JWT的认证和RBAC权限控制，保障系统安全
-- ⚡ **高性能**：基于FastAPI构建，支持异步处理和分布式任务队列
+- 🚀 **开箱即用**: 完整的量化分析系统，无需从零开始搭建
+- 📊 **多市场支持**: 同时支持股票(Tushare)和加密货币(Binance/OKX/Bybit)
+- 🔬 **回测引擎**: 事件驱动的回测系统，支持T+0和T+1两种模式
+- 🎯 **策略模板**: 内置13种策略模板，快速上手量化分析
+- 🔐 **安全可靠**: 基于JWT的认证和RBAC权限控制，保障系统安全
+- ⚡ **高性能**: 基于FastAPI构建，支持异步处理和分布式任务队列
 
 ## 功能特性
 
 ### 🚀 核心功能
 
-- **📊 数据管理**: 支持Tushare数据源，自动采集、清洗和存储股票数据
-  - 支持分表存储，提高查询性能
-  - 自动汇总分表同步日志，便于监控和管理
-  - 支持数据视图，统一查询接口
-- **🔬 回测引擎**: 事件驱动的回测系统，支持多种策略类型
-- **📈 策略管理**: 完整的策略增删改查功能，支持策略模板库
-- **📉 绩效分析**: 全面的回测绩效指标，包括夏普比率、最大回撤等
+#### 股票模块
+- **📊 数据管理**: 支持Tushare数据源,自动采集、清洗和存储股票数据
+  - 支持分表存储,提高查询性能
+  - 自动汇总分表同步日志,便于监控和管理
+  - 支持数据视图,统一查询接口
+- **🔬 回测引擎**: 事件驱动的回测系统,T+1交易机制,支持多种策略类型
+- **📈 策略管理**: 完整的策略增删改查功能,支持策略模板库
+- **📉 绩效分析**: 全面的回测绩效指标,包括夏普比率、最大回撤等
 - **👥 用户系统**: 基于JWT的认证和RBAC权限控制
 - **🔐 API密钥**: 灵活的API密钥管理机制
-- **🔔 通知系统**: 完整的用户通知功能，支持系统通知、策略通知等
-- **⏰ 定时任务**: 强大的任务调度系统，支持Cron表达式和间隔调度
-- **📋 数据日志**: 完整的数据操作日志记录，支持分表汇总
-- **⭐ 我的自选**: 用户股票自选管理功能，支持添加、查询、更新、删除自选股票，记录关注理由
-- **💼 我的持仓**: 用户股票持仓管理功能，支持记录持仓数量、成本价、买入日期等信息，自动计算市值和盈亏
+- **🔔 通知系统**: 完整的用户通知功能,支持系统通知、策略通知等
+- **⏰ 定时任务**: 强大的任务调度系统,支持Cron表达式和间隔调度
+- **📋 数据日志**: 完整的数据操作日志记录,支持分表汇总
+- **⭐ 我的自选**: 用户股票自选管理功能,支持添加、查询、更新、删除自选股票,记录关注理由
+- **💼 我的持仓**: 用户股票持仓管理功能,支持记录持仓数量、成本价、买入日期等信息,自动计算市值和盈亏
+
+#### 加密货币模块
+- **🌐 多交易所支持**: 支持Binance、OKX、Bybit三大主流交易所
+- **📊 实时行情**: 实时获取加密货币价格、交易量、涨跌幅等信息
+- **📈 K线数据**: 支持多种周期的K线数据(1m/5m/15m/30m/1h/4h/1d)
+- **🔬 加密回测**: T+0即时成交,24/7交易,可多可空,灵活杠杆
+- **💰 成本计算**: Maker/Taker费率计算,精确模拟交易成本
+- **🤖 策略库**: 内置5种加密货币策略(均线/突破/网格/RSI/趋势)
+- **🔄 数据同步**: 自动同步交易对列表和K线数据,支持增量同步
+- **📱 前端页面**: 实时行情、K线图表、数据同步、策略回测四个页面
 
 ### 🎯 策略模板
 
-系统内置8种策略模板，涵盖技术分析、基本面分析和量化策略：
+系统内置13种策略模板,涵盖技术分析、基本面分析和量化策略:
 
+#### 股票策略(8种)
 - **技术分析类**: 简单均线、双均线、布林带、RSI
 - **基本面类**: PE/PB价值策略
 - **量化策略类**: 动量策略、均值回归、网格交易
+
+#### 加密货币策略(5种)
+- **技术分析类**: 均线策略、突破策略、RSI策略
+- **量化策略类**: 网格交易策略、趋势跟踪策略
 
 ### 🛠️ 技术栈
 
@@ -214,6 +230,103 @@ docker-compose exec zquant-app python3 -m zquant.scripts.init_strategies
 - ✅ 数据持久化
 
 详细说明请参考 [Docker 部署文档](docs/docker_deployment.md)
+
+---
+
+## 加密货币模块
+
+ZQuant现已支持完整的加密货币量化功能,包含实时行情、K线图表、策略回测等。
+
+### 📋 功能概览
+
+- **🌐 多交易所**: 支持Binance、OKX、Bybit三大主流交易所
+- **📊 实时行情**: 实时获取加密货币价格、交易量、涨跌幅等信息
+- **📈 K线图表**: 支持多种周期的K线数据(1m/5m/15m/30m/1h/4h/1d)
+- **🔬 回测引擎**: T+0即时成交,24/7交易,可多可空,灵活杠杆
+- **🤖 策略库**: 内置5种加密货币策略(均线/突破/网格/RSI/趋势)
+- **🔄 数据同步**: 自动同步交易对列表和K线数据,支持增量同步
+- **📱 前端页面**: 实时行情、K线图表、数据同步、策略回测四个页面
+
+### 🚀 快速启动
+
+```bash
+# 1. 安装加密货币依赖
+pip install -r requirements_crypto.txt
+
+# 2. 快速启动(自动初始化数据库并同步基础数据)
+python zquant/scripts/quick_start_crypto.py
+
+# 3. 配置API密钥(可选)
+# 在.env文件中添加:
+# BINANCE_API_KEY=your-api-key
+# BINANCE_API_SECRET=your-api-secret
+
+# 4. 初始化调度任务
+python zquant/scripts/init_crypto_scheduler.py
+
+# 5. 启动服务
+python -m zquant.main  # 后端
+cd web && npm run dev # 前端
+
+# 6. 访问加密货币页面
+# http://localhost:8000/crypto/market  - 行情页面
+# http://localhost:8000/crypto/chart   - K线图表
+# http://localhost:8000/crypto/sync    - 数据同步
+# http://localhost:8000/crypto/backtest # 策略回测
+```
+
+### 📚 详细文档
+
+- [加密货币快速开始指南](docs/CRYPTO_QUICKSTART.md) - 5分钟快速上手
+- [最终总结文档](CRYPTO_FINAL_SUMMARY.md) - 完整功能说明
+- [使用文档](zquant/crypto/README.md) - 开发者文档
+- [API文档](http://localhost:8000/docs) - 在线API文档
+
+### 💡 使用示例
+
+```python
+# 获取实时价格
+from zquant.crypto.exchange_factory import ExchangeFactory
+binance = ExchangeFactory.create_exchange("binance")
+ticker = await binance.get_ticker("BTCUSDT")
+print(f"BTC价格: ${ticker['price']}")
+
+# 运行回测
+from zquant.backtest.crypto_engine import CryptoBacktestEngine
+from zquant.strategies.crypto_strategies import MovingAverageCryptoStrategy
+
+strategy = MovingAverageCryptoStrategy(
+    symbol="BTCUSDT",
+    interval="1d",
+    short_period=7,
+    long_period=25,
+)
+
+engine = CryptoBacktestEngine()
+result = engine.run(
+    strategy=strategy,
+    start_date="2024-01-01",
+    end_date="2024-12-31",
+    initial_capital=100000,
+)
+```
+
+### 📊 项目统计
+
+| 指标 | 数量 |
+|------|------|
+| 新增文件 | 30个 |
+| 代码行数 | ~6000行 |
+| API端点 | 6个 |
+| 调度任务 | 4个 |
+| 前端页面 | 4个 |
+| 内置策略 | 5个 |
+| 支持交易所 | 3个 |
+
+详细改造文档请查看:
+- [P0核心功能总结](CRYPTO_MIGRATION_SUMMARY.md)
+- [P1重要功能总结](CRYPTO_P1_COMPLETED.md)
+- [最终总结](CRYPTO_FINAL_SUMMARY.md)
 
 ---
 

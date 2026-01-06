@@ -360,6 +360,38 @@ export default [
     component: './table-list',
     hideInMenu: true,
   },
+  // 加密货币
+  {
+    name: 'crypto',
+    icon: 'FundOutlined',
+    path: '/crypto',
+    routes: [
+      {
+        path: '/crypto/market',
+        name: 'market',
+        icon: 'LineChartOutlined',
+        component: './CryptoMarket',
+      },
+      {
+        path: '/crypto/chart',
+        name: 'chart',
+        icon: 'AreaChartOutlined',
+        component: './CryptoChart',
+      },
+      {
+        path: '/crypto/sync',
+        name: 'sync',
+        icon: 'SyncOutlined',
+        component: './CryptoSync',
+      },
+      {
+        path: '/crypto/backtest',
+        name: 'backtest',
+        icon: 'RadarChartOutlined',
+        component: './CryptoBacktest',
+      },
+    ],
+  },
   {
     path: '/',
     redirect: '/welcome',
