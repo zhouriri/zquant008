@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from zquant.common.database import get_db
 from zquant.common.response import success_response
-from zquant.api.decorators import handle_errors, log_request
+from zquant.api.decorators import handle_data_api_error as handle_errors
 from zquant.data.crypto_sync import CryptoDataSyncService
 from zquant.models.crypto import (
     CryptoPair,
@@ -73,7 +73,6 @@ class ExchangeConfigRequest(BaseModel):
 
 @router.get("/pairs")
 @handle_errors
-@log_request
 async def get_crypto_pairs(
     quote_asset: str | None = Query(default=None, description="计价资产"),
     exchange: str | None = Query(default=None, description="交易所"),
@@ -117,7 +116,6 @@ async def get_crypto_pairs(
 
 @router.get("/klines/{symbol}")
 @handle_errors
-@log_request
 async def get_crypto_klines(
     symbol: str,
     interval: str = Query(default="1h", description="K线周期"),

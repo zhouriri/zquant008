@@ -29,6 +29,7 @@ from zquant.strategies.crypto_strategies import (
     TrendFollowCryptoStrategy,
 )
 from zquant.models.backtest import BacktestResult, BacktestTask, BacktestStatus, Strategy
+from zquant.repositories import CryptoKlineRepository
 from zquant.database import SessionLocal
 from datetime import datetime, timedelta, timezone
 
@@ -44,6 +45,10 @@ STRATEGY_MAP = {
 
 class CryptoBacktestJob:
     """加密货币回测任务"""
+
+    def __init__(self):
+        self.db = None
+        self.kline_repo = None
 
     def execute(self, args: dict[str, Any]):
         """
@@ -94,6 +99,18 @@ class CryptoBacktestJob:
 
             logger.info(f"开始执行加密货币回测: {strategy_name}")
 
+            # 使用Repository验证K线数据
+            self.db = SessionLocal()
+            self.kline_repo = CryptoKlineRepository(self.db)
+
+            # 检查K线数据是否充足
+            klines = self.kline_repo.get_by_time_range(symbol, interval, start_time, end_time)
+            if len(klines) == 0:
+                logger.warning(f"没有找到K线数据: {symbol} {interval}")
+                return {"status": "skipped", "reason": "no_kline_data"}
+
+            logger.info(f"找到{len(klines)}条K线数据")
+
             # 创建回测配置
             config = {
                 "initial_capital": initial_capital,
@@ -128,6 +145,9 @@ class CryptoBacktestJob:
         except Exception as e:
             logger.error(f"回测任务执行失败: {e}")
             raise
+        finally:
+            if self.db:
+                self.db.close()
 
     def _save_backtest_result(
         self,
@@ -149,19 +169,17 @@ class CryptoBacktestJob:
             config: 回测配置
             results: 回测结果
         """
-        db = SessionLocal()
-
         try:
             # 创建或获取策略记录
-            strategy = db.query(Strategy).filter_by(name=strategy_name).first()
+            strategy = self.db.query(Strategy).filter_by(name=strategy_name).first()
             if not strategy:
                 strategy = Strategy(name=strategy_name, description=strategy_name)
-                db.add(strategy)
-                db.flush()
+                self.db.add(strategy)
+                self.db.flush()
 
             # 更新任务状态
             if task_id:
-                task = db.query(BacktestTask).filter_by(id=task_id).first()
+                task = self.db.query(BacktestTask).filter_by(id=task_id).first()
                 if task:
                     task.status = BacktestStatus.COMPLETED
                     task.end_time = datetime.now(timezone.utc)
@@ -172,8 +190,8 @@ class CryptoBacktestJob:
                     start_time=config["start_time"],
                     end_time=config["end_time"],
                 )
-                db.add(task)
-                db.flush()
+                self.db.add(task)
+                self.db.flush()
 
             # 创建回测结果
             result = BacktestResult(
@@ -189,14 +207,12 @@ class CryptoBacktestJob:
                 max_drawdown=0.0,
                 sharpe_ratio=0.0,
             )
-            db.add(result)
+            self.db.add(result)
 
-            db.commit()
+            self.db.commit()
             logger.info("回测结果已保存")
 
         except Exception as e:
-            db.rollback()
+            self.db.rollback()
             logger.error(f"保存回测结果失败: {e}")
             raise
-        finally:
-            db.close()

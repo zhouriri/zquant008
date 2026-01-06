@@ -20,22 +20,21 @@ from typing import Any
 
 from loguru import logger
 
-from zquant.data.crypto_sync import CryptoDataSyncService
-from zquant.database import SessionLocal
-from zquant.models.crypto import CryptoPair
 from zquant.scheduler.job.base import BaseSyncJob
+from zquant.scheduler.executors.crypto_sync_executor import CryptoSyncExecutor
+from zquant.scheduler.job.sync_crypto_realtime import SyncCryptoRealtimeJob
 
 
 class SyncCryptoKlinesJob(BaseSyncJob):
     """
     加密货币K线数据同步任务
-    
+
     定期同步指定交易对的K线数据到数据库
     """
 
     def __init__(self):
         super().__init__()
-        self.sync_service = None
+        self.executor = None
 
     def execute(self, args: dict[str, Any]):
         """
@@ -52,69 +51,31 @@ class SyncCryptoKlinesJob(BaseSyncJob):
                 - passphrase: API密钥 (OKX需要)
         """
         try:
-            exchange = args.get("exchange", "binance")
-            interval = args.get("interval", "1h")
+            # 创建执行器
+            self.executor = CryptoSyncExecutor(
+                exchange=args.get("exchange", "binance"),
+                interval=args.get("interval", "1h"),
+                api_key=args.get("api_key"),
+                api_secret=args.get("api_secret"),
+                passphrase=args.get("passphrase"),
+            )
+
+            # 准备参数
             symbols = args.get("symbols")
             quote_asset = args.get("quote_asset", "USDT")
-            api_key = args.get("api_key")
-            api_secret = args.get("api_secret")
-            passphrase = args.get("passphrase")
+            days_back = args.get("days_back", 1)
 
-            if not api_key or not api_secret:
-                raise ValueError("api_key和api_secret参数是必需的")
+            # 执行同步K线任务
+            logger.info(f"开始K线同步任务: {self.executor.exchange}, {self.executor.interval}")
+            result = self.executor.execute(
+                task_type="sync_klines",
+                symbols=symbols,
+                quote_asset=quote_asset,
+                days_back=days_back,
+            )
 
-            logger.info(f"开始同步加密货币K线数据: exchange={exchange}, interval={interval}")
-
-            # 创建数据库会话
-            db = SessionLocal()
-
-            try:
-                # 创建同步服务
-                self.sync_service = CryptoDataSyncService(
-                    db_session=db,
-                    exchange_name=exchange,
-                    api_key=api_key,
-                    api_secret=api_secret,
-                    passphrase=passphrase,
-                )
-
-                # 获取要同步的交易对
-                if symbols:
-                    target_symbols = symbols
-                else:
-                    # 从数据库获取所有符合条件的交易对
-                    pairs = (
-                        db.query(CryptoPair)
-                        .filter_by(status="trading")
-                        .filter_by(quote_asset=quote_asset)
-                        .all()
-                    )
-                    target_symbols = [pair.symbol for pair in pairs]
-
-                logger.info(f"待同步交易对数量: {len(target_symbols)}")
-
-                # 同步K线数据
-                total_count = 0
-                for symbol in target_symbols:
-                    try:
-                        count = self.sync_service.sync_klines(
-                            symbol=symbol,
-                            interval=interval,
-                            days_back=1,  # 同步最近1天
-                        )
-                        total_count += count
-                        logger.info(f"同步完成: {symbol}, 新增{count}条")
-
-                    except Exception as e:
-                        logger.error(f"同步{symbol}失败: {e}")
-                        continue
-
-                logger.info(f"K线同步任务完成: 总计{total_count}条")
-
-                return {"status": "success", "total_count": total_count}
-
-            finally:
-                db.close()
+            logger.info(f"K线同步任务完成: {result}")
+            return result
 
         except Exception as e:
             logger.error(f"K线同步任务执行失败: {e}")
@@ -124,13 +85,13 @@ class SyncCryptoKlinesJob(BaseSyncJob):
 class SyncCryptoPairsJob(BaseSyncJob):
     """
     加密货币交易对列表同步任务
-    
+
     定期同步交易对列表到数据库
     """
 
     def __init__(self):
         super().__init__()
-        self.sync_service = None
+        self.executor = None
 
     def execute(self, args: dict[str, Any]):
         """
@@ -146,43 +107,28 @@ class SyncCryptoPairsJob(BaseSyncJob):
                 - passphrase: API密钥 (OKX需要)
         """
         try:
-            exchange = args.get("exchange", "binance")
+            # 创建执行器
+            self.executor = CryptoSyncExecutor(
+                exchange=args.get("exchange", "binance"),
+                api_key=args.get("api_key"),
+                api_secret=args.get("api_secret"),
+                passphrase=args.get("passphrase"),
+            )
+
+            # 准备参数
             quote_asset = args.get("quote_asset", "USDT")
             status = args.get("status", "trading")
-            api_key = args.get("api_key")
-            api_secret = args.get("api_secret")
-            passphrase = args.get("passphrase")
 
-            if not api_key or not api_secret:
-                raise ValueError("api_key和api_secret参数是必需的")
+            # 执行同步交易对任务
+            logger.info(f"开始交易对同步任务: {self.executor.exchange}")
+            result = self.executor.execute(
+                task_type="sync_pairs",
+                quote_asset=quote_asset,
+                status=status,
+            )
 
-            logger.info(f"开始同步加密货币交易对: exchange={exchange}")
-
-            # 创建数据库会话
-            db = SessionLocal()
-
-            try:
-                # 创建同步服务
-                sync_service = CryptoDataSyncService(
-                    db_session=db,
-                    exchange_name=exchange,
-                    api_key=api_key,
-                    api_secret=api_secret,
-                    passphrase=passphrase,
-                )
-
-                # 同步交易对
-                count = sync_service.sync_pairs(
-                    quote_asset=quote_asset,
-                    status=status,
-                )
-
-                logger.info(f"交易对同步任务完成: {count}个")
-
-                return {"status": "success", "count": count}
-
-            finally:
-                db.close()
+            logger.info(f"交易对同步任务完成: {result}")
+            return result
 
         except Exception as e:
             logger.error(f"交易对同步任务执行失败: {e}")
