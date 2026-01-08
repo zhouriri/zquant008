@@ -197,7 +197,7 @@ export default defineConfig({
    * @description 使用 mako 极速研发
    * @doc https://umijs.org/docs/api/config#mako
    */
-  mako: {},
+  mako: false,
   esbuildMinifyIIFE: true,
   requestRecord: {},
   exportStatic: {},
@@ -205,22 +205,24 @@ export default defineConfig({
   ...(process.env.NODE_ENV === 'production' && {
     chainWebpack(config: any) {
       // 配置 Terser 进行代码混淆
-      config.optimization.minimizer('terser').tap((args: any[]) => {
-        args[0].terserOptions = {
-          ...args[0].terserOptions,
-          compress: {
-            drop_console: true, // 移除 console 语句
-            drop_debugger: true, // 移除 debugger 语句
-            pure_funcs: ['console.log', 'console.info', 'console.debug'], // 移除指定的函数调用
-          },
-          mangle: {
-            properties: {
-              regex: /^_/, // 混淆以下划线开头的属性
+      if (config.optimization.minimizers.has('terser')) {
+        config.optimization.minimizer('terser').tap((args: any[]) => {
+          args[0].terserOptions = {
+            ...args[0].terserOptions,
+            compress: {
+              drop_console: true, // 移除 console 语句
+              drop_debugger: true, // 移除 debugger 语句
+              pure_funcs: ['console.log', 'console.info', 'console.debug'], // 移除指定的函数调用
             },
-          },
-        };
-        return args;
-      });
+            mangle: {
+              properties: {
+                regex: /^_/, // 混淆以下划线开头的属性
+              },
+            },
+          };
+          return args;
+        });
+      }
     },
   }),
 });

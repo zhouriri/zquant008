@@ -57,3 +57,14 @@ ruff>=0.1.0
 black>=23.0.0
 isort>=5.12.0
 pre-commit>=3.5.0
+h11>=0.14.0
+billiard>=4.1.0
+click-didyoumean>=0.3.0
+click-plugins>=1.1.1
+click-repl>=0.2.0
+mypy-extensions>=0.4.3
+packaging>=22.0
+pathspec>=0.9.0
+platformdirs>=2
+pytokens>=0.3.0
+

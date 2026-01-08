@@ -59,8 +59,8 @@ COPY --chown=zquant:zquant zquant/ ./zquant/
 # 复制后端依赖文件
 COPY zquant/requirements.txt ./
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 安装 Python 依赖（禁用哈希验证）
+RUN pip install --no-cache-dir --disable-pip-version-check --no-cache-dir -r requirements.txt || pip install --no-cache-dir -r requirements.txt
 
 # 复制前端构建产物
 COPY --from=frontend-builder --chown=zquant:zquant /app/web/dist ./web/dist

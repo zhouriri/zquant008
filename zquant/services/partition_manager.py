@@ -20,9 +20,8 @@
 #     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 #     - Repository: https://github.com/yoyoung/zquant
 
-"""
 from typing import List, Optional
-
+"""
 分表管理服务
 
 提供分表的自动管理功能，包括：

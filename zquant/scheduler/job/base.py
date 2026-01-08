@@ -20,9 +20,8 @@
 #     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 #     - Repository: https://github.com/yoyoung/zquant
 
-"""
 from typing import Optional
-
+"""
 调度脚本基类
 
 提供统一的参数解析、日期验证、错误处理等公共逻辑。

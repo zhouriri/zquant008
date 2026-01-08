@@ -13,10 +13,10 @@
 # limitations under the License.
 
 """
-from typing import Optional
-
 交易所工厂类
 """
+
+from typing import Optional
 
 from zquant.crypto.binance import BinanceExchange, BinanceFuturesExchange
 from zquant.crypto.bybit import BybitExchange, BybitFuturesExchange

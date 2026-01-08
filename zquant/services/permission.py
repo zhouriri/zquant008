@@ -20,9 +20,8 @@
 #     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 #     - Repository: https://github.com/yoyoung/zquant
 
-"""
 from typing import Optional
-
+"""
 权限服务
 """
 

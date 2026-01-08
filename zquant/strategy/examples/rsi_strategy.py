@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
 from typing import List
-
+"""
 RSI策略示例
 策略逻辑：当RSI低于超卖线时买入，高于超买线时卖出
 """

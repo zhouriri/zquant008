@@ -84,33 +84,35 @@ async def get_crypto_pairs(
     """
     获取加密货币交易对列表
     """
-    repo = CryptoPairRepository(db)
-    
-    # 根据条件获取交易对
-    if exchange:
-        pairs = repo.get_by_exchange(exchange, limit=limit)
-    else:
-        pairs = repo.get_all(skip=0, limit=limit)
-    
-    # 过滤状态
-    if status:
-        pairs = [p for p in pairs if p.status == status]
-    
-    # 过滤计价资产
-    if quote_asset:
-        pairs = [p for p in pairs if p.quote_asset == quote_asset]
-    
-    return success_response(
-        data=[{
-            "symbol": pair.symbol,
-            "base_asset": pair.base_asset,
-            "quote_asset": pair.quote_asset,
-            "exchange": pair.exchange,
-            "status": pair.status,
-            "created_at": pair.created_at.isoformat() if pair.created_at else None,
-        } for pair in pairs],
-        message="获取交易对列表成功",
-    )
+    try:
+        repo = CryptoPairRepository(db)
+        
+        # 根据条件获取交易对
+        if exchange:
+            pairs = repo.get_by_exchange(exchange, limit=limit)
+        else:
+            pairs = repo.get_all(skip=0, limit=limit)
+        
+        # 过滤状态
+        if status:
+            pairs = [p for p in pairs if p.status == status]
+        
+        # 过滤计价资产
+        if quote_asset:
+            pairs = [p for p in pairs if p.quote_asset == quote_asset]
+        
+        return success_response(
+            data=[{
+                "symbol": pair.symbol,
+                "base_asset": pair.base_asset,
+                "quote_asset": pair.quote_asset,
+                "exchange": pair.exchange,
+                "status": pair.status,
+                "created_at": pair.created_at.isoformat() if pair.created_at else None,
+            } for pair in pairs],
+            message="获取交易对列表成功",
+        )
+    except Exception as e:
         logger.error(f"获取交易对列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -128,18 +130,20 @@ async def get_crypto_klines(
     """
     获取加密货币K线数据
     """
-    repo = CryptoKlineRepository(db)
-    
-    # 获取K线数据
-    if start_time and end_time:
-        klines = repo.get_by_time_range(symbol, interval, start_time, end_time)
-    else:
-        klines = repo.get_latest(symbol, interval, limit)
-    
-    return success_response(
-        data=klines,
-        message=f"获取K线数据成功: {symbol}, {len(klines)}条",
-    )
+    try:
+        repo = CryptoKlineRepository(db)
+        
+        # 获取K线数据
+        if start_time and end_time:
+            klines = repo.get_by_time_range(symbol, interval, start_time, end_time)
+        else:
+            klines = repo.get_latest(symbol, interval, limit)
+        
+        return success_response(
+            data=klines,
+            message=f"获取K线数据成功: {symbol}, {len(klines)}条",
+        )
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

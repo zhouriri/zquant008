@@ -20,9 +20,8 @@
 #     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 #     - Repository: https://github.com/yoyoung/zquant
 
-"""
 from typing import List
-
+"""
 K线数据同步脚本
 
 用于同步股票K线数据，可以通过定时任务命令执行方式调用。

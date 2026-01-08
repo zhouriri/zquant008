@@ -20,9 +20,8 @@
 #     - Documentation: https://github.com/yoyoung/zquant/blob/main/README.md
 #     - Repository: https://github.com/yoyoung/zquant
 
-"""
 from typing import Optional
-
+"""
 请求日志中间件
 记录所有API请求的详细信息，包括请求ID追踪
 """

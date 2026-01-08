@@ -1,6 +1,5 @@
-"""
 from typing import Optional
-
+"""
 API访问测试脚本
 测试使用localhost和127.0.0.1访问API是否正常
 """
