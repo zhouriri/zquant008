@@ -24,7 +24,7 @@
 因子计算器工厂
 """
 
-from typing import Any
+from typing import Any, Dict, Optional
 
 from loguru import logger
 
@@ -53,7 +53,7 @@ def register_calculator(model_code: str, calculator_class: type[BaseFactorCalcul
     logger.info(f"注册因子计算器: {model_code} -> {calculator_class.__name__}")
 
 
-def create_calculator(model_code: str, config: dict[str, Any] | None = None) -> BaseFactorCalculator:
+def create_calculator(model_code: str, config: Optional[Dict[str, Any]] = None) -> BaseFactorCalculator:
     """
     创建因子计算器实例
 

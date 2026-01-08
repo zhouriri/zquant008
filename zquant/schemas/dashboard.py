@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 系统大盘相关Pydantic模型
 """
 
@@ -51,17 +53,17 @@ class TaskStatsResponse(BaseModel):
 class LatestOperationLogItem(BaseModel):
     """最新操作日志项"""
 
-    id: int | None = Field(None, description="日志ID")
-    table_name: str | None = Field(None, description="数据表名")
-    operation_type: str | None = Field(None, description="操作类型")
-    operation_result: str | None = Field(None, description="操作结果")
+    id: Optional[int] = Field(None, description="日志ID")
+    table_name: Optional[str] = Field(None, description="数据表名")
+    operation_type: Optional[str] = Field(None, description="操作类型")
+    operation_result: Optional[str] = Field(None, description="操作结果")
     insert_count: int = Field(0, description="插入记录数")
     update_count: int = Field(0, description="更新记录数")
     delete_count: int = Field(0, description="删除记录数")
     start_time: datetime | str | None = Field(None, description="开始时间（ISO格式）")
     end_time: datetime | str | None = Field(None, description="结束时间（ISO格式）")
-    duration_seconds: float | None = Field(None, description="耗时(秒)")
-    created_by: str | None = Field(None, description="创建人")
+    duration_seconds: Optional[float] = Field(None, description="耗时(秒)")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
 
 
@@ -76,7 +78,7 @@ class LatestTableStatisticsItem(BaseModel):
     daily_records: int = Field(0, description="日记录数")
     daily_insert_count: int = Field(0, description="日新增记录数")
     daily_update_count: int = Field(0, description="日更新记录数")
-    created_by: str | None = Field(None, description="创建人")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime | str | None = Field(None, description="创建时间（ISO格式）")
     updated_time: datetime | str | None = Field(None, description="更新时间（ISO格式）")
 
@@ -84,10 +86,10 @@ class LatestTableStatisticsItem(BaseModel):
 class LatestDataResponse(BaseModel):
     """本地数据最新信息响应"""
 
-    latest_operation_logs: list[LatestOperationLogItem] = Field(
+    latest_operation_logs: List[LatestOperationLogItem] = Field(
         ..., description="数据操作日志表中，按table_name分组，每个表的最新记录列表"
     )
-    latest_table_statistics: list[LatestTableStatisticsItem] = Field(
+    latest_table_statistics: List[LatestTableStatisticsItem] = Field(
         ..., description="数据表统计表中，按table_name分组，每个表的最新记录列表"
     )
 

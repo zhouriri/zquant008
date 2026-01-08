@@ -24,7 +24,7 @@
 通用Pydantic模型
 """
 
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar, List
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ class Pagination(BaseModel, Generic[T]):
     通用分页响应模型
     """
 
-    items: list[T] = Field(..., description="数据列表")
+    items: List[T] = Field(..., description="数据列表")
     total: int = Field(..., description="总记录数")
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
@@ -48,5 +48,5 @@ class QueryRequest(BaseModel):
     """
     skip: int = Field(0, ge=0, description="跳过记录数")
     limit: int = Field(100, ge=1, le=1000, description="每页记录数")
-    order_by: str | None = Field(None, description="排序字段")
+    order_by: Optional[str] = Field(None, description="排序字段")
     order: str = Field("desc", description="排序方向：asc 或 desc")

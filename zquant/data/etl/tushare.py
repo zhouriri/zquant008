@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 Tushare数据源接口封装
 """
 
@@ -39,7 +41,7 @@ from zquant.utils.encryption import EncryptionError
 class TushareClient:
     """Tushare客户端"""
 
-    def __init__(self, token: str | None = None, db: Session | None = None):
+    def __init__(self, token: Optional[str] = None, db: Optional[Session] = None):
         """
         初始化Tushare客户端
 
@@ -82,7 +84,7 @@ class TushareClient:
         params: dict,
         start_time: float,
         df: pd.DataFrame | None = None,
-        error: Exception | None = None,
+        error: Optional[Exception] = None,
     ):
         """
         统一的 API 调用日志记录

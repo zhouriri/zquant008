@@ -18,7 +18,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional, List
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ import pandas as pd
 class ExchangeBase(ABC):
     """交易所数据源基类"""
 
-    def __init__(self, api_key: str, api_secret: str, passphrase: str | None = None):
+    def __init__(self, api_key: str, api_secret: str, passphrase: Optional[str] = None):
         """
         初始化交易所客户端
 
@@ -85,8 +85,8 @@ class ExchangeBase(ABC):
         self,
         symbol: str,
         interval: str,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
         limit: int = 1000,
     ) -> pd.DataFrame:
         """
@@ -194,7 +194,7 @@ class ExchangeBase(ABC):
             return pd.concat(all_data, ignore_index=True)
         return pd.DataFrame()
 
-    def standardize_kline_data(self, raw_data: list[dict[str, Any]], interval: str) -> pd.DataFrame:
+    def standardize_kline_data(self, raw_data: List[dict[str, Any]], interval: str) -> pd.DataFrame:
         """
         标准化K线数据为统一格式
 

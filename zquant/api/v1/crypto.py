@@ -17,7 +17,7 @@
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
@@ -49,8 +49,8 @@ class SyncKlinesRequest(BaseModel):
     symbol: str = Field(..., description="交易对符号(如BTCUSDT)")
     interval: str = Field(default="1h", description="K线周期")
     days_back: int = Field(default=7, description="回溯天数")
-    start_time: datetime | None = Field(default=None, description="开始时间")
-    end_time: datetime | None = Field(default=None, description="结束时间")
+    start_time: Optional[datetime] = Field(default=None, description="开始时间")
+    end_time: Optional[datetime] = Field(default=None, description="结束时间")
 
 
 class SyncPairsRequest(BaseModel):
@@ -66,7 +66,7 @@ class ExchangeConfigRequest(BaseModel):
     exchange: str = Field(..., description="交易所名称")
     api_key: str = Field(..., description="API Key")
     api_secret: str = Field(..., description="API Secret")
-    passphrase: str | None = Field(default=None, description="Passphrase(OKX需要)")
+    passphrase: Optional[str] = Field(default=None, description="Passphrase(OKX需要)")
 
 
 # ============== API Endpoints ==============
@@ -75,8 +75,8 @@ class ExchangeConfigRequest(BaseModel):
 @router.get("/pairs")
 @handle_errors
 async def get_crypto_pairs(
-    quote_asset: str | None = Query(default=None, description="计价资产"),
-    exchange: str | None = Query(default=None, description="交易所"),
+    quote_asset: Optional[str] = Query(default=None, description="计价资产"),
+    exchange: Optional[str] = Query(default=None, description="交易所"),
     status: str = Query(default="trading", description="交易状态"),
     limit: int = Query(default=100, description="返回数量"),
     db: Session = Depends(get_db),
@@ -121,8 +121,8 @@ async def get_crypto_klines(
     symbol: str,
     interval: str = Query(default="1h", description="K线周期"),
     limit: int = Query(default=100, ge=1, le=1000, description="返回数量"),
-    start_time: datetime | None = Query(default=None, description="开始时间"),
-    end_time: datetime | None = Query(default=None, description="结束时间"),
+    start_time: Optional[datetime] = Query(default=None, description="开始时间"),
+    end_time: Optional[datetime] = Query(default=None, description="结束时间"),
     db: Session = Depends(get_db),
 ):
     """

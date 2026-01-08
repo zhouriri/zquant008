@@ -24,6 +24,7 @@
 API依赖注入
 """
 
+from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
@@ -76,8 +77,8 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
 
 
 def get_api_key_user(
-    x_api_key: str | None = Header(None, alias="X-API-Key"),
-    x_api_secret: str | None = Header(None, alias="X-API-Secret"),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    x_api_secret: Optional[str] = Header(None, alias="X-API-Secret"),
     db: Session = Depends(get_db),
 ) -> User:
     """通过API密钥获取用户"""

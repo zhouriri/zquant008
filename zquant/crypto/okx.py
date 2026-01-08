@@ -17,7 +17,7 @@ OKX交易所数据源
 """
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -27,7 +27,7 @@ from zquant.crypto.exchange_base import ExchangeBase
 class OKXExchange(ExchangeBase):
     """OKX交易所"""
 
-    def __init__(self, api_key: str, api_secret: str, passphrase: str | None = None):
+    def __init__(self, api_key: str, api_secret: str, passphrase: Optional[str] = None):
         super().__init__(api_key, api_secret, passphrase)
         # TODO: 初始化OKX Python SDK
         # import ccxt
@@ -83,8 +83,8 @@ class OKXExchange(ExchangeBase):
         self,
         symbol: str,
         interval: str,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
         limit: int = 1000,
     ) -> pd.DataFrame:
         """获取K线数据"""
@@ -127,7 +127,7 @@ class OKXExchange(ExchangeBase):
 class OKXFuturesExchange(OKXExchange):
     """OKX合约交易所"""
 
-    def __init__(self, api_key: str, api_secret: str, passphrase: str | None = None):
+    def __init__(self, api_key: str, api_secret: str, passphrase: Optional[str] = None):
         super().__init__(api_key, api_secret, passphrase)
         # TODO: 初始化OKX合约SDK
 

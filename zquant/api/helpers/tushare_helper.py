@@ -116,7 +116,7 @@ class TushareAPIHelper:
     def build_error_response(
         response_class: type,
         error_message: str,
-        request_params: dict | None = None,
+        request_params: Optional[dict] = None,
         **kwargs
     ) -> Any:
         """

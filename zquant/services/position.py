@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 我的持仓服务层
 """
 
@@ -65,7 +67,7 @@ class PositionService:
                 position.profit_pct = None
 
     @staticmethod
-    def create_position(db: Session, user_id: int, position_data: PositionCreate, created_by: str | None = None) -> StockPosition:
+    def create_position(db: Session, user_id: int, position_data: PositionCreate, created_by: Optional[str] = None) -> StockPosition:
         """
         创建持仓
 
@@ -119,9 +121,9 @@ class PositionService:
     def get_positions(
         db: Session,
         user_id: int,
-        code: str | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        code: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         skip: int = 0,
         limit: int = 100,
         order_by: str = "created_time",
@@ -196,7 +198,7 @@ class PositionService:
 
     @staticmethod
     def update_position(
-        db: Session, position_id: int, user_id: int, position_data: PositionUpdate, updated_by: str | None = None
+        db: Session, position_id: int, user_id: int, position_data: PositionUpdate, updated_by: Optional[str] = None
     ) -> StockPosition:
         """
         更新持仓

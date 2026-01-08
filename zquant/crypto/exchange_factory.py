@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """
+from typing import Optional
+
 交易所工厂类
 """
 
@@ -42,7 +44,7 @@ class ExchangeFactory:
         exchange_name: str,
         api_key: str,
         api_secret: str,
-        passphrase: str | None = None,
+        passphrase: Optional[str] = None,
     ) -> ExchangeBase:
         """
         创建交易所客户端

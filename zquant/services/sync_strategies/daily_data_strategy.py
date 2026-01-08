@@ -24,7 +24,7 @@
 日线数据同步策略
 """
 
-from typing import Any
+from typing import Any, Optional
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -41,7 +41,7 @@ class DailyDataSyncStrategy(DataSyncStrategy):
         self.data_scheduler = DataScheduler()
 
     def sync(
-        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+        self, db: Session, config: dict[str, Any], extra_info: Optional[dict] = None, execution: Optional[TaskExecution] = None
     ) -> dict[str, Any]:
         """
         同步单只股票的日线数据
@@ -75,7 +75,7 @@ class AllDailyDataSyncStrategy(DataSyncStrategy):
         self.data_scheduler = DataScheduler()
 
     def sync(
-        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+        self, db: Session, config: dict[str, Any], extra_info: Optional[dict] = None, execution: Optional[TaskExecution] = None
     ) -> dict[str, Any]:
         """
         同步所有股票的日线数据

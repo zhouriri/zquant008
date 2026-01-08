@@ -25,7 +25,7 @@ Redis客户端
 """
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 import redis
@@ -68,7 +68,7 @@ class RedisClient:
         self,
         key: str,
         value: Any,
-        ex: int | None = None,  # 过期时间（秒）
+        ex: Optional[int] = None,  # 过期时间（秒）
     ) -> bool:
         """设置值"""
         if not self.client:
@@ -103,7 +103,7 @@ class RedisClient:
 
 
 # 全局Redis客户端实例（延迟初始化）
-_redis_client_instance: RedisClient | None = None
+_redis_client_instance: Optional[RedisClient] = None
 
 
 def get_redis_client() -> RedisClient:
@@ -149,7 +149,7 @@ class RedisCacheAdapter:
         """获取缓存值"""
         return self._redis.get(key)
 
-    def set(self, key: str, value: Any, ex: int | None = None) -> bool:
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
         """设置缓存值"""
         return self._redis.set(key, value, ex=ex)
 

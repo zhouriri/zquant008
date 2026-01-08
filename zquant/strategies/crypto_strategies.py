@@ -16,7 +16,7 @@
 加密货币策略示例
 """
 
-from typing import Any
+from typing import Any, List
 
 import pandas as pd
 import numpy as np
@@ -262,7 +262,7 @@ class RSICryptoStrategy(BaseStrategy):
             context.order(self.symbol, -position.quantity)
             print(f"[{context.current_time}] RSI超买卖出 {self.symbol}: {current_price}, RSI={rsi:.2f}")
     
-    def _calculate_rsi(self, prices: list[float]) -> float:
+    def _calculate_rsi(self, prices: List[float]) -> float:
         """
         计算RSI指标
         
@@ -350,7 +350,7 @@ class TrendFollowCryptoStrategy(BaseStrategy):
             context.order(self.symbol, -position.quantity)
             print(f"[{context.current_time}] 趋势向下卖出 {self.symbol}: {current_price}")
     
-    def _calculate_ema(self, prices: list[float], period: int) -> float:
+    def _calculate_ema(self, prices: List[float], period: int) -> float:
         """
         计算EMA(指数移动平均)
         

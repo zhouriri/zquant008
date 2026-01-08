@@ -25,7 +25,7 @@
 """
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
@@ -60,9 +60,9 @@ class UserUpdate(BaseModel):
     """更新用户模型"""
 
     user_id: int = Field(..., description="用户ID")
-    email: EmailStr | None = Field(None, description="邮箱地址")
-    is_active: bool | None = Field(None, description="是否激活")
-    role_id: int | None = Field(None, description="角色ID")
+    email: Optional[EmailStr] = Field(None, description="邮箱地址")
+    is_active: Optional[bool] = Field(None, description="是否激活")
+    role_id: Optional[int] = Field(None, description="角色ID")
 
 
 class UserGetRequest(BaseModel):
@@ -98,9 +98,9 @@ class UserInDB(UserBase):
     id: int = Field(..., description="用户ID")
     role_id: int = Field(..., description="角色ID")
     is_active: bool = Field(..., description="是否激活")
-    created_by: str | None = Field(None, description="创建人")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
+    updated_by: Optional[str] = Field(None, description="修改人")
     updated_time: datetime = Field(..., description="更新时间")
 
     class Config:
@@ -113,10 +113,10 @@ class UserResponse(UserBase):
     id: int = Field(..., description="用户ID")
     role_id: int = Field(..., description="角色ID")
     is_active: bool = Field(..., description="是否激活")
-    created_by: str | None = Field(None, description="创建人")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
-    updated_time: datetime | None = Field(None, description="更新时间")
+    updated_by: Optional[str] = Field(None, description="修改人")
+    updated_time: Optional[datetime] = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -126,7 +126,7 @@ class RoleBase(BaseModel):
     """角色基础模型"""
 
     name: str = Field(..., description="角色名称")
-    description: str | None = Field(None, description="角色描述")
+    description: Optional[str] = Field(None, description="角色描述")
 
 
 class RoleCreate(RoleBase):
@@ -137,8 +137,8 @@ class RoleUpdate(BaseModel):
     """更新角色模型"""
 
     role_id: int = Field(..., description="角色ID")
-    name: str | None = Field(None, description="角色名称")
-    description: str | None = Field(None, description="角色描述")
+    name: Optional[str] = Field(None, description="角色名称")
+    description: Optional[str] = Field(None, description="角色描述")
 
 
 class RoleGetRequest(BaseModel):
@@ -160,7 +160,7 @@ class AssignPermissionsRequest(BaseModel):
     """分配权限请求模型"""
 
     role_id: int = Field(..., description="角色ID")
-    permission_ids: list[int] = Field(..., description="权限ID列表")
+    permission_ids: List[int] = Field(..., description="权限ID列表")
 
 
 class RolePermissionAddRequest(BaseModel):
@@ -179,10 +179,10 @@ class RoleResponse(RoleBase):
     """角色响应模型"""
 
     id: int = Field(..., description="角色ID")
-    created_by: str | None = Field(None, description="创建人")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
-    updated_time: datetime | None = Field(None, description="更新时间")
+    updated_by: Optional[str] = Field(None, description="修改人")
+    updated_time: Optional[datetime] = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -194,7 +194,7 @@ class PermissionBase(BaseModel):
     name: str = Field(..., description="权限名称")
     resource: str = Field(..., description="资源类型，如：user, data, backtest")
     action: str = Field(..., description="操作类型，如：create, read, update, delete")
-    description: str | None = Field(None, description="权限描述")
+    description: Optional[str] = Field(None, description="权限描述")
 
 
 class PermissionCreate(PermissionBase):
@@ -205,10 +205,10 @@ class PermissionUpdate(BaseModel):
     """更新权限模型"""
 
     id: int = Field(..., description="权限ID")
-    name: str | None = Field(None, description="权限名称")
-    resource: str | None = Field(None, description="资源类型")
-    action: str | None = Field(None, description="操作类型")
-    description: str | None = Field(None, description="权限描述")
+    name: Optional[str] = Field(None, description="权限名称")
+    resource: Optional[str] = Field(None, description="资源类型")
+    action: Optional[str] = Field(None, description="操作类型")
+    description: Optional[str] = Field(None, description="权限描述")
 
 
 class PermissionGetRequest(BaseModel):
@@ -225,10 +225,10 @@ class PermissionResponse(PermissionBase):
     """权限响应模型"""
 
     id: int = Field(..., description="权限ID")
-    created_by: str | None = Field(None, description="创建人")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
-    updated_time: datetime | None = Field(None, description="更新时间")
+    updated_by: Optional[str] = Field(None, description="修改人")
+    updated_time: Optional[datetime] = Field(None, description="更新时间")
 
     class Config:
         from_attributes = True
@@ -245,8 +245,8 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """Token数据模型"""
 
-    user_id: int | None = Field(None, description="用户ID")
-    username: str | None = Field(None, description="用户名")
+    user_id: Optional[int] = Field(None, description="用户ID")
+    username: Optional[str] = Field(None, description="用户名")
 
 
 class LoginRequest(BaseModel):
@@ -259,7 +259,7 @@ class LoginRequest(BaseModel):
 class APIKeyCreate(BaseModel):
     """创建API密钥请求模型"""
 
-    name: str | None = Field(None, max_length=100, description="密钥名称/描述")
+    name: Optional[str] = Field(None, max_length=100, description="密钥名称/描述")
 
 
 class APIKeyDeleteRequest(BaseModel):
@@ -272,11 +272,11 @@ class APIKeyResponse(BaseModel):
 
     id: int = Field(..., description="API密钥ID")
     access_key: str = Field(..., description="访问密钥")
-    name: str | None = Field(None, description="密钥名称/描述")
+    name: Optional[str] = Field(None, description="密钥名称/描述")
     is_active: bool = Field(..., description="是否激活")
-    last_used_at: datetime | None = Field(None, description="最后使用时间")
+    last_used_at: Optional[datetime] = Field(None, description="最后使用时间")
     created_time: datetime = Field(..., description="创建时间")
-    expires_at: datetime | None = Field(None, description="过期时间，None表示永不过期")
+    expires_at: Optional[datetime] = Field(None, description="过期时间，None表示永不过期")
 
     class Config:
         from_attributes = True
@@ -288,37 +288,37 @@ class APIKeyCreateResponse(BaseModel):
     id: int = Field(..., description="API密钥ID")
     access_key: str = Field(..., description="访问密钥")
     secret_key: str = Field(..., description="密钥（仅返回一次，请妥善保管）")
-    name: str | None = Field(None, description="密钥名称/描述")
+    name: Optional[str] = Field(None, description="密钥名称/描述")
     created_time: datetime = Field(..., description="创建时间")
-    expires_at: datetime | None = Field(None, description="过期时间，None表示永不过期")
+    expires_at: Optional[datetime] = Field(None, description="过期时间，None表示永不过期")
     message: str = Field("请妥善保管secret_key，系统不会再次显示", description="提示消息")
 
 
 class UserListRequest(QueryRequest):
     """用户列表查询请求模型"""
-    is_active: bool | None = Field(None, description="是否激活")
-    role_id: int | None = Field(None, description="角色ID")
-    username: str | None = Field(None, description="用户名（模糊搜索）")
-    order_by: str | None = Field(
+    is_active: Optional[bool] = Field(None, description="是否激活")
+    role_id: Optional[int] = Field(None, description="角色ID")
+    username: Optional[str] = Field(None, description="用户名（模糊搜索）")
+    order_by: Optional[str] = Field(
         None, description="排序字段：id, username, email, is_active, created_time, updated_time"
     )
 
 
 class RoleListRequest(QueryRequest):
     """角色列表查询请求模型"""
-    order_by: str | None = Field(None, description="排序字段：id, name, description, created_time")
+    order_by: Optional[str] = Field(None, description="排序字段：id, name, description, created_time")
 
 
 class PermissionListRequest(QueryRequest):
     """权限列表查询请求模型"""
-    resource: str | None = Field(None, description="资源类型筛选")
-    order_by: str | None = Field(None, description="排序字段：id, name, resource, action, created_time")
+    resource: Optional[str] = Field(None, description="资源类型筛选")
+    order_by: Optional[str] = Field(None, description="排序字段：id, name, resource, action, created_time")
 
 
 class PageResponse(BaseModel):
     """分页响应模型"""
 
-    items: list[Any] = Field(..., description="数据列表")
+    items: List[Any] = Field(..., description="数据列表")
     total: int = Field(..., description="总记录数")
     skip: int = Field(..., description="跳过记录数")
     limit: int = Field(..., description="限制返回记录数")
@@ -330,7 +330,7 @@ class PageResponse(BaseModel):
 class RoleWithPermissions(RoleResponse):
     """角色响应模型（包含权限列表）"""
 
-    permissions: list[PermissionResponse] = Field(default_factory=list, description="权限列表")
+    permissions: List[PermissionResponse] = Field(default_factory=list, description="权限列表")
 
     class Config:
         from_attributes = True
@@ -343,16 +343,16 @@ class FavoriteCreate(BaseModel):
     """创建自选请求模型"""
 
     code: str = Field(..., min_length=6, max_length=6, description="股票代码（6位数字），如：000001")
-    comment: str | None = Field(None, max_length=2000, description="关注理由")
-    fav_datettime: datetime | None = Field(None, description="自选日期")
+    comment: Optional[str] = Field(None, max_length=2000, description="关注理由")
+    fav_datettime: Optional[datetime] = Field(None, description="自选日期")
 
 
 class FavoriteUpdate(BaseModel):
     """更新自选请求模型"""
 
     favorite_id: int = Field(..., description="自选ID")
-    comment: str | None = Field(None, max_length=2000, description="关注理由")
-    fav_datettime: datetime | None = Field(None, description="自选日期")
+    comment: Optional[str] = Field(None, max_length=2000, description="关注理由")
+    fav_datettime: Optional[datetime] = Field(None, description="自选日期")
 
 
 class FavoriteGetRequest(BaseModel):
@@ -371,15 +371,15 @@ class FavoriteResponse(BaseModel):
     id: int = Field(..., description="自选ID")
     user_id: int = Field(..., description="用户ID")
     code: str = Field(..., description="股票代码（6位数字）")
-    comment: str | None = Field(None, description="关注理由")
-    fav_datettime: datetime | None = Field(None, description="自选日期")
-    created_by: str | None = Field(None, description="创建人")
+    comment: Optional[str] = Field(None, description="关注理由")
+    fav_datettime: Optional[datetime] = Field(None, description="自选日期")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
+    updated_by: Optional[str] = Field(None, description="修改人")
     updated_time: datetime = Field(..., description="更新时间")
     # 关联股票信息（可选）
-    stock_name: str | None = Field(None, description="股票名称")
-    stock_ts_code: str | None = Field(None, description="TS代码")
+    stock_name: Optional[str] = Field(None, description="股票名称")
+    stock_ts_code: Optional[str] = Field(None, description="TS代码")
 
     class Config:
         from_attributes = True
@@ -388,19 +388,19 @@ class FavoriteResponse(BaseModel):
 class FavoriteListRequest(BaseModel):
     """查询自选列表请求模型"""
 
-    code: str | None = Field(None, description="股票代码（精确查询）")
-    start_date: date | None = Field(None, description="开始日期（自选日期范围）")
-    end_date: date | None = Field(None, description="结束日期（自选日期范围）")
+    code: Optional[str] = Field(None, description="股票代码（精确查询）")
+    start_date: Optional[date] = Field(None, description="开始日期（自选日期范围）")
+    end_date: Optional[date] = Field(None, description="结束日期（自选日期范围）")
     skip: int = Field(0, ge=0, description="跳过记录数")
     limit: int = Field(100, ge=1, le=1000, description="每页记录数")
-    order_by: str | None = Field("created_time", description="排序字段：id, code, fav_datettime, created_time")
-    order: str | None = Field("desc", description="排序方向：asc 或 desc")
+    order_by: Optional[str] = Field("created_time", description="排序字段：id, code, fav_datettime, created_time")
+    order: Optional[str] = Field("desc", description="排序方向：asc 或 desc")
 
 
 class FavoriteListResponse(BaseModel):
     """自选列表响应模型"""
 
-    items: list[FavoriteResponse] = Field(..., description="自选列表")
+    items: List[FavoriteResponse] = Field(..., description="自选列表")
     total: int = Field(..., description="总记录数")
     skip: int = Field(..., description="跳过记录数")
     limit: int = Field(..., description="限制返回记录数")
@@ -415,20 +415,20 @@ class PositionCreate(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, description="股票代码（6位数字），如：000001")
     quantity: float = Field(..., gt=0, description="持仓数量（股数），必须大于0")
     avg_cost: float = Field(..., gt=0, description="平均成本价（元），必须大于0")
-    buy_date: date | None = Field(None, description="买入日期")
-    current_price: float | None = Field(None, gt=0, description="当前价格（元），可选，可从行情数据获取")
-    comment: str | None = Field(None, max_length=2000, description="备注")
+    buy_date: Optional[date] = Field(None, description="买入日期")
+    current_price: Optional[float] = Field(None, gt=0, description="当前价格（元），可选，可从行情数据获取")
+    comment: Optional[str] = Field(None, max_length=2000, description="备注")
 
 
 class PositionUpdate(BaseModel):
     """更新持仓请求模型"""
 
     position_id: int = Field(..., description="持仓ID")
-    quantity: float | None = Field(None, gt=0, description="持仓数量（股数），必须大于0")
-    avg_cost: float | None = Field(None, gt=0, description="平均成本价（元），必须大于0")
-    buy_date: date | None = Field(None, description="买入日期")
-    current_price: float | None = Field(None, gt=0, description="当前价格（元），可选")
-    comment: str | None = Field(None, max_length=2000, description="备注")
+    quantity: Optional[float] = Field(None, gt=0, description="持仓数量（股数），必须大于0")
+    avg_cost: Optional[float] = Field(None, gt=0, description="平均成本价（元），必须大于0")
+    buy_date: Optional[date] = Field(None, description="买入日期")
+    current_price: Optional[float] = Field(None, gt=0, description="当前价格（元），可选")
+    comment: Optional[str] = Field(None, max_length=2000, description="备注")
 
 
 class PositionGetRequest(BaseModel):
@@ -449,19 +449,19 @@ class PositionResponse(BaseModel):
     code: str = Field(..., description="股票代码（6位数字）")
     quantity: float = Field(..., description="持仓数量（股数）")
     avg_cost: float = Field(..., description="平均成本价（元）")
-    buy_date: date | None = Field(None, description="买入日期")
-    current_price: float | None = Field(None, description="当前价格（元）")
-    market_value: float | None = Field(None, description="市值（元）")
-    profit: float | None = Field(None, description="盈亏（元）")
-    profit_pct: float | None = Field(None, description="盈亏比例（%）")
-    comment: str | None = Field(None, description="备注")
-    created_by: str | None = Field(None, description="创建人")
+    buy_date: Optional[date] = Field(None, description="买入日期")
+    current_price: Optional[float] = Field(None, description="当前价格（元）")
+    market_value: Optional[float] = Field(None, description="市值（元）")
+    profit: Optional[float] = Field(None, description="盈亏（元）")
+    profit_pct: Optional[float] = Field(None, description="盈亏比例（%）")
+    comment: Optional[str] = Field(None, description="备注")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
+    updated_by: Optional[str] = Field(None, description="修改人")
     updated_time: datetime = Field(..., description="更新时间")
     # 关联股票信息（可选）
-    stock_name: str | None = Field(None, description="股票名称")
-    stock_ts_code: str | None = Field(None, description="TS代码")
+    stock_name: Optional[str] = Field(None, description="股票名称")
+    stock_ts_code: Optional[str] = Field(None, description="TS代码")
 
     class Config:
         from_attributes = True
@@ -470,19 +470,19 @@ class PositionResponse(BaseModel):
 class PositionListRequest(BaseModel):
     """查询持仓列表请求模型"""
 
-    code: str | None = Field(None, description="股票代码（精确查询）")
-    start_date: date | None = Field(None, description="开始日期（买入日期范围）")
-    end_date: date | None = Field(None, description="结束日期（买入日期范围）")
+    code: Optional[str] = Field(None, description="股票代码（精确查询）")
+    start_date: Optional[date] = Field(None, description="开始日期（买入日期范围）")
+    end_date: Optional[date] = Field(None, description="结束日期（买入日期范围）")
     skip: int = Field(0, ge=0, description="跳过记录数")
     limit: int = Field(100, ge=1, le=1000, description="每页记录数")
-    order_by: str | None = Field("created_time", description="排序字段：id, code, buy_date, created_time")
-    order: str | None = Field("desc", description="排序方向：asc 或 desc")
+    order_by: Optional[str] = Field("created_time", description="排序字段：id, code, buy_date, created_time")
+    order: Optional[str] = Field("desc", description="排序方向：asc 或 desc")
 
 
 class PositionListResponse(BaseModel):
     """持仓列表响应模型"""
 
-    items: list[PositionResponse] = Field(..., description="持仓列表")
+    items: List[PositionResponse] = Field(..., description="持仓列表")
     total: int = Field(..., description="总记录数")
     skip: int = Field(..., description="跳过记录数")
     limit: int = Field(..., description="限制返回记录数")

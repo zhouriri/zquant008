@@ -26,7 +26,7 @@
 """
 
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy import text
@@ -43,7 +43,7 @@ class HyperActivityCalculator(BaseFactorCalculator):
     # 超活跃组合因子
     MODEL_CODE = "hyper_activity"
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: Optional[dict] = None):
         """
         初始化超活跃组合因子计算器
 

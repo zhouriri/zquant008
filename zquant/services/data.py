@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 数据服务
 """
 
@@ -44,7 +46,7 @@ class DataService:
     """数据服务类"""
 
     @staticmethod
-    def get_fundamentals(db: Session, symbols: list[str], statement_type: str, report_date: date | None = None) -> dict:
+    def get_fundamentals(db: Session, symbols: List[str], statement_type: str, report_date: Optional[date] = None) -> dict:
         """
         获取财务数据
 
@@ -165,7 +167,7 @@ class DataService:
         return {"data": result, "field_descriptions": field_descriptions}
 
     @staticmethod
-    def get_trading_calendar(db: Session, start_date: date, end_date: date, exchange: str | None = None) -> list[dict]:
+    def get_trading_calendar(db: Session, start_date: date, end_date: date, exchange: Optional[str] = None) -> list[dict]:
         """
         获取交易日历（返回完整记录）
 
@@ -203,7 +205,7 @@ class DataService:
 
     @staticmethod
     def get_stock_list(
-        db: Session, exchange: str | None = None, symbol: str | None = None, name: str | None = None
+        db: Session, exchange: Optional[str] = None, symbol: Optional[str] = None, name: Optional[str] = None
     ) -> list[dict]:
         """
         获取股票列表（返回所有字段）
@@ -228,10 +230,10 @@ class DataService:
     def get_daily_data(
         db: Session,
         ts_code: str | list[str] | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        trading_day_filter: str | None = "all",
-        exchange: str | None = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        trading_day_filter: Optional[str] = "all",
+        exchange: Optional[str] = None,
     ) -> list[dict]:
         """
         获取日线数据（返回完整记录）
@@ -298,12 +300,12 @@ class DataService:
     @staticmethod
     def _align_records_with_calendar(
         db: Session,
-        records: list[dict],
+        records: List[dict],
         ts_code: str | list[str] | None,
-        start_date: date | None,
-        end_date: date | None,
-        trading_day_filter: str | None,
-        exchange: str | None,
+        start_date: Optional[date],
+        end_date: Optional[date],
+        trading_day_filter: Optional[str],
+        exchange: Optional[str],
         placeholder_factory: callable,
     ) -> list[dict]:
         """
@@ -388,10 +390,10 @@ class DataService:
     def get_daily_basic_data(
         db: Session,
         ts_code: str | list[str] | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        trading_day_filter: str | None = "all",
-        exchange: str | None = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        trading_day_filter: Optional[str] = "all",
+        exchange: Optional[str] = None,
     ) -> list[dict]:
         """
         获取每日指标数据（返回完整记录）
@@ -462,10 +464,10 @@ class DataService:
     def get_factor_data(
         db: Session,
         ts_code: str | list[str] | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        trading_day_filter: str | None = "all",
-        exchange: str | None = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        trading_day_filter: Optional[str] = "all",
+        exchange: Optional[str] = None,
     ) -> list[dict]:
         """
         获取因子数据（返回完整记录）
@@ -538,10 +540,10 @@ class DataService:
     def get_stkfactorpro_data(
         db: Session,
         ts_code: str | list[str] | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        trading_day_filter: str | None = "all",
-        exchange: str | None = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        trading_day_filter: Optional[str] = "all",
+        exchange: Optional[str] = None,
     ) -> list[dict]:
         """
         获取专业版因子数据（返回完整记录）
@@ -662,10 +664,10 @@ class DataService:
         insert_count: int = 0,
         update_count: int = 0,
         delete_count: int = 0,
-        error_message: str | None = None,
-        created_by: str | None = None,
-        data_source: str | None = None,
-        api_interface: str | None = None,
+        error_message: Optional[str] = None,
+        created_by: Optional[str] = None,
+        data_source: Optional[str] = None,
+        api_interface: Optional[str] = None,
         api_data_count: int = 0,
     ) -> DataOperationLog:
         """
@@ -724,11 +726,11 @@ class DataService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        table_name: str | None = None,
-        operation_type: str | None = None,
-        operation_result: str | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        table_name: Optional[str] = None,
+        operation_type: Optional[str] = None,
+        operation_result: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         order_by: str = "created_time",
         order: str = "desc",
     ) -> tuple[list[DataOperationLog], int]:
@@ -804,7 +806,7 @@ class DataService:
         inspector,
         table_name: str,
         stat_date: date,
-        created_by: str | None = None,
+        created_by: Optional[str] = None,
     ) -> TableStatistics | None:
         """
         统计单个表的数据
@@ -906,7 +908,7 @@ class DataService:
 
     @staticmethod
     def statistics_table_data(
-        db: Session, stat_date: date, created_by: str | None = None, execution: TaskExecution | None = None
+        db: Session, stat_date: date, created_by: Optional[str] = None, execution: Optional[TaskExecution] = None
     ) -> list[TableStatistics]:
         """
         统计指定日期的数据表入库情况
@@ -1458,10 +1460,10 @@ class DataService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        stat_date: date | None = None,
-        table_name: str | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        stat_date: Optional[date] = None,
+        table_name: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         order_by: str = "stat_date",
         order: str = "desc",
     ) -> tuple[list[TableStatistics], int]:

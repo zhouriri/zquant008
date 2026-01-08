@@ -29,7 +29,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 
@@ -67,7 +67,7 @@ def cache_key(*args, **kwargs) -> str:
     return key_hash
 
 
-def cached(ttl: int = 3600, key_prefix: str = "", key_func: Callable | None = None):
+def cached(ttl: int = 3600, key_prefix: str = "", key_func: Optional[Callable] = None):
     """
     缓存装饰器
 
@@ -126,7 +126,7 @@ def cached(ttl: int = 3600, key_prefix: str = "", key_func: Callable | None = No
     return decorator
 
 
-def invalidate_cache(pattern: str | None = None, key: str | None = None):
+def invalidate_cache(pattern: Optional[str] = None, key: Optional[str] = None):
     """
     使缓存失效
 

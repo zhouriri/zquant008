@@ -27,7 +27,7 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 from sqlalchemy.orm import Session
 from zquant.models.scheduler import TaskExecution
 
@@ -37,7 +37,7 @@ class DataSyncStrategy(ABC):
 
     @abstractmethod
     def sync(
-        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+        self, db: Session, config: dict[str, Any], extra_info: Optional[dict] = None, execution: Optional[TaskExecution] = None
     ) -> dict[str, Any]:
         """
         执行数据同步

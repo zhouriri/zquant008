@@ -25,7 +25,7 @@
 根据 config 中的字段路由到不同的执行器
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -46,7 +46,7 @@ class CommonTaskExecutor(TaskExecutor):
     def get_task_type(self) -> TaskType:
         return TaskType.COMMON_TASK
 
-    def execute(self, db: Session, config: dict[str, Any], execution: TaskExecution | None = None) -> dict[str, Any]:
+    def execute(self, db: Session, config: dict[str, Any], execution: Optional[TaskExecution] = None) -> dict[str, Any]:
         """
         执行通用任务
 

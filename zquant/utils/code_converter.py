@@ -29,7 +29,7 @@
 - Symbol格式：与TS代码相同
 """
 
-from typing import Optional
+from typing import Dict, List, Optional
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -47,7 +47,7 @@ class CodeConverter:
     }
 
     @staticmethod
-    def to_ts_code(code: str, db: Session | None = None) -> Optional[str]:
+    def to_ts_code(code: str, db: Optional[Session] = None) -> Optional[str]:
         """
         将任意格式的股票代码转换为TS代码格式（如：000001.SZ）
 
@@ -119,7 +119,7 @@ class CodeConverter:
         return None
 
     @staticmethod
-    def batch_to_ts_codes(codes: list[str], db: Session) -> dict[str, str]:
+    def batch_to_ts_codes(codes: List[str], db: Session) -> dict[str, str]:
         """
         批量将股票代码转换为TS代码格式
 
@@ -166,7 +166,7 @@ class CodeConverter:
         return result
 
     @staticmethod
-    def get_possible_ts_codes(code: str, db: Session | None = None) -> list[str]:
+    def get_possible_ts_codes(code: str, db: Optional[Session] = None) -> list[str]:
         """
         获取可能的TS代码列表（用于模糊匹配）
 

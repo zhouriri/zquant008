@@ -25,6 +25,7 @@
 """
 
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional, Tuple
 import secrets
 
 from jose import JWTError, jwt
@@ -82,7 +83,7 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     return True, ""
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """创建访问Token"""
     to_encode = data.copy()
     if expires_delta:
@@ -104,7 +105,7 @@ def create_refresh_token(data: dict) -> str:
     return encoded_jwt
 
 
-def decode_token(token: str) -> dict | None:
+def decode_token(token: str) -> Optional[Dict[str, Any]]:
     """解码Token"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -113,7 +114,7 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
-def generate_api_key() -> tuple[str, str]:
+def generate_api_key() -> Tuple[str, str]:
     """生成API密钥对（access_key, secret_key）"""
     # 生成32字节的随机字符串作为access_key
     access_key = secrets.token_urlsafe(32)[:32]

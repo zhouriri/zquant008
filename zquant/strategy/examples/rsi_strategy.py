@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """
+from typing import List
+
 RSI策略示例
 策略逻辑：当RSI低于超卖线时买入，高于超买线时卖出
 """
@@ -35,7 +37,7 @@ class Strategy(BaseStrategy):
         # 存储历史价格变化
         self.price_changes = {}
 
-    def calculate_rsi(self, changes: list[float], period: int) -> float:
+    def calculate_rsi(self, changes: List[float], period: int) -> float:
         """计算RSI指标"""
         if len(changes) < period + 1:
             return 50.0  # 默认值

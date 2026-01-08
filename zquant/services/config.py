@@ -26,7 +26,7 @@
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -83,9 +83,9 @@ class ConfigService:
         db: Session,
         config_key: str,
         config_value: str,
-        comment: str | None = None,
-        created_by: str | None = None,
-        updated_by: str | None = None,
+        comment: Optional[str] = None,
+        created_by: Optional[str] = None,
+        updated_by: Optional[str] = None,
     ) -> Config:
         """
         设置配置（如果不存在则创建，存在则更新）
@@ -146,9 +146,9 @@ class ConfigService:
     def update_config(
         db: Session,
         config_key: str,
-        config_value: str | None = None,
-        comment: str | None = None,
-        updated_by: str | None = None,
+        config_value: Optional[str] = None,
+        comment: Optional[str] = None,
+        updated_by: Optional[str] = None,
     ) -> Config:
         """
         更新配置

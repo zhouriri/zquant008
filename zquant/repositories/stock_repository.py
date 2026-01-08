@@ -26,7 +26,7 @@
 统一股票数据访问，提供批量查询和缓存优化
 """
 
-from typing import Optional
+from typing import Optional, List
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -85,7 +85,7 @@ class StockRepository:
 
         return None
 
-    def batch_get_ts_codes_by_symbols(self, symbols: list[str]) -> dict[str, str]:
+    def batch_get_ts_codes_by_symbols(self, symbols: List[str]) -> dict[str, str]:
         """
         批量根据symbol获取ts_code
 

@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 数据采集定时任务调度
 """
 
@@ -244,7 +246,7 @@ class DataScheduler:
 
         return " ".join(parts).strip()
 
-    def sync_stock_list(self, db: Session, extra_info: dict | None = None, execution: TaskExecution | None = None) -> int:
+    def sync_stock_list(self, db: Session, extra_info: Optional[dict] = None, execution: Optional[TaskExecution] = None) -> int:
         """
         同步股票列表
 
@@ -365,11 +367,11 @@ class DataScheduler:
     def sync_trading_calendar(
         self,
         db: Session,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        exchanges: list[str] | None = None,
-        extra_info: dict | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        exchanges: List[str] | None = None,
+        extra_info: Optional[dict] = None,
+        execution: Optional[TaskExecution] = None,
     ) -> int:
         """
         同步交易日历
@@ -495,11 +497,11 @@ class DataScheduler:
         self,
         db: Session,
         ts_code: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
         update_view: bool = True,
-        execution: TaskExecution | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> int:
         """
         同步单只股票的日线数据（按 ts_code 分表存储）
@@ -605,11 +607,11 @@ class DataScheduler:
     def sync_all_daily_data(
         self,
         db: Session,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
-        codelist: list[str] | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
+        codelist: List[str] | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict:
         """
         同步所有股票的日线数据（增量更新）
@@ -1005,11 +1007,11 @@ class DataScheduler:
         self,
         db: Session,
         ts_code: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
         update_view: bool = True,
-        execution: TaskExecution | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> int:
         """
         同步单只股票的每日指标数据（按 ts_code 分表存储）
@@ -1115,11 +1117,11 @@ class DataScheduler:
     def sync_all_daily_basic_data(
         self,
         db: Session,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
-        codelist: list[str] | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
+        codelist: List[str] | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict:
         """
         同步所有股票的每日指标数据（增量更新）
@@ -1492,11 +1494,11 @@ class DataScheduler:
         self,
         db: Session,
         ts_code: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
         update_view: bool = True,
-        execution: TaskExecution | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> int:
         """
         同步单只股票的因子数据（按 ts_code 分表存储）
@@ -1635,11 +1637,11 @@ class DataScheduler:
     def sync_all_factor_data(
         self,
         db: Session,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
-        codelist: list[str] | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
+        codelist: List[str] | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict:
         """
         同步所有股票的因子数据
@@ -1822,11 +1824,11 @@ class DataScheduler:
         self,
         db: Session,
         ts_code: str,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
         update_view: bool = True,
-        execution: TaskExecution | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> int:
         """
         同步单只股票的专业版因子数据（按 ts_code 分表存储）
@@ -1965,11 +1967,11 @@ class DataScheduler:
     def sync_all_stkfactorpro_data(
         self,
         db: Session,
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
-        codelist: list[str] | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
+        codelist: List[str] | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict:
         """
         同步所有股票的专业版因子数据
@@ -2153,10 +2155,10 @@ class DataScheduler:
         db: Session,
         symbol: str,
         statement_type: str = "income",
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
+        execution: Optional[TaskExecution] = None,
     ) -> int:
         """
         同步单只股票的财务数据
@@ -2256,11 +2258,11 @@ class DataScheduler:
         self,
         db: Session,
         statement_type: str = "income",
-        start_date: str | None = None,
-        end_date: str | None = None,
-        extra_info: dict | None = None,
-        codelist: list[str] | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        extra_info: Optional[dict] = None,
+        codelist: List[str] | None = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict:
         """
         同步所有股票的财务数据（增量更新）

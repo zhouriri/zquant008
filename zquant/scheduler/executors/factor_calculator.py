@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 因子计算定时任务执行器
 """
 
@@ -43,7 +45,7 @@ class FactorCalculatorExecutor(TaskExecutor):
     def get_task_type(self) -> TaskType:
         return TaskType.COMMON_TASK
 
-    def execute(self, db: Session, config: dict, execution: TaskExecution | None = None) -> dict:
+    def execute(self, db: Session, config: dict, execution: Optional[TaskExecution] = None) -> dict:
         """
         执行因子计算任务
 

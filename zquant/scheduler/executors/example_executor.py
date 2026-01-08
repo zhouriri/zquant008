@@ -27,7 +27,7 @@
 
 import random
 import time
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -50,7 +50,7 @@ class ExampleExecutor(TaskExecutor):
     def get_task_type(self) -> TaskType:
         return TaskType.COMMON_TASK
 
-    def execute(self, db: Session, config: dict[str, Any], execution: TaskExecution | None = None) -> dict[str, Any]:
+    def execute(self, db: Session, config: dict[str, Any], execution: Optional[TaskExecution] = None) -> dict[str, Any]:
         """
         执行示例任务
 

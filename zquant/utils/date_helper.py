@@ -129,7 +129,7 @@ class DateHelper:
             return []
 
     @staticmethod
-    def format_duration(seconds: float | None) -> str:
+    def format_duration(seconds: Optional[float]) -> str:
         """
         格式化时长（秒 -> 时分秒）
 
@@ -160,7 +160,7 @@ class DateHelper:
     def format_date_range(
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
-        db: Session | None = None,
+        db: Optional[Session] = None,
         default_start: Optional[date] = None,
     ) -> tuple[date, date]:
         """

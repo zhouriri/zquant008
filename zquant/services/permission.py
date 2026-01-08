@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 权限服务
 """
 
@@ -75,8 +77,8 @@ class PermissionService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        resource: str | None = None,
-        order_by: str | None = None,
+        resource: Optional[str] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> list[Permission]:
         """获取所有权限（分页、筛选、排序）"""
@@ -109,7 +111,7 @@ class PermissionService:
         return query.offset(skip).limit(limit).all()
 
     @staticmethod
-    def count_permissions(db: Session, resource: str | None = None) -> int:
+    def count_permissions(db: Session, resource: Optional[str] = None) -> int:
         """统计权限数量"""
         query = db.query(Permission)
 

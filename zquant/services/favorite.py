@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 我的自选服务层
 """
 
@@ -39,7 +41,7 @@ class FavoriteService:
     """我的自选服务"""
 
     @staticmethod
-    def create_favorite(db: Session, user_id: int, favorite_data: FavoriteCreate, created_by: str | None = None) -> StockFavorite:
+    def create_favorite(db: Session, user_id: int, favorite_data: FavoriteCreate, created_by: Optional[str] = None) -> StockFavorite:
         """
         创建自选
 
@@ -85,9 +87,9 @@ class FavoriteService:
     def get_favorites(
         db: Session,
         user_id: int,
-        code: str | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
+        code: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         skip: int = 0,
         limit: int = 100,
         order_by: str = "created_time",
@@ -162,7 +164,7 @@ class FavoriteService:
 
     @staticmethod
     def update_favorite(
-        db: Session, favorite_id: int, user_id: int, favorite_data: FavoriteUpdate, updated_by: str | None = None
+        db: Session, favorite_id: int, user_id: int, favorite_data: FavoriteUpdate, updated_by: Optional[str] = None
     ) -> StockFavorite:
         """
         更新自选

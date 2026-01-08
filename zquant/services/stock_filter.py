@@ -26,7 +26,7 @@
 
 import json
 from datetime import date
-from typing import Any
+from typing import Any, List, Optional
 
 from loguru import logger
 from sqlalchemy import text
@@ -145,7 +145,7 @@ class StockFilterService:
         return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]{0,63}$', field))
     
     @classmethod
-    def _get_full_field_name(cls, field: str, use_mapping: bool = True, table_alias: str | None = None) -> str:
+    def _get_full_field_name(cls, field: str, use_mapping: bool = True, table_alias: Optional[str] = None) -> str:
         """
         获取完全限定的字段名
         
@@ -176,7 +176,7 @@ class StockFilterService:
         return f"{prefix}`{field}`"
 
     @classmethod
-    def _build_single_condition(cls, condition: dict[str, Any], param_index: int, use_mapping: bool = True, table_alias: str | None = None) -> tuple[str, dict[str, Any], int]:
+    def _build_single_condition(cls, condition: dict[str, Any], param_index: int, use_mapping: bool = True, table_alias: Optional[str] = None) -> tuple[str, dict[str, Any], int]:
         """
         构建单个条件的SQL
 
@@ -290,7 +290,7 @@ class StockFilterService:
 
     @staticmethod
     def _build_filter_conditions_recursive(
-        filter_conditions: dict[str, Any] | list[dict[str, Any]], param_index: int = 0, use_mapping: bool = True, table_alias: str | None = None
+        filter_conditions: dict[str, Any] | list[dict[str, Any]], param_index: int = 0, use_mapping: bool = True, table_alias: Optional[str] = None
     ) -> tuple[str, dict[str, Any], int]:
         """
         递归构建筛选条件SQL（支持逻辑组合）
@@ -381,7 +381,7 @@ class StockFilterService:
         return "1=1", {}, param_index
 
     @staticmethod
-    def _build_filter_conditions(filter_conditions: dict[str, Any] | list[dict[str, Any]] | None, use_mapping: bool = True, table_alias: str | None = None) -> tuple[str, dict[str, Any]]:
+    def _build_filter_conditions(filter_conditions: dict[str, Any] | list[dict[str, Any]] | None, use_mapping: bool = True, table_alias: Optional[str] = None) -> tuple[str, dict[str, Any]]:
         """
         构建筛选条件SQL（入口方法）
 
@@ -403,7 +403,7 @@ class StockFilterService:
         return where_clause, params
 
     @staticmethod
-    def _build_order_by(sort_config: list[dict[str, str]] | None, table_alias: str = "sb", use_mapping: bool = True) -> str:
+    def _build_order_by(sort_config: List[dict[str, str]] | None, table_alias: str = "sb", use_mapping: bool = True) -> str:
         """
         构建排序SQL
 
@@ -438,7 +438,7 @@ class StockFilterService:
             return f"ORDER BY {table_alias}.ts_code ASC"
 
     @classmethod
-    def _build_select_columns(cls, selected_columns: list[str] | None) -> str:
+    def _build_select_columns(cls, selected_columns: List[str] | None) -> str:
         """
         构建SELECT列
 
@@ -497,9 +497,9 @@ class StockFilterService:
     def get_filter_results(
         db: Session,
         trade_date: date,
-        filter_conditions: list[dict[str, Any]] | None = None,
-        selected_columns: list[str] | None = None,
-        sort_config: list[dict[str, str]] | None = None,
+        filter_conditions: List[dict[str, Any]] | None = None,
+        selected_columns: List[str] | None = None,
+        sort_config: List[dict[str, str]] | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[dict[str, Any]], int]:
@@ -710,11 +710,11 @@ class StockFilterService:
         db: Session,
         user_id: int,
         name: str,
-        description: str | None = None,
-        filter_conditions: list[dict[str, Any]] | None = None,
-        selected_columns: list[str] | None = None,
-        sort_config: list[dict[str, str]] | None = None,
-        created_by: str | None = None,
+        description: Optional[str] = None,
+        filter_conditions: List[dict[str, Any]] | None = None,
+        selected_columns: List[str] | None = None,
+        sort_config: List[dict[str, str]] | None = None,
+        created_by: Optional[str] = None,
     ) -> StockFilterStrategy:
         """
         保存策略模板
@@ -809,12 +809,12 @@ class StockFilterService:
         db: Session,
         strategy_id: int,
         user_id: int,
-        name: str | None = None,
-        description: str | None = None,
-        filter_conditions: list[dict[str, Any]] | None = None,
-        selected_columns: list[str] | None = None,
-        sort_config: list[dict[str, str]] | None = None,
-        updated_by: str | None = None,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        filter_conditions: List[dict[str, Any]] | None = None,
+        selected_columns: List[str] | None = None,
+        sort_config: List[dict[str, str]] | None = None,
+        updated_by: Optional[str] = None,
     ) -> StockFilterStrategy:
         """
         更新策略模板
@@ -895,8 +895,8 @@ class StockFilterService:
         db: Session,
         trade_date: date,
         strategy_id: int,
-        filter_conditions: list[dict[str, Any]] | None = None,
-        sort_config: list[dict[str, str]] | None = None,
+        filter_conditions: List[dict[str, Any]] | None = None,
+        sort_config: List[dict[str, str]] | None = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[dict[str, Any]], int]:
@@ -995,8 +995,8 @@ class StockFilterService:
         trade_date: date,
         strategy_id: int,
         strategy_name: str,
-        stock_data: list[dict[str, Any]],
-        username: str | None = None,
+        stock_data: List[dict[str, Any]],
+        username: Optional[str] = None,
     ) -> int:
         """
         保存选股结果到数据库（包含反范式化数据）

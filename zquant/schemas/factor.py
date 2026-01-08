@@ -25,7 +25,7 @@
 """
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -39,25 +39,25 @@ class FactorDefinitionCreate(BaseModel):
 
     factor_name: str = Field(..., description="因子名称（唯一标识）")
     cn_name: str = Field(..., description="中文简称")
-    en_name: str | None = Field(None, description="英文简称")
+    en_name: Optional[str] = Field(None, description="英文简称")
     column_name: str = Field(..., description="因子表数据列名")
-    description: str | None = Field(None, description="因子详细描述")
-    factor_type: str | None = Field("单因子", description="因子类型：单因子、组合因子")
+    description: Optional[str] = Field(None, description="因子详细描述")
+    factor_type: Optional[str] = Field("单因子", description="因子类型：单因子、组合因子")
     enabled: bool = Field(True, description="是否启用")
-    factor_config: dict[str, Any] | None = Field(None, description="因子配置，格式：{\"enabled\": bool, \"mappings\": [{\"model_id\": int, \"codes\": list[str]|None}, ...]}")
+    factor_config: Optional[Dict[str, Any]] = Field(None, description="因子配置，格式：{\"enabled\": bool, \"mappings\": [{\"model_id\": int, \"codes\": List[str]|None}, ...]}")
 
 
 class FactorDefinitionUpdate(BaseModel):
     """更新因子定义请求"""
 
     factor_id: int = Field(..., description="因子ID")
-    cn_name: str | None = Field(None, description="中文简称")
-    en_name: str | None = Field(None, description="英文简称")
-    column_name: str | None = Field(None, description="因子表数据列名")
-    description: str | None = Field(None, description="因子详细描述")
-    factor_type: str | None = Field(None, description="因子类型：单因子、组合因子")
-    enabled: bool | None = Field(None, description="是否启用")
-    factor_config: dict[str, Any] | None = Field(None, description="因子配置")
+    cn_name: Optional[str] = Field(None, description="中文简称")
+    en_name: Optional[str] = Field(None, description="英文简称")
+    column_name: Optional[str] = Field(None, description="因子表数据列名")
+    description: Optional[str] = Field(None, description="因子详细描述")
+    factor_type: Optional[str] = Field(None, description="因子类型：单因子、组合因子")
+    enabled: Optional[bool] = Field(None, description="是否启用")
+    factor_config: Optional[Dict[str, Any]] = Field(None, description="因子配置")
 
 
 class FactorDefinitionDeleteRequest(BaseModel):
@@ -71,15 +71,15 @@ class FactorDefinitionResponse(BaseModel):
     id: int
     factor_name: str
     cn_name: str
-    en_name: str | None
+    en_name: Optional[str]
     column_name: str
-    description: str | None
-    factor_type: str | None
+    description: Optional[str]
+    factor_type: Optional[str]
     enabled: bool
-    factor_config: dict[str, Any] | None
-    created_by: str | None
+    factor_config: Optional[Dict[str, Any]]
+    created_by: Optional[str]
     created_time: datetime
-    updated_by: str | None
+    updated_by: Optional[str]
     updated_time: datetime
 
     class Config:
@@ -108,8 +108,8 @@ class FactorDefinitionResponse(BaseModel):
 
 class FactorDefinitionListRequest(QueryRequest):
     """因子定义列表查询请求模型"""
-    enabled: bool | None = Field(None, description="是否启用")
-    order_by: str | None = Field(
+    enabled: Optional[bool] = Field(None, description="是否启用")
+    order_by: Optional[str] = Field(
         None, description="排序字段：id, factor_name, cn_name, created_time, updated_time"
     )
 
@@ -122,7 +122,7 @@ class FactorDefinitionGetRequest(BaseModel):
 class FactorDefinitionListResponse(BaseModel):
     """因子定义列表响应"""
 
-    items: list[FactorDefinitionResponse] = Field(..., description="因子定义列表")
+    items: List[FactorDefinitionResponse] = Field(..., description="因子定义列表")
     total: int = Field(..., description="总数")
 
 
@@ -134,7 +134,7 @@ class FactorModelCreate(BaseModel):
     factor_id: int = Field(..., description="因子ID")
     model_name: str = Field(..., description="模型名称")
     model_code: str = Field(..., description="模型代码（用于识别计算器类型）")
-    config_json: dict[str, Any] | None = Field(None, description="模型配置（JSON格式）")
+    config_json: Optional[Dict[str, Any]] = Field(None, description="模型配置（JSON格式）")
     is_default: bool = Field(False, description="是否默认算法")
     enabled: bool = Field(True, description="是否启用")
 
@@ -146,11 +146,11 @@ class FactorModelUpdate(BaseModel):
     """更新因子模型请求"""
 
     model_id: int = Field(..., description="模型ID")
-    model_name: str | None = Field(None, description="模型名称")
-    model_code: str | None = Field(None, description="模型代码")
-    config_json: dict[str, Any] | None = Field(None, description="模型配置")
-    is_default: bool | None = Field(None, description="是否默认算法")
-    enabled: bool | None = Field(None, description="是否启用")
+    model_name: Optional[str] = Field(None, description="模型名称")
+    model_code: Optional[str] = Field(None, description="模型代码")
+    config_json: Optional[Dict[str, Any]] = Field(None, description="模型配置")
+    is_default: Optional[bool] = Field(None, description="是否默认算法")
+    enabled: Optional[bool] = Field(None, description="是否启用")
 
     class Config:
         protected_namespaces = ()
@@ -171,12 +171,12 @@ class FactorModelResponse(BaseModel):
     factor_id: int
     model_name: str
     model_code: str
-    config_json: dict[str, Any] | None
+    config_json: Optional[Dict[str, Any]]
     is_default: bool
     enabled: bool
-    created_by: str | None
+    created_by: Optional[str]
     created_time: datetime
-    updated_by: str | None
+    updated_by: Optional[str]
     updated_time: datetime
 
     class Config:
@@ -204,9 +204,9 @@ class FactorModelResponse(BaseModel):
 
 class FactorModelListRequest(QueryRequest):
     """因子模型列表查询请求模型"""
-    factor_id: int | None = Field(None, description="因子ID")
-    enabled: bool | None = Field(None, description="是否启用")
-    order_by: str | None = Field(
+    factor_id: Optional[int] = Field(None, description="因子ID")
+    enabled: Optional[bool] = Field(None, description="是否启用")
+    order_by: Optional[str] = Field(
         None, description="排序字段：id, model_name, model_code, created_time, updated_time"
     )
 
@@ -225,7 +225,7 @@ class FactorModelGetRequest(BaseModel):
 class FactorModelListResponse(BaseModel):
     """因子模型列表响应"""
 
-    items: list[FactorModelResponse] = Field(..., description="因子模型列表")
+    items: List[FactorModelResponse] = Field(..., description="因子模型列表")
     total: int = Field(..., description="总数")
 
 
@@ -235,7 +235,7 @@ class FactorConfigMappingItem(BaseModel):
     """因子配置映射项（模型-代码列表对）"""
 
     model_id: int = Field(..., description="模型ID")
-    codes: list[str] | None = Field(None, description="股票代码列表，None或空列表表示默认配置")
+    codes: List[str] | None = Field(None, description="股票代码列表，None或空列表表示默认配置")
 
     class Config:
         protected_namespaces = ()
@@ -245,7 +245,7 @@ class FactorConfigCreate(BaseModel):
     """创建因子配置请求（支持多个映射）"""
 
     factor_id: int = Field(..., description="因子ID")
-    mappings: list[FactorConfigMappingItem] = Field(..., description="模型-代码列表映射对列表")
+    mappings: List[FactorConfigMappingItem] = Field(..., description="模型-代码列表映射对列表")
     enabled: bool = Field(True, description="是否启用")
     
     def to_config_dict(self) -> dict[str, Any]:
@@ -260,8 +260,8 @@ class FactorConfigUpdate(BaseModel):
     """更新因子配置请求（支持批量更新映射）"""
 
     factor_id: int = Field(..., description="因子ID")
-    mappings: list[FactorConfigMappingItem] | None = Field(None, description="模型-代码列表映射对列表（None表示不更新）")
-    enabled: bool | None = Field(None, description="是否启用")
+    mappings: List[FactorConfigMappingItem] | None = Field(None, description="模型-代码列表映射对列表（None表示不更新）")
+    enabled: Optional[bool] = Field(None, description="是否启用")
 
 
 class FactorConfigDeleteRequest(BaseModel):
@@ -273,9 +273,9 @@ class FactorConfigSingleUpdate(BaseModel):
     """更新单个因子配置请求（向后兼容）"""
 
     config_id: int = Field(..., description="配置ID")
-    model_id: int | None = Field(None, description="模型ID")
-    codes: list[str] | None = Field(None, description="股票代码列表")
-    enabled: bool | None = Field(None, description="是否启用")
+    model_id: Optional[int] = Field(None, description="模型ID")
+    codes: List[str] | None = Field(None, description="股票代码列表")
+    enabled: Optional[bool] = Field(None, description="是否启用")
 
     class Config:
         protected_namespaces = ()
@@ -293,11 +293,11 @@ class FactorConfigResponse(BaseModel):
     """因子配置响应"""
 
     factor_id: int = Field(..., description="因子ID（主键）")
-    config: dict[str, Any] = Field(..., description="因子配置，格式：{\"enabled\": bool, \"mappings\": [{\"model_id\": int, \"codes\": list[str]|None}, ...]}")
+    config: dict[str, Any] = Field(..., description="因子配置，格式：{\"enabled\": bool, \"mappings\": [{\"model_id\": int, \"codes\": List[str]|None}, ...]}")
     enabled: bool = Field(..., description="是否启用")
-    created_by: str | None = Field(None, description="创建人")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
+    updated_by: Optional[str] = Field(None, description="修改人")
     updated_time: datetime = Field(..., description="更新时间")
 
     class Config:
@@ -321,8 +321,8 @@ class FactorConfigResponse(BaseModel):
 
 class FactorConfigListRequest(QueryRequest):
     """因子配置列表查询请求模型"""
-    enabled: bool | None = Field(None, description="是否启用")
-    order_by: str | None = Field(None, description="排序字段：factor_id, created_time, updated_time")
+    enabled: Optional[bool] = Field(None, description="是否启用")
+    order_by: Optional[str] = Field(None, description="排序字段：factor_id, created_time, updated_time")
 
 
 class FactorConfigGetRequest(BaseModel):
@@ -332,13 +332,13 @@ class FactorConfigGetRequest(BaseModel):
 
 class FactorConfigGroupedListRequest(BaseModel):
     """因子配置分组列表查询请求模型"""
-    enabled: bool | None = Field(None, description="是否启用")
+    enabled: Optional[bool] = Field(None, description="是否启用")
 
 
 class FactorConfigListResponse(BaseModel):
     """因子配置列表响应"""
 
-    items: list[FactorConfigResponse] = Field(..., description="因子配置列表")
+    items: List[FactorConfigResponse] = Field(..., description="因子配置列表")
     total: int = Field(..., description="总数")
 
 
@@ -347,17 +347,17 @@ class FactorConfigGroupedResponse(BaseModel):
 
     factor_id: int = Field(..., description="因子ID")
     enabled: bool = Field(..., description="是否启用")
-    mappings: list[FactorConfigResponse] = Field(..., description="该因子的所有配置映射")
-    created_by: str | None = Field(None, description="创建人")
+    mappings: List[FactorConfigResponse] = Field(..., description="该因子的所有配置映射")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
+    updated_by: Optional[str] = Field(None, description="修改人")
     updated_time: datetime = Field(..., description="更新时间")
 
 
 class FactorConfigGroupedListResponse(BaseModel):
     """因子配置分组列表响应"""
 
-    items: list[FactorConfigGroupedResponse] = Field(..., description="因子配置分组列表")
+    items: List[FactorConfigGroupedResponse] = Field(..., description="因子配置分组列表")
     total: int = Field(..., description="总数")
 
 
@@ -366,10 +366,10 @@ class FactorConfigGroupedListResponse(BaseModel):
 class FactorCalculationRequest(BaseModel):
     """因子计算请求"""
 
-    factor_id: int | None = Field(None, description="因子ID（None表示计算所有启用的因子）")
-    codes: list[str] | None = Field(None, description="股票代码列表（None表示使用配置中的codes）")
-    start_date: date | None = Field(None, description="开始日期（可选，参考日线数据处理逻辑：都不提供则使用最后一个交易日；部分提供时start_date默认2025-01-01）")
-    end_date: date | None = Field(None, description="结束日期（可选，参考日线数据处理逻辑：都不提供则使用最后一个交易日；部分提供时end_date默认最后一个交易日）")
+    factor_id: Optional[int] = Field(None, description="因子ID（None表示计算所有启用的因子）")
+    codes: List[str] | None = Field(None, description="股票代码列表（None表示使用配置中的codes）")
+    start_date: Optional[date] = Field(None, description="开始日期（可选，参考日线数据处理逻辑：都不提供则使用最后一个交易日；部分提供时start_date默认2025-01-01）")
+    end_date: Optional[date] = Field(None, description="结束日期（可选，参考日线数据处理逻辑：都不提供则使用最后一个交易日；部分提供时end_date默认最后一个交易日）")
 
 
 class FactorCalculationResponse(BaseModel):
@@ -379,7 +379,7 @@ class FactorCalculationResponse(BaseModel):
     message: str = Field(..., description="消息")
     calculated_count: int = Field(0, description="计算的股票数量")
     failed_count: int = Field(0, description="失败的股票数量")
-    details: list[dict[str, Any]] = Field(default_factory=list, description="详细信息")
+    details: List[dict[str, Any]] = Field(default_factory=list, description="详细信息")
 
 
 # ==================== 因子结果 Schema ====================
@@ -387,10 +387,10 @@ class FactorCalculationResponse(BaseModel):
 class FactorResultItem(BaseModel):
     """因子结果项"""
 
-    id: int | None
+    id: Optional[int]
     trade_date: date
-    factor_name: str | None = None
-    factor_value: float | None
+    factor_name: Optional[str] = None
+    factor_value: Optional[float]
 
     class Config:
         from_attributes = True
@@ -401,7 +401,7 @@ class FactorResultResponse(BaseModel):
 
     code: str = Field(..., description="股票代码")
     factor_name: str = Field(..., description="因子名称")
-    items: list[FactorResultItem] = Field(..., description="因子结果列表")
+    items: List[FactorResultItem] = Field(..., description="因子结果列表")
     total: int = Field(..., description="总数")
 
 
@@ -409,8 +409,8 @@ class FactorResultQueryRequest(BaseModel):
     """因子结果查询请求"""
 
     code: str = Field(..., description="股票代码")
-    factor_name: str | None = Field(None, description="因子名称（None表示查询所有）")
-    trade_date: date | None = Field(None, description="交易日期")
+    factor_name: Optional[str] = Field(None, description="因子名称（None表示查询所有）")
+    trade_date: Optional[date] = Field(None, description="交易日期")
 
 
 # ==================== 量化因子查询 Schema ====================
@@ -418,18 +418,18 @@ class FactorResultQueryRequest(BaseModel):
 class QuantFactorQueryRequest(BaseModel):
     """量化因子查询请求"""
 
-    ts_code: str | None = Field(None, description="股票代码，模糊查询")
-    start_date: date | None = Field(None, description="开始日期")
-    end_date: date | None = Field(None, description="结束日期")
-    filter_conditions: Any | None = Field(None, description="筛选条件，支持逻辑组合")
+    ts_code: Optional[str] = Field(None, description="股票代码，模糊查询")
+    start_date: Optional[date] = Field(None, description="开始日期")
+    end_date: Optional[date] = Field(None, description="结束日期")
+    filter_conditions: Optional[Any] = Field(None, description="筛选条件，支持逻辑组合")
     skip: int = Field(0, description="跳过记录数")
     limit: int = Field(100, description="限制返回记录数")
-    order_by: str | None = Field(None, description="排序字段")
-    order: str | None = Field("desc", description="排序方式：asc或desc")
+    order_by: Optional[str] = Field(None, description="排序字段")
+    order: Optional[str] = Field("desc", description="排序方式：asc或desc")
 
 
 class QuantFactorQueryResponse(BaseModel):
     """量化因子查询响应"""
 
-    items: list[dict[str, Any]] = Field(..., description="因子数据列表")
+    items: List[dict[str, Any]] = Field(..., description="因子数据列表")
     total: int = Field(..., description="总记录数")

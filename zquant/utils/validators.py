@@ -27,7 +27,7 @@
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, List, Optional
 
 from pydantic import field_validator
 
@@ -58,7 +58,7 @@ def validate_ts_code(code: str) -> bool:
     return True
 
 
-def validate_ts_codes(codes: list[str] | str) -> list[str]:
+def validate_ts_codes(codes: List[str] | str) -> list[str]:
     """
     验证股票代码列表
 
@@ -254,7 +254,7 @@ def validate_range(
     return float(value)
 
 
-def sanitize_string(value: str, max_length: int | None = None) -> str:
+def sanitize_string(value: str, max_length: Optional[int] = None) -> str:
     """
     清理字符串输入，防止XSS攻击
 
@@ -310,7 +310,7 @@ def date_validator(value: str | datetime | None) -> str | None:
         from pydantic import BaseModel, field_validator
 
         class MyModel(BaseModel):
-            date: str | None = None
+            date: Optional[str] = None
 
             @field_validator('date')
             @classmethod

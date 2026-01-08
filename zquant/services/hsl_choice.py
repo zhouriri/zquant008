@@ -21,7 +21,7 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 from datetime import date
-from typing import Any, Tuple
+from typing import Any, Tuple, List, Optional
 
 from loguru import logger
 from sqlalchemy import text, func
@@ -42,11 +42,11 @@ class HslChoiceService:
     @staticmethod
     def query_hsl_choice(
         db: Session,
-        trade_date_start: date | None = None,
-        trade_date_end: date | None = None,
-        ts_code: str | None = None,
-        code: str | None = None,
-        name: str | None = None,
+        trade_date_start: Optional[date] = None,
+        trade_date_end: Optional[date] = None,
+        ts_code: Optional[str] = None,
+        code: Optional[str] = None,
+        name: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> Tuple[list[dict[str, Any]], int]:
@@ -143,8 +143,8 @@ class HslChoiceService:
     def add_hsl_choice(
         db: Session,
         trade_date: date,
-        ts_codes: list[str],
-        username: str | None = None,
+        ts_codes: List[str],
+        username: Optional[str] = None,
     ) -> int:
         """
         添加ZQ精选数据

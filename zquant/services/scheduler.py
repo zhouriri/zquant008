@@ -27,7 +27,7 @@
 import threading
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, Optional
 
 from loguru import logger
 from sqlalchemy import asc, desc, func
@@ -46,14 +46,14 @@ class SchedulerService:
         db: Session,
         name: str,
         task_type: TaskType,
-        cron_expression: str | None = None,
-        interval_seconds: int | None = None,
-        description: str | None = None,
-        config: dict[str, Any] | None = None,
+        cron_expression: Optional[str] = None,
+        interval_seconds: Optional[int] = None,
+        description: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
         max_retries: int = 3,
         retry_interval: int = 60,
         enabled: bool = True,
-        created_by: str | None = None,
+        created_by: Optional[str] = None,
     ) -> ScheduledTask:
         """
         创建定时任务
@@ -151,9 +151,9 @@ class SchedulerService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        task_type: TaskType | None = None,
-        enabled: bool | None = None,
-        order_by: str | None = None,
+        task_type: Optional[TaskType] = None,
+        enabled: Optional[bool] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
         exclude_child_tasks: bool = True,
     ) -> list[ScheduledTask]:
@@ -257,14 +257,14 @@ class SchedulerService:
     def update_task(
         db: Session,
         task_id: int,
-        name: str | None = None,
-        cron_expression: str | None = None,
-        interval_seconds: int | None = None,
-        description: str | None = None,
-        config: dict[str, Any] | None = None,
-        max_retries: int | None = None,
-        retry_interval: int | None = None,
-        updated_by: str | None = None,
+        name: Optional[str] = None,
+        cron_expression: Optional[str] = None,
+        interval_seconds: Optional[int] = None,
+        description: Optional[str] = None,
+        config: Optional[Dict[str, Any]] = None,
+        max_retries: Optional[int] = None,
+        retry_interval: Optional[int] = None,
+        updated_by: Optional[str] = None,
     ) -> ScheduledTask:
         """更新任务"""
         task = SchedulerService.get_task(db, task_id)
@@ -759,7 +759,7 @@ class SchedulerService:
         return execution
 
     @staticmethod
-    def get_stats(db: Session, task_id: int | None = None) -> dict[str, Any]:
+    def get_stats(db: Session, task_id: Optional[int] = None) -> dict[str, Any]:
         """获取任务统计信息"""
         if task_id:
             # 单个任务的统计
@@ -874,7 +874,7 @@ class SchedulerService:
 
     @staticmethod
     def calculate_task_status(
-        task: ScheduledTask, job_status: dict[str, Any] | None = None, db: Session | None = None
+        task: ScheduledTask, job_status: Optional[Dict[str, Any]] = None, db: Optional[Session] = None
     ) -> TaskScheduleStatus:
         """
         计算任务调度状态

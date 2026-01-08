@@ -17,7 +17,7 @@
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, List, Optional
 import uuid
 
 import pandas as pd
@@ -68,7 +68,7 @@ class CryptoBacktestEngine:
 
         # 订单管理(T+0即时成交)
         self.pending_orders: dict[str, Order] = {}  # 待成交订单
-        self.filled_orders: list[Order] = []  # 已成交订单
+        self.filled_orders: List[Order] = []  # 已成交订单
 
         # 数据
         self.start_time = config["start_time"]
@@ -80,7 +80,7 @@ class CryptoBacktestEngine:
         self,
         symbol: str,
         quantity: float,
-        price: float | None = None,
+        price: Optional[float] = None,
         order_type: str = "market",
     ) -> str:
         """

@@ -26,7 +26,7 @@
 
 import json
 from datetime import date
-from typing import Any
+from typing import Any, Dict, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -43,7 +43,7 @@ class StockFilterTaskService:
 
     @classmethod
     def execute_strategy(
-        cls, db: Session, strategy: StockFilterStrategy | int, trade_date: date | None = None
+        cls, db: Session, strategy: StockFilterStrategy | int, trade_date: Optional[date] = None
     ) -> dict[str, Any]:
         """
         执行单个策略并保存结果
@@ -121,11 +121,11 @@ class StockFilterTaskService:
     def batch_execute_strategies(
         cls,
         db: Session,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        strategy_id: int | None = None,
-        extra_info: dict[str, Any] | None = None,
-        execution: TaskExecution | None = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        strategy_id: Optional[int] = None,
+        extra_info: Optional[Dict[str, Any]] = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict[str, Any]:
         """
         批量执行量化选股策略（支持多日期和指定策略）
@@ -247,9 +247,9 @@ class StockFilterTaskService:
     def batch_execute_all_strategies(
         cls,
         db: Session,
-        trade_date: date | None = None,
-        extra_info: dict[str, Any] | None = None,
-        execution: TaskExecution | None = None,
+        trade_date: Optional[date] = None,
+        extra_info: Optional[Dict[str, Any]] = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict[str, Any]:
         """
         批量执行所有量化选股策略并保存结果（为了兼容旧调用，转发给新方法）

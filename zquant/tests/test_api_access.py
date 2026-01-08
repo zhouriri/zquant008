@@ -1,4 +1,6 @@
 """
+from typing import Optional
+
 API访问测试脚本
 测试使用localhost和127.0.0.1访问API是否正常
 """
@@ -20,7 +22,7 @@ TEST_PASSWORD = "admin123"
 
 
 def test_endpoint(
-    method: str, url: str, base_url: str, data: dict | None = None, headers: dict | None = None, description: str = ""
+    method: str, url: str, base_url: str, data: Optional[dict] = None, headers: Optional[dict] = None, description: str = ""
 ) -> bool:
     """测试API端点"""
     full_url = f"{base_url}{url}"

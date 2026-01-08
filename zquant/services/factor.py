@@ -25,7 +25,7 @@
 """
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from loguru import logger
 from sqlalchemy import asc, desc, func, text
@@ -47,20 +47,20 @@ class FactorService:
         db: Session,
         factor_name: str,
         cn_name: str,
-        en_name: str | None = None,
-        column_name: str | None = None,
-        description: str | None = None,
-        factor_type: str | None = None,
+        en_name: Optional[str] = None,
+        column_name: Optional[str] = None,
+        description: Optional[str] = None,
+        factor_type: Optional[str] = None,
         enabled: bool = True,
-        factor_config: dict[str, Any] | None = None,
-        created_by: str | None = None,
+        factor_config: Optional[Dict[str, Any]] = None,
+        created_by: Optional[str] = None,
     ) -> FactorDefinition:
         """
         创建因子定义
         
         Args:
             factor_type: 因子类型，可选值："单因子"、"组合因子"，默认为"单因子"
-            factor_config: 因子配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            factor_config: 因子配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
             created_by: 创建人
         """
         # 检查因子名称是否已存在
@@ -118,8 +118,8 @@ class FactorService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        enabled: bool | None = None,
-        order_by: str | None = None,
+        enabled: Optional[bool] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> tuple[list[FactorDefinition], int]:
         """获取因子定义列表"""
@@ -155,21 +155,21 @@ class FactorService:
     def update_factor_definition(
         db: Session,
         factor_id: int,
-        cn_name: str | None = None,
-        en_name: str | None = None,
-        column_name: str | None = None,
-        description: str | None = None,
-        factor_type: str | None = None,
-        enabled: bool | None = None,
-        factor_config: dict[str, Any] | None = None,
-        updated_by: str | None = None,
+        cn_name: Optional[str] = None,
+        en_name: Optional[str] = None,
+        column_name: Optional[str] = None,
+        description: Optional[str] = None,
+        factor_type: Optional[str] = None,
+        enabled: Optional[bool] = None,
+        factor_config: Optional[Dict[str, Any]] = None,
+        updated_by: Optional[str] = None,
     ) -> FactorDefinition:
         """
         更新因子定义
         
         Args:
             factor_type: 因子类型，可选值："单因子"、"组合因子"
-            factor_config: 因子配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            factor_config: 因子配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
             updated_by: 修改人
         """
         factor_def = FactorService.get_factor_definition(db, factor_id)
@@ -216,10 +216,10 @@ class FactorService:
         factor_id: int,
         model_name: str,
         model_code: str,
-        config_json: dict[str, Any] | None = None,
+        config_json: Optional[Dict[str, Any]] = None,
         is_default: bool = False,
         enabled: bool = True,
-        created_by: str | None = None,
+        created_by: Optional[str] = None,
     ) -> FactorModel:
         """创建因子模型"""
         # 检查因子是否存在
@@ -260,11 +260,11 @@ class FactorService:
     @staticmethod
     def list_factor_models(
         db: Session,
-        factor_id: int | None = None,
+        factor_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
-        enabled: bool | None = None,
-        order_by: str | None = None,
+        enabled: Optional[bool] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> tuple[list[FactorModel], int]:
         """获取因子模型列表"""
@@ -311,12 +311,12 @@ class FactorService:
     def update_factor_model(
         db: Session,
         model_id: int,
-        model_name: str | None = None,
-        model_code: str | None = None,
-        config_json: dict[str, Any] | None = None,
-        is_default: bool | None = None,
-        enabled: bool | None = None,
-        updated_by: str | None = None,
+        model_name: Optional[str] = None,
+        model_code: Optional[str] = None,
+        config_json: Optional[Dict[str, Any]] = None,
+        is_default: Optional[bool] = None,
+        enabled: Optional[bool] = None,
+        updated_by: Optional[str] = None,
     ) -> FactorModel:
         """更新因子模型"""
         model = FactorService.get_factor_model(db, model_id)
@@ -362,8 +362,8 @@ class FactorService:
     def create_factor_config(
         db: Session,
         factor_id: int,
-        model_id: int | None = None,
-        codes: list[str] | None = None,
+        model_id: Optional[int] = None,
+        codes: List[str] | None = None,
         enabled: bool = True,
     ) -> FactorConfig:
         """
@@ -404,11 +404,11 @@ class FactorService:
     @staticmethod
     def list_factor_configs(
         db: Session,
-        factor_id: int | None = None,
+        factor_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
-        enabled: bool | None = None,
-        order_by: str | None = None,
+        enabled: Optional[bool] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> tuple[list[FactorConfig], int]:
         """获取因子配置列表"""
@@ -446,9 +446,9 @@ class FactorService:
     def update_factor_config(
         db: Session,
         config_id: int,
-        model_id: int | None = None,
-        codes: list[str] | None = None,
-        enabled: bool | None = None,
+        model_id: Optional[int] = None,
+        codes: List[str] | None = None,
+        enabled: Optional[bool] = None,
     ) -> FactorConfig:
         """更新因子配置"""
         config = FactorService.get_factor_config(db, config_id)
@@ -484,8 +484,8 @@ class FactorService:
     def update_factor_config_with_mappings(
         db: Session,
         factor_id: int,
-        mappings: list[dict] | None = None,
-        enabled: bool | None = None,
+        mappings: List[dict] | None = None,
+        enabled: Optional[bool] = None,
     ) -> list[FactorConfig]:
         """
         更新因子配置（支持批量更新映射）（已废弃）
@@ -560,7 +560,7 @@ class FactorService:
             factor_id: 因子ID
             
         Returns:
-            配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
         """
         factor_def = FactorService.get_factor_definition(db, factor_id)
         return factor_def.get_factor_config()
@@ -577,7 +577,7 @@ class FactorService:
         Args:
             db: 数据库会话
             factor_id: 因子ID
-            factor_config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            factor_config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
             
         Returns:
             更新后的因子定义
@@ -662,7 +662,7 @@ class FactorService:
         db: Session,
         factor_id: int,
         config: dict[str, Any],
-        created_by: str | None = None,
+        created_by: Optional[str] = None,
     ) -> FactorConfig:
         """
         创建因子配置
@@ -670,7 +670,7 @@ class FactorService:
         Args:
             db: 数据库会话
             factor_id: 因子ID
-            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
             created_by: 创建人
             
         Returns:
@@ -733,7 +733,7 @@ class FactorService:
         db: Session,
         factor_id: int,
         config: dict[str, Any],
-        updated_by: str | None = None,
+        updated_by: Optional[str] = None,
     ) -> FactorConfig:
         """
         更新因子配置（按factor_id）
@@ -741,7 +741,7 @@ class FactorService:
         Args:
             db: 数据库会话
             factor_id: 因子ID
-            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
             updated_by: 更新人
             
         Returns:
@@ -796,13 +796,13 @@ class FactorService:
     @staticmethod
     def get_quant_factor_results(
         db: Session,
-        ts_code: str | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        filter_conditions: Any | None = None,
+        ts_code: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        filter_conditions: Optional[Any] = None,
         skip: int = 0,
         limit: int = 100,
-        order_by: str | None = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> tuple[list[dict[str, Any]], int]:
         """

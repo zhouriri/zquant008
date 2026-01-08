@@ -25,7 +25,7 @@
 """
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from loguru import logger
 from sqlalchemy import Date, DateTime, Float, Integer, String, text, desc, inspect as sql_inspect
@@ -46,7 +46,7 @@ from zquant.services.factor import FactorService
 class FactorCalculationCache:
     """因子计算缓存，用于减少数据库查询"""
     
-    def __init__(self, db: Session, factor_defs: list[FactorDefinition]):
+    def __init__(self, db: Session, factor_defs: List[FactorDefinition]):
         """
         初始化缓存
         
@@ -69,7 +69,7 @@ class FactorCalculationCache:
         
         self._load_all_data(db, factor_defs)
     
-    def _load_all_data(self, db: Session, factor_defs: list[FactorDefinition]):
+    def _load_all_data(self, db: Session, factor_defs: List[FactorDefinition]):
         """一次性加载所有数据到内存"""
         if not factor_defs:
             return
@@ -217,7 +217,7 @@ class FactorCalculationService:
     """因子计算服务"""
 
     @staticmethod
-    def check_data_ready(db: Session, trade_date: date | None = None) -> tuple[bool, str]:
+    def check_data_ready(db: Session, trade_date: Optional[date] = None) -> tuple[bool, str]:
         """
         检查数据是否准备就绪
 
@@ -341,7 +341,7 @@ class FactorCalculationService:
         return table_name
 
     @staticmethod
-    def ensure_factor_tables_for_codes(db: Session, codes: list[str]) -> dict[str, bool]:
+    def ensure_factor_tables_for_codes(db: Session, codes: List[str]) -> dict[str, bool]:
         """
         为指定的股票代码列表初始化因子表（只创建基础结构，不添加因子列）
 
@@ -381,7 +381,7 @@ class FactorCalculationService:
         return results
 
     @staticmethod
-    def sync_factor_columns(db: Session, code: str | None = None) -> dict[str, Any]:
+    def sync_factor_columns(db: Session, code: Optional[str] = None) -> dict[str, Any]:
         """
         根据因子配置同步因子列到因子表
 
@@ -481,8 +481,8 @@ class FactorCalculationService:
         table_name: str,
         trade_date: date,
         factor_values: dict[str, Any],
-        code: str | None = None,
-        extra_info: dict[str, Any] | None = None,
+        code: Optional[str] = None,
+        extra_info: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         保存组合因子计算结果（多个字段）
@@ -604,10 +604,10 @@ class FactorCalculationService:
         db: Session,
         table_name: str,
         trade_date: date,
-        factor_value: float | None,
+        factor_value: Optional[float],
         column_name: str,
-        code: str | None = None,
-        extra_info: dict[str, Any] | None = None,
+        code: Optional[str] = None,
+        extra_info: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         保存因子计算结果
@@ -707,12 +707,12 @@ class FactorCalculationService:
     @staticmethod
     def calculate_factor(
         db: Session,
-        factor_id: int | None = None,
-        codes: list[str] | None = None,
-        start_date: date | None = None,
-        end_date: date | None = None,
-        extra_info: dict[str, Any] | None = None,
-        execution: TaskExecution | None = None,
+        factor_id: Optional[int] = None,
+        codes: List[str] | None = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        extra_info: Optional[Dict[str, Any]] = None,
+        execution: Optional[TaskExecution] = None,
     ) -> dict[str, Any]:
         """
         计算因子
@@ -1114,7 +1114,7 @@ class FactorCalculationService:
         model: FactorModel,
         code: str,
         trade_date: date,
-        extra_info: dict[str, Any] | None = None,
+        extra_info: Optional[Dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """
         计算单个因子的单个股票
@@ -1245,8 +1245,8 @@ class FactorCalculationService:
     def get_factor_results(
         db: Session,
         code: str,
-        factor_name: str | None = None,
-        trade_date: date | None = None,
+        factor_name: Optional[str] = None,
+        trade_date: Optional[date] = None,
     ) -> list[dict[str, Any]]:
         """
         获取因子计算结果

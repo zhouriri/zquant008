@@ -27,7 +27,7 @@
 from datetime import date, datetime
 import importlib.util
 import json
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy import asc, desc
@@ -49,9 +49,9 @@ class BacktestService:
         user_id: int,
         strategy_name: str,
         config: dict[str, Any],
-        strategy_id: int | None = None,
-        strategy_code: str | None = None,
-        created_by: str | None = None,
+        strategy_id: Optional[int] = None,
+        strategy_code: Optional[str] = None,
+        created_by: Optional[str] = None,
     ) -> BacktestTask:
         """
         创建回测任务
@@ -102,7 +102,7 @@ class BacktestService:
         return task
 
     @staticmethod
-    def run_backtest(db: Session, task_id: int, updated_by: str | None = None) -> BacktestResult:
+    def run_backtest(db: Session, task_id: int, updated_by: Optional[str] = None) -> BacktestResult:
         """运行回测"""
         # 获取任务
         task = db.query(BacktestTask).filter(BacktestTask.id == task_id).first()
@@ -192,7 +192,7 @@ class BacktestService:
 
     @staticmethod
     def get_user_tasks(
-        db: Session, user_id: int, skip: int = 0, limit: int = 100, order_by: str | None = None, order: str = "desc"
+        db: Session, user_id: int, skip: int = 0, limit: int = 100, order_by: Optional[str] = None, order: str = "desc"
     ) -> list[BacktestTask]:
         """获取用户的所有回测任务（支持排序）"""
         query = db.query(BacktestTask).filter(BacktestTask.user_id == user_id)
@@ -232,7 +232,7 @@ class BacktestService:
 
     @staticmethod
     def list_results(
-        db: Session, user_id: int, skip: int = 0, limit: int = 100, order_by: str | None = None, order: str = "desc"
+        db: Session, user_id: int, skip: int = 0, limit: int = 100, order_by: Optional[str] = None, order: str = "desc"
     ) -> list[BacktestResult]:
         """获取用户的所有回测结果列表（支持排序）"""
         # 先获取用户的所有任务ID

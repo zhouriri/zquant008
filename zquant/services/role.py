@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 角色服务
 """
 
@@ -70,7 +72,7 @@ class RoleService:
 
     @staticmethod
     def get_all_roles(
-        db: Session, skip: int = 0, limit: int = 100, order_by: str | None = None, order: str = "desc"
+        db: Session, skip: int = 0, limit: int = 100, order_by: Optional[str] = None, order: str = "desc"
     ) -> list[Role]:
         """获取所有角色（分页、排序）"""
         query = db.query(Role)
@@ -160,7 +162,7 @@ class RoleService:
         return db.query(Permission).join(RolePermission).filter(RolePermission.role_id == role_id).all()
 
     @staticmethod
-    def assign_permissions(db: Session, role_id: int, permission_ids: list[int]) -> Role:
+    def assign_permissions(db: Session, role_id: int, permission_ids: List[int]) -> Role:
         """为角色分配权限"""
         role = RoleService.get_role_by_id(db, role_id)
         if not role:

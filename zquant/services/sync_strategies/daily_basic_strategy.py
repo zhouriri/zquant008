@@ -24,7 +24,7 @@
 每日指标数据同步策略
 """
 
-from typing import Any
+from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from zquant.models.scheduler import TaskExecution
@@ -39,7 +39,7 @@ class DailyBasicSyncStrategy(DataSyncStrategy):
         self.data_scheduler = DataScheduler()
 
     def sync(
-        self, db: Session, config: dict[str, Any], extra_info: dict | None = None, execution: TaskExecution | None = None
+        self, db: Session, config: dict[str, Any], extra_info: Optional[dict] = None, execution: Optional[TaskExecution] = None
     ) -> dict[str, Any]:
         """
         同步每日指标数据

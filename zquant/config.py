@@ -24,6 +24,7 @@
 配置管理模块
 """
 
+from typing import Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -41,6 +42,7 @@ class Settings(BaseSettings):
     APP_HOST: str = "0.0.0.0"  # 应用主机地址
 
     # 数据库配置
+    DATABASE_URL: Optional[str] = None
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
     DB_USER: str = "root"
@@ -57,10 +59,11 @@ class Settings(BaseSettings):
     DB_ECHO: bool = False  # 是否打印SQL语句（DEBUG模式下自动启用）
 
     # Redis配置
+    REDIS_URL: Optional[str] = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    REDIS_PASSWORD: str | None = None
+    REDIS_PASSWORD: Optional[str] = None
 
     # 缓存配置
     CACHE_TYPE: str = "memory"  # 缓存类型：memory=本地内存缓存，redis=Redis缓存
@@ -72,7 +75,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_HOUR: int = 1000  # 每小时允许的请求数
 
     # JWT配置
-    SECRET_KEY: str | None = Field(
+    SECRET_KEY: Optional[str] = Field(
         default=None,
         description="JWT密钥，生产环境必须从环境变量设置。开发环境未设置时会自动生成随机密钥（不安全，仅用于开发）"
     )
@@ -81,13 +84,13 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS配置
-    CORS_ORIGINS: list[str] = Field(
+    CORS_ORIGINS: list = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"],
         description="允许的CORS来源列表，生产环境必须配置具体域名，不能使用 '*'"
     )
 
     # 加密配置
-    ENCRYPTION_KEY: str | None = None  # 加密密钥（从环境变量读取），用于加密敏感配置
+    ENCRYPTION_KEY: Optional[str] = None  # 加密密钥（从环境变量读取），用于加密敏感配置
     # 注意：如果未配置 ENCRYPTION_KEY，可以使用以下命令生成：
     # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 

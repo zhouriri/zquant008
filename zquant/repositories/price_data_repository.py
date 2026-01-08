@@ -27,7 +27,7 @@
 """
 
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -68,7 +68,7 @@ class PriceDataRepository:
         )
 
     def batch_get_daily_data(
-        self, ts_codes: list[str], start_date: date, end_date: date
+        self, ts_codes: List[str], start_date: date, end_date: date
     ) -> dict[str, list[dict]]:
         """
         批量获取多个股票的价格数据
@@ -119,7 +119,7 @@ class PriceDataRepository:
         )
 
     def batch_get_daily_basic_data(
-        self, ts_codes: list[str], start_date: date, end_date: date
+        self, ts_codes: List[str], start_date: date, end_date: date
     ) -> dict[str, list[dict]]:
         """
         批量获取多个股票的每日指标数据

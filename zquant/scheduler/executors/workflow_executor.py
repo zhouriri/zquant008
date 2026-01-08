@@ -27,7 +27,7 @@
 
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
+from typing import Any, List, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -47,7 +47,7 @@ class WorkflowExecutor(TaskExecutor):
     def get_task_type(self) -> TaskType:
         return TaskType.WORKFLOW
 
-    def execute(self, db: Session, config: dict[str, Any], execution: TaskExecution | None = None) -> dict[str, Any]:
+    def execute(self, db: Session, config: dict[str, Any], execution: Optional[TaskExecution] = None) -> dict[str, Any]:
         """
         执行编排任务
 
@@ -99,7 +99,7 @@ class WorkflowExecutor(TaskExecutor):
             return self._execute_parallel(db, task_objects, tasks_config, dependency_graph, on_failure, execution, successful_tasks)
         raise ValueError(f"不支持的执行模式: {workflow_type}，支持的模式：serial, parallel")
 
-    def _load_tasks(self, db: Session, tasks_config: list[dict[str, Any]]) -> dict[int, ScheduledTask]:
+    def _load_tasks(self, db: Session, tasks_config: List[dict[str, Any]]) -> dict[int, ScheduledTask]:
         """加载任务对象"""
         task_ids = [task["task_id"] for task in tasks_config]
         tasks = db.query(ScheduledTask).filter(ScheduledTask.id.in_(task_ids)).all()
@@ -118,7 +118,7 @@ class WorkflowExecutor(TaskExecutor):
 
         return task_dict
 
-    def _validate_dependencies(self, tasks_config: list[dict[str, Any]]):
+    def _validate_dependencies(self, tasks_config: List[dict[str, Any]]):
         """验证依赖关系，检查循环依赖"""
         task_ids = {task["task_id"] for task in tasks_config}
 
@@ -155,7 +155,7 @@ class WorkflowExecutor(TaskExecutor):
                 if has_cycle(task_id):
                     raise ValueError(f"检测到循环依赖，任务 {task_id} 存在循环依赖关系")
 
-    def _build_dependency_graph(self, tasks_config: list[dict[str, Any]]) -> dict[int, set[int]]:
+    def _build_dependency_graph(self, tasks_config: List[dict[str, Any]]) -> dict[int, set[int]]:
         """构建依赖图，返回每个任务的依赖集合"""
         graph = defaultdict(set)
         for task in tasks_config:
@@ -167,10 +167,10 @@ class WorkflowExecutor(TaskExecutor):
         self,
         db: Session,
         task_objects: dict[int, ScheduledTask],
-        tasks_config: list[dict[str, Any]],
+        tasks_config: List[dict[str, Any]],
         dependency_graph: dict[int, set[int]],
         on_failure: str,
-        execution: TaskExecution | None,
+        execution: Optional[TaskExecution],
         successful_tasks: set[int] = None,
     ) -> dict[str, Any]:
         """串行执行任务"""
@@ -269,10 +269,10 @@ class WorkflowExecutor(TaskExecutor):
         self,
         db: Session,
         task_objects: dict[int, ScheduledTask],
-        tasks_config: list[dict[str, Any]],
+        tasks_config: List[dict[str, Any]],
         dependency_graph: dict[int, set[int]],
         on_failure: str,
-        execution: TaskExecution | None,
+        execution: Optional[TaskExecution],
         successful_tasks: set[int] = None,
     ) -> dict[str, Any]:
         """并行执行任务"""
@@ -390,7 +390,7 @@ class WorkflowExecutor(TaskExecutor):
         task_config["task_type"] = task.task_type
         return executor.execute(db, task_config, None)
 
-    def _topological_sort(self, tasks_config: list[dict[str, Any]], dependency_graph: dict[int, set[int]]) -> list[int]:
+    def _topological_sort(self, tasks_config: List[dict[str, Any]], dependency_graph: dict[int, set[int]]) -> list[int]:
         """拓扑排序，确定任务执行顺序"""
         # 计算入度
         in_degree = defaultdict(int)

@@ -25,6 +25,7 @@
 """
 
 import json
+from typing import List
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -65,7 +66,7 @@ class FactorDefinition(Base, AuditMixin):
         获取因子配置字典
         
         Returns:
-            配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
         """
         if self.config:
             return self.config.get_config()
@@ -76,7 +77,7 @@ class FactorDefinition(Base, AuditMixin):
         设置因子配置
         
         Args:
-            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
         """
         if config:
             # 验证配置格式
@@ -173,7 +174,7 @@ class FactorConfig(Base, AuditMixin):
         获取因子配置字典
         
         Returns:
-            配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
         """
         if self.config_json:
             try:
@@ -187,7 +188,7 @@ class FactorConfig(Base, AuditMixin):
         设置因子配置
         
         Args:
-            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": list[str]|None}, ...]}
+            config: 配置字典，格式：{"enabled": bool, "mappings": [{"model_id": int, "codes": List[str]|None}, ...]}
         """
         if config:
             # 验证配置格式
@@ -236,7 +237,7 @@ class FactorConfig(Base, AuditMixin):
         
         return all_codes
 
-    def set_codes_list(self, codes: list[str]):
+    def set_codes_list(self, codes: List[str]):
         """
         设置配置中的codes列表（兼容旧代码，已废弃）
         

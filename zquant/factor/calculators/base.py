@@ -26,7 +26,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import date
-from typing import Any, Union
+from typing import Any, Union, Dict, Optional
 
 from sqlalchemy.orm import Session
 
@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 class BaseFactorCalculator(ABC):
     """因子计算器基类"""
 
-    def __init__(self, model_code: str, config: dict[str, Any] | None = None):
+    def __init__(self, model_code: str, config: Optional[Dict[str, Any]] = None):
         """
         初始化因子计算器
 

@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 数据清洗和处理模块
 """
 
@@ -64,7 +66,7 @@ class DataProcessor:
 
     @staticmethod
     def get_trading_calendar_records(
-        db: Session, start_date: date, end_date: date, exchange: str | None = None
+        db: Session, start_date: date, end_date: date, exchange: Optional[str] = None
     ) -> list[dict]:
         """
         获取完整的交易日历记录列表
@@ -99,7 +101,7 @@ class DataProcessor:
 
     @staticmethod
     def get_daily_data_records(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session, ts_code: str | list[str] | None = None, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> list[dict]:
         """
         获取日线数据记录列表
@@ -322,7 +324,7 @@ class DataProcessor:
 
     @staticmethod
     def get_daily_basic_data_records(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session, ts_code: str | list[str] | None = None, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> list[dict]:
         """
         获取每日指标数据记录列表
@@ -530,7 +532,7 @@ class DataProcessor:
     @staticmethod
     def align_data_by_calendar(
         df: pd.DataFrame,
-        trading_dates: list[date],
+        trading_dates: List[date],
         fill_method: str = "ffill",  # forward fill, 使用前值填充
     ) -> pd.DataFrame:
         """
@@ -555,7 +557,7 @@ class DataProcessor:
         return result
 
     @staticmethod
-    def filter_by_list_date(symbols: list[str], filter_date: date, db: Session) -> list[str]:
+    def filter_by_list_date(symbols: List[str], filter_date: date, db: Session) -> list[str]:
         """
         过滤股票：只保留在指定日期之前已上市的股票
 
@@ -577,7 +579,7 @@ class DataProcessor:
 
     @staticmethod
     def get_factor_data_records(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session, ts_code: str | list[str] | None = None, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> list[dict]:
         """
         获取因子数据记录列表
@@ -750,7 +752,7 @@ class DataProcessor:
 
     @staticmethod
     def get_stkfactorpro_data_records(
-        db: Session, ts_code: str | list[str] | None = None, start_date: date | None = None, end_date: date | None = None
+        db: Session, ts_code: str | list[str] | None = None, start_date: Optional[date] = None, end_date: Optional[date] = None
     ) -> list[dict]:
         """
         获取专业版因子数据记录列表

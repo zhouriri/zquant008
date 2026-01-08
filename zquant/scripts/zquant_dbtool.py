@@ -7,7 +7,7 @@
 import datetime
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, List, Dict
 
 from loguru import logger
 
@@ -514,7 +514,7 @@ class ZQuantDBTool:
             except:
                 pass
 
-    def _ask_delete_data(self, table_name: str, is_partitioned: bool = False, sub_tables: list[tuple[str, str]] = None):
+    def _ask_delete_data(self, table_name: str, is_partitioned: bool = False, sub_tables: List[tuple[str, str]] = None):
         """
         询问是否要删除数据
         """
@@ -566,7 +566,7 @@ class ZQuantDBTool:
         except Exception as e:
             print(f"❌ 删除过程中发生错误: {e}")
 
-    def _delete_partition_table_data(self, base_name: str, sub_tables: list[tuple[str, str]]):
+    def _delete_partition_table_data(self, base_name: str, sub_tables: List[tuple[str, str]]):
         """
         删除分表组的数据
         """
@@ -858,7 +858,7 @@ class ZQuantDBTool:
         else:
             print(f"❌ {result['message']}")
 
-    def _drop_partition_table_group(self, base_name: str, sub_tables: list[tuple[str, str]]):
+    def _drop_partition_table_group(self, base_name: str, sub_tables: List[tuple[str, str]]):
         """
         删除分表组
         """

@@ -25,7 +25,7 @@
 提供查询优化相关的工具函数，包括分页、字段选择、查询缓存等。
 """
 
-from typing import Any, TypeVar
+from typing import Any, TypeVar, List, Optional
 from sqlalchemy.orm import Query, joinedload, selectinload
 from sqlalchemy import func
 
@@ -80,7 +80,7 @@ def paginate_query(
 
 
 def optimize_query_with_relationships(
-    query: Query[T], relationships: list[str] | None = None, use_joinedload: bool = True
+    query: Query[T], relationships: List[str] | None = None, use_joinedload: bool = True
 ) -> Query[T]:
     """
     优化查询，预加载关联关系（避免N+1查询问题）
@@ -112,7 +112,7 @@ def optimize_query_with_relationships(
     return query
 
 
-def select_fields(query: Query[T], fields: list[str] | None = None) -> Query[T]:
+def select_fields(query: Query[T], fields: List[str] | None = None) -> Query[T]:
     """
     选择特定字段（减少数据传输量）
 
@@ -137,7 +137,7 @@ def select_fields(query: Query[T], fields: list[str] | None = None) -> Query[T]:
 
 
 def add_date_range_filter(
-    query: Query[T], date_field: str, start_date: str | None = None, end_date: str | None = None
+    query: Query[T], date_field: str, start_date: Optional[str] = None, end_date: Optional[str] = None
 ) -> Query[T]:
     """
     添加日期范围过滤

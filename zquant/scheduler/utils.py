@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 import time
 
 from loguru import logger
@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from zquant.models.scheduler import TaskExecution, TaskStatus
 
 
-def check_control_flags(db: Session, execution: TaskExecution | None):
+def check_control_flags(db: Session, execution: Optional[TaskExecution]):
     """
     仅检查控制标志（暂停/终止），不更新进度。
     适用于循环中高频调用。
@@ -90,12 +90,12 @@ def check_control_flags(db: Session, execution: TaskExecution | None):
 
 def update_execution_progress(
     db: Session,
-    execution: TaskExecution | None,
-    processed_items: int | None = None,
-    total_items: int | None = None,
-    current_item: str | None = None,
-    progress_percent: float | None = None,
-    message: str | None = None,
+    execution: Optional[TaskExecution],
+    processed_items: Optional[int] = None,
+    total_items: Optional[int] = None,
+    current_item: Optional[str] = None,
+    progress_percent: Optional[float] = None,
+    message: Optional[str] = None,
 ):
     """
     更新执行进度并检查控制标志

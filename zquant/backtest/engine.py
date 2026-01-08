@@ -25,7 +25,7 @@
 """
 
 from datetime import date
-from typing import Any
+from typing import Any, List, Optional
 import uuid
 
 from loguru import logger
@@ -72,7 +72,7 @@ class BacktestEngine:
 
         # 订单管理
         self.pending_orders: dict[str, Order] = {}  # 待成交订单（T日下单，T+1日成交）
-        self.filled_orders: list[Order] = []  # 已成交订单
+        self.filled_orders: List[Order] = []  # 已成交订单
 
         # 数据
         self.start_date = config["start_date"]
@@ -197,7 +197,7 @@ class BacktestEngine:
             return None
         return self.daily_basic_data[symbol][trade_date]
 
-    def _create_order(self, symbol: str, quantity: float, price: float | None = None) -> str:
+    def _create_order(self, symbol: str, quantity: float, price: Optional[float] = None) -> str:
         """
         创建订单（由context.order调用）
 

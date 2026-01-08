@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 换手率因子计算器
 """
 
@@ -39,7 +41,7 @@ class TurnoverRateCalculator(BaseFactorCalculator):
 
     MODEL_CODE = "turnover_rate"
 
-    def __init__(self, config: dict | None = None):
+    def __init__(self, config: Optional[dict] = None):
         """
         初始化换手率计算器
 

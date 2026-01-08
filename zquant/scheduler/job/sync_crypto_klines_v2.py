@@ -16,7 +16,7 @@
 加密货币回测任务调度
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 
@@ -151,7 +151,7 @@ class CryptoBacktestJob:
 
     def _save_backtest_result(
         self,
-        task_id: int | None,
+        task_id: Optional[int],
         strategy_name: str,
         symbol: str,
         interval: str,

@@ -24,7 +24,7 @@ COPY web/package.json web/yarn.lock* web/package-lock.json* ./
 # 安装前端依赖
 RUN if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
     elif [ -f package-lock.json ]; then npm ci; \
-    else echo "Lockfile not found." && exit 1; \
+    else npm install; \
     fi
 
 # 复制前端源代码

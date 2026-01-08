@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 调度脚本基类
 
 提供统一的参数解析、日期验证、错误处理等公共逻辑。
@@ -63,7 +65,7 @@ class BaseSyncJob:
         self.job_name = job_name
         self.description = description
         self.start_time = None
-        self.db: Session | None = None
+        self.db: Optional[Session] = None
 
     def create_parser(self) -> argparse.ArgumentParser:
         """
@@ -107,8 +109,8 @@ class BaseSyncJob:
 
     def validate_dates(
         self,
-        start_date: str | None,
-        end_date: str | None,
+        start_date: Optional[str],
+        end_date: Optional[str],
         default_start_days: int = 0,
         use_latest_trading_date_when_all_empty: bool = False,
     ) -> tuple[str, str]:

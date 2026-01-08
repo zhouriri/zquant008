@@ -27,6 +27,7 @@
 """
 
 from datetime import datetime, timedelta
+from typing import Optional
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -161,7 +162,7 @@ class AuthService:
         logger.info(f"Token已添加到黑名单: {token_hash[:16]}...")
 
     @staticmethod
-    def authenticate_user(db: Session, username: str, password: str) -> User | None:
+    def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
         """
         验证用户
 

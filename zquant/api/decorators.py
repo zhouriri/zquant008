@@ -28,7 +28,7 @@ API装饰器模块
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from fastapi import HTTPException, status
 from loguru import logger
@@ -80,7 +80,7 @@ def handle_data_api_error(func: Callable) -> Callable:
     return wrapper
 
 
-def convert_to_response_items(records: list[Any], item_class: type) -> list[Any]:
+def convert_to_response_items(records: List[Any], item_class: type) -> list[Any]:
     """
     将数据库记录转换为响应项列表
 
@@ -171,7 +171,7 @@ def wrap_response(message: str = "操作成功", code: int = 200):
 
 
 def create_error_response(
-    message: str, error_code: str | None = None, error_detail: dict[str, Any] | None = None, status_code: int = 400
+    message: str, error_code: Optional[str] = None, error_detail: Optional[Dict[str, Any]] = None, status_code: int = 400
 ) -> HTTPException:
     """
     创建统一的错误响应

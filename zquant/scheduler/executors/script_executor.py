@@ -31,7 +31,7 @@ import shlex
 import subprocess
 import threading
 import time
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -55,7 +55,7 @@ class ScriptExecutor(TaskExecutor):
         """获取任务类型（脚本执行器不通过任务类型调用，返回任意类型）"""
         return TaskType.COMMON_TASK  # 占位符，实际不通过类型调用
 
-    def execute(self, db: Session, config: dict[str, Any], execution: TaskExecution | None = None) -> dict[str, Any]:
+    def execute(self, db: Session, config: dict[str, Any], execution: Optional[TaskExecution] = None) -> dict[str, Any]:
         """
         执行命令/脚本
 

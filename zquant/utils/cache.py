@@ -28,7 +28,7 @@
 from collections import OrderedDict
 import threading
 import time
-from typing import Any, Protocol
+from typing import Any, Dict, List, Optional, Protocol
 
 from loguru import logger
 
@@ -38,11 +38,11 @@ from zquant.config import settings
 class CacheInterface(Protocol):
     """缓存接口协议"""
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str) -> Optional[str]:
         """获取缓存值"""
         ...
 
-    def set(self, key: str, value: Any, ex: int | None = None) -> bool:
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
         """设置缓存值"""
         ...
 
@@ -98,7 +98,7 @@ class MemoryCache:
                 self._cache.pop(lru_key, None)
                 self._access_order.pop(lru_key, None)
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str) -> Optional[str]:
         """获取缓存值"""
         with self._lock:
             # 惰性清理过期条目
@@ -124,7 +124,7 @@ class MemoryCache:
                 return value
             return str(value)
 
-    def set(self, key: str, value: Any, ex: int | None = None) -> bool:
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
         """设置缓存值
 
         Args:
@@ -210,7 +210,7 @@ class CacheFactory:
     根据配置创建并返回缓存实例（单例模式）
     """
 
-    _instance: Any | None = None
+    _instance: Optional[Any] = None
     _lock = threading.Lock()
 
     @classmethod

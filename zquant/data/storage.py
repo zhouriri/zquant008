@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 数据存储服务
 """
 
@@ -58,7 +60,7 @@ class DataStorage:
     """数据存储服务类"""
 
     @staticmethod
-    def upsert_stocks(db: Session, stocks_df: pd.DataFrame, extra_info: dict | None = None) -> int:
+    def upsert_stocks(db: Session, stocks_df: pd.DataFrame, extra_info: Optional[dict] = None) -> int:
         """
         批量插入或更新股票基础信息
 
@@ -147,7 +149,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_daily_data(
-        db: Session, bars_df: pd.DataFrame, ts_code: str, extra_info: dict | None = None, update_view: bool = True
+        db: Session, bars_df: pd.DataFrame, ts_code: str, extra_info: Optional[dict] = None, update_view: bool = True
     ) -> int:
         """
         批量插入或更新日线数据（按 ts_code 分表存储）
@@ -212,7 +214,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_daily_data_batch(
-        db: Session, all_data_df: pd.DataFrame, extra_info: dict | None = None, update_view: bool = False
+        db: Session, all_data_df: pd.DataFrame, extra_info: Optional[dict] = None, update_view: bool = False
     ) -> dict:
         """
         批量插入或更新日线数据（按 ts_code 分组写入对应分表）
@@ -285,7 +287,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_daily_basic_data(
-        db: Session, basic_df: pd.DataFrame, ts_code: str, extra_info: dict | None = None, update_view: bool = True
+        db: Session, basic_df: pd.DataFrame, ts_code: str, extra_info: Optional[dict] = None, update_view: bool = True
     ) -> int:
         """
         批量插入或更新每日指标数据（按 ts_code 分表存储）
@@ -374,7 +376,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_daily_basic_data_batch(
-        db: Session, all_data_df: pd.DataFrame, extra_info: dict | None = None, update_view: bool = False
+        db: Session, all_data_df: pd.DataFrame, extra_info: Optional[dict] = None, update_view: bool = False
     ) -> dict:
         """
         批量插入或更新每日指标数据（按 ts_code 分组写入对应分表）
@@ -446,7 +448,7 @@ class DataStorage:
         return {"total": total_count, "success": success_count, "failed": failed_list, "table_details": table_details}
 
     @staticmethod
-    def upsert_trading_calendar(db: Session, cal_df: pd.DataFrame, extra_info: dict | None = None) -> int:
+    def upsert_trading_calendar(db: Session, cal_df: pd.DataFrame, extra_info: Optional[dict] = None) -> int:
         """
         批量插入或更新交易日历
 
@@ -492,7 +494,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_fundamentals(
-        db: Session, fund_df: pd.DataFrame, symbol: str, statement_type: str, extra_info: dict | None = None
+        db: Session, fund_df: pd.DataFrame, symbol: str, statement_type: str, extra_info: Optional[dict] = None
     ) -> int:
         """
         批量插入或更新财务数据
@@ -566,7 +568,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_factor_data(
-        db: Session, factor_df: pd.DataFrame, ts_code: str, extra_info: dict | None = None, update_view: bool = True
+        db: Session, factor_df: pd.DataFrame, ts_code: str, extra_info: Optional[dict] = None, update_view: bool = True
     ) -> int:
         """
         批量插入或更新股票技术因子数据（按 ts_code 分表存储）
@@ -701,7 +703,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_factor_data_batch(
-        db: Session, all_data_df: pd.DataFrame, extra_info: dict | None = None, update_view: bool = False
+        db: Session, all_data_df: pd.DataFrame, extra_info: Optional[dict] = None, update_view: bool = False
     ) -> dict:
         """
         批量插入或更新因子数据（按 ts_code 分组写入对应分表）
@@ -771,7 +773,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_stkfactorpro_data(
-        db: Session, factor_df: pd.DataFrame, ts_code: str, extra_info: dict | None = None, update_view: bool = True
+        db: Session, factor_df: pd.DataFrame, ts_code: str, extra_info: Optional[dict] = None, update_view: bool = True
     ) -> int:
         """
         批量插入或更新股票技术因子（专业版）数据（按 ts_code 分表存储）
@@ -1144,7 +1146,7 @@ class DataStorage:
 
     @staticmethod
     def upsert_stkfactorpro_data_batch(
-        db: Session, all_data_df: pd.DataFrame, extra_info: dict | None = None, update_view: bool = False
+        db: Session, all_data_df: pd.DataFrame, extra_info: Optional[dict] = None, update_view: bool = False
     ) -> dict:
         """
         批量插入或更新专业版因子数据（按 ts_code 分组写入对应分表）

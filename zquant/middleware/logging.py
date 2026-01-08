@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 请求日志中间件
 记录所有API请求的详细信息，包括请求ID追踪
 """
@@ -76,7 +78,7 @@ def set_request_id(request_id: str) -> None:
     request_id_var.set(request_id)
 
 
-def should_exclude_response(path: str, content_type: str | None) -> bool:
+def should_exclude_response(path: str, content_type: Optional[str]) -> bool:
     """
     判断是否应该排除响应体记录
 

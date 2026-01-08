@@ -28,7 +28,7 @@
 
 from datetime import date
 import math
-from typing import Any
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
@@ -67,7 +67,7 @@ def parse_date_field(value: Any) -> date | None:
         return None
 
 
-def apply_extra_info(record: dict[str, Any], extra_info: dict[str, Any] | None = None) -> dict[str, Any]:
+def apply_extra_info(record: dict[str, Any], extra_info: Optional[Dict[str, Any]] = None) -> dict[str, Any]:
     """
     应用extra_info到记录中，设置created_by和updated_by字段
 

@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 交易成本计算
 """
 
@@ -43,7 +45,7 @@ class CostConfig:
 class CostCalculator:
     """交易成本计算器"""
 
-    def __init__(self, config: CostConfig | None = None):
+    def __init__(self, config: Optional[CostConfig] = None):
         self.config = config or CostConfig()
 
     def calculate_commission(self, value: float) -> float:

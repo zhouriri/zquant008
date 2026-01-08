@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 分表管理服务
 
 提供分表的自动管理功能，包括：
@@ -124,7 +126,7 @@ class PartitionManager:
             return []
 
     @staticmethod
-    def init_partition_tables_for_codes(db: Session, codes: list[str]) -> dict:
+    def init_partition_tables_for_codes(db: Session, codes: List[str]) -> dict:
         """
         为指定的股票代码批量初始化所有类型的分表
 
@@ -322,7 +324,7 @@ class PartitionManager:
         return results
 
     @staticmethod
-    def sync_spacex_factor_columns(db: Session, execution: TaskExecution | None = None) -> dict:
+    def sync_spacex_factor_columns(db: Session, execution: Optional[TaskExecution] = None) -> dict:
         """
         同步所有 SpaceX Factor 分表的列结构，确保所有分表的列一致
 

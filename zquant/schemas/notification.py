@@ -26,7 +26,7 @@
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -36,8 +36,8 @@ from zquant.schemas.common import QueryRequest
 
 class NotificationListRequest(QueryRequest):
     """通知列表查询请求模型"""
-    is_read: bool | None = Field(None, description="是否已读")
-    type: NotificationType | None = Field(None, description="通知类型")
+    is_read: Optional[bool] = Field(None, description="是否已读")
+    type: Optional[NotificationType] = Field(None, description="通知类型")
     order_by: str = Field("created_time", description="排序字段：created_time, updated_time")
 
 
@@ -48,7 +48,7 @@ class NotificationCreate(BaseModel):
     type: NotificationType = Field(NotificationType.SYSTEM, description="通知类型")
     title: str = Field(..., min_length=1, max_length=200, description="通知标题")
     content: str = Field(..., min_length=1, description="通知内容")
-    extra_data: dict[str, Any] | None = Field(None, description="额外数据（JSON格式）")
+    extra_data: Optional[Dict[str, Any]] = Field(None, description="额外数据（JSON格式）")
 
     @field_validator("extra_data", mode="before")
     @classmethod
@@ -67,7 +67,7 @@ class NotificationCreate(BaseModel):
 class NotificationUpdate(BaseModel):
     """更新通知请求模型"""
 
-    is_read: bool | None = Field(None, description="是否已读")
+    is_read: Optional[bool] = Field(None, description="是否已读")
 
 
 class NotificationResponse(BaseModel):
@@ -79,10 +79,10 @@ class NotificationResponse(BaseModel):
     title: str = Field(..., description="通知标题")
     content: str = Field(..., description="通知内容")
     is_read: bool = Field(..., description="是否已读")
-    extra_data: dict[str, Any] | None = Field(None, description="额外数据（JSON格式）")
-    created_by: str | None = Field(None, description="创建人")
+    extra_data: Optional[Dict[str, Any]] = Field(None, description="额外数据（JSON格式）")
+    created_by: Optional[str] = Field(None, description="创建人")
     created_time: datetime = Field(..., description="创建时间")
-    updated_by: str | None = Field(None, description="修改人")
+    updated_by: Optional[str] = Field(None, description="修改人")
     updated_time: datetime = Field(..., description="更新时间")
 
     class Config:
@@ -105,7 +105,7 @@ class NotificationResponse(BaseModel):
 class NotificationListResponse(BaseModel):
     """通知列表响应（分页）"""
 
-    items: list[NotificationResponse] = Field(..., description="通知列表")
+    items: List[NotificationResponse] = Field(..., description="通知列表")
     total: int = Field(..., description="总记录数")
     skip: int = Field(..., description="跳过记录数")
     limit: int = Field(..., description="限制返回记录数")

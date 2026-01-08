@@ -18,7 +18,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Optional
 
 
 @dataclass
@@ -91,7 +91,7 @@ class CryptoContext:
         self,
         symbol: str,
         quantity: float,
-        price: float | None = None,
+        price: Optional[float] = None,
         order_type: str = "market",
     ):
         """
@@ -109,7 +109,7 @@ class CryptoContext:
         # 这个方法将在回测引擎中被重写
         # 策略通过context.order()调用,引擎会拦截并处理
 
-    def order_target(self, symbol: str, target_quantity: float, price: float | None = None):
+    def order_target(self, symbol: str, target_quantity: float, price: Optional[float] = None):
         """
         目标持仓下单
 
@@ -129,7 +129,7 @@ class CryptoContext:
         self,
         symbol: str,
         value: float,
-        price: float | None = None,
+        price: Optional[float] = None,
         order_type: str = "market",
     ):
         """
@@ -155,7 +155,7 @@ class CryptoContext:
         self,
         symbol: str,
         target_value: float,
-        price: float | None = None,
+        price: Optional[float] = None,
     ):
         """
         目标市值下单
@@ -178,7 +178,7 @@ class CryptoContext:
         self,
         symbol: str,
         quantity: float,
-        price: float | None = None,
+        price: Optional[float] = None,
         leverage: float = 1.0,
     ):
         """
@@ -198,7 +198,7 @@ class CryptoContext:
         self,
         symbol: str,
         quantity: float,
-        price: float | None = None,
+        price: Optional[float] = None,
         leverage: float = 1.0,
     ):
         """
@@ -216,8 +216,8 @@ class CryptoContext:
     def close_position(
         self,
         symbol: str,
-        quantity: float | None = None,
-        price: float | None = None,
+        quantity: Optional[float] = None,
+        price: Optional[float] = None,
     ):
         """
         平仓

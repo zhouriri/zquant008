@@ -26,7 +26,7 @@
 提供数据存储的公共逻辑，包括表存在性检查、ON DUPLICATE KEY UPDATE构建等。
 """
 
-from typing import Any
+from typing import Any, List, Dict, Optional
 
 from loguru import logger
 from sqlalchemy import inspect as sql_inspect
@@ -38,7 +38,7 @@ from sqlalchemy.sql import func, text
 from zquant.database import Base, engine
 
 
-def log_sql_statement(stmt: Any, params: dict | None = None) -> None:
+def log_sql_statement(stmt: Any, params: Optional[dict] = None) -> None:
     """
     打印SQL语句（用于调试）
     日志级别为INFO，确保同时输出到控制台和日志文件
@@ -75,7 +75,7 @@ def log_sql_statement(stmt: Any, params: dict | None = None) -> None:
         logger.info(f"[SQL] 无法打印SQL语句: {e}")
 
 
-def ensure_table_exists(db: Session, model_class, table_name: str | None = None) -> bool:
+def ensure_table_exists(db: Session, model_class, table_name: Optional[str] = None) -> bool:
     """
     确保表存在，如果不存在则创建
 
@@ -104,7 +104,7 @@ def ensure_table_exists(db: Session, model_class, table_name: str | None = None)
 
 
 def build_update_dict(
-    stmt: insert, update_fields: list[str], extra_info: dict[str, Any] | None = None, include_updated_time: bool = True
+    stmt: insert, update_fields: List[str], extra_info: Optional[Dict[str, Any]] = None, include_updated_time: bool = True
 ) -> dict[str, Any]:
     """
     构建ON DUPLICATE KEY UPDATE的更新字典

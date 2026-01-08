@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 用户服务
 """
 
@@ -38,7 +40,7 @@ class UserService:
     """用户服务类"""
 
     @staticmethod
-    def create_user(db: Session, user_data: UserCreate, created_by: str | None = None) -> User:
+    def create_user(db: Session, user_data: UserCreate, created_by: Optional[str] = None) -> User:
         """创建用户（管理员操作）"""
         # 检查角色是否存在
         role = db.query(Role).filter(Role.id == user_data.role_id).first()
@@ -92,7 +94,7 @@ class UserService:
         return db.query(User).filter(User.username == username).first()
 
     @staticmethod
-    def update_user(db: Session, user_id: int, user_data: UserUpdate, updated_by: str | None = None) -> User:
+    def update_user(db: Session, user_id: int, user_data: UserUpdate, updated_by: Optional[str] = None) -> User:
         """更新用户"""
         user = UserService.get_user_by_id(db, user_id)
         if not user:
@@ -154,10 +156,10 @@ class UserService:
         db: Session,
         skip: int = 0,
         limit: int = 100,
-        is_active: bool | None = None,
-        role_id: int | None = None,
-        username: str | None = None,
-        order_by: str | None = None,
+        is_active: Optional[bool] = None,
+        role_id: Optional[int] = None,
+        username: Optional[str] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> list[User]:
         """获取所有用户（分页、筛选、排序）"""
@@ -196,7 +198,7 @@ class UserService:
 
     @staticmethod
     def count_users(
-        db: Session, is_active: bool | None = None, role_id: int | None = None, username: str | None = None
+        db: Session, is_active: Optional[bool] = None, role_id: Optional[int] = None, username: Optional[str] = None
     ) -> int:
         """统计用户数量"""
         query = db.query(User)

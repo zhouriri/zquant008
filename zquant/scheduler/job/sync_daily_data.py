@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List
+
 K线数据同步脚本
 
 用于同步股票K线数据，可以通过定时任务命令执行方式调用。
@@ -118,7 +120,7 @@ class SyncDailyDataJob(BaseSyncJob):
             logger.warning(f"获取执行记录失败: {e}")
             return None
 
-    def _convert_codes_to_ts_codes(self, db, codes: list[str]) -> list[str]:
+    def _convert_codes_to_ts_codes(self, db, codes: List[str]) -> list[str]:
         """
         将纯代码列表转换为TS代码列表
         """

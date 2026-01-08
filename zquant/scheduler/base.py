@@ -26,7 +26,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
@@ -38,7 +38,7 @@ class TaskExecutor(ABC):
     """任务执行器基类"""
 
     @abstractmethod
-    def execute(self, db: Session, config: dict[str, Any], execution: TaskExecution | None = None) -> dict[str, Any]:
+    def execute(self, db: Session, config: dict[str, Any], execution: Optional[TaskExecution] = None) -> dict[str, Any]:
         """
         执行任务
 
@@ -58,12 +58,12 @@ class TaskExecutor(ABC):
     def update_progress(
         self,
         db: Session,
-        execution: TaskExecution | None,
-        processed_items: int | None = None,
-        total_items: int | None = None,
-        current_item: str | None = None,
-        progress_percent: float | None = None,
-        message: str | None = None,
+        execution: Optional[TaskExecution],
+        processed_items: Optional[int] = None,
+        total_items: Optional[int] = None,
+        current_item: Optional[str] = None,
+        progress_percent: Optional[float] = None,
+        message: Optional[str] = None,
     ):
         """
         更新执行进度并检查控制标志 (转发到工具函数)

@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 订单管理
 """
 
@@ -53,7 +55,7 @@ class Order:
     symbol: str
     side: OrderSide
     quantity: float  # 数量（正数）
-    price: float | None  # 价格（None表示市价单）
+    price: Optional[float]  # 价格（None表示市价单）
     status: OrderStatus = OrderStatus.PENDING
     filled_quantity: float = 0.0  # 已成交数量
     filled_price: float = 0.0  # 成交价格
@@ -61,8 +63,8 @@ class Order:
     tax: float = 0.0  # 印花税
     slippage: float = 0.0  # 滑点
     order_date: date = None  # 下单日期
-    fill_date: date | None = None  # 成交日期
-    reason: str | None = None  # 拒绝/取消原因
+    fill_date: Optional[date] = None  # 成交日期
+    reason: Optional[str] = None  # 拒绝/取消原因
 
     @property
     def is_buy(self) -> bool:

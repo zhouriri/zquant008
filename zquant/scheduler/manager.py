@@ -27,7 +27,7 @@
 
 from datetime import UTC, datetime
 import threading
-from typing import Any
+from typing import Any, Optional
 
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.jobstores.memory import MemoryJobStore
@@ -513,7 +513,7 @@ class TaskSchedulerManager:
 
 
 # 全局调度器实例
-_scheduler_manager: TaskSchedulerManager | None = None
+_scheduler_manager: Optional[TaskSchedulerManager] = None
 
 
 def get_scheduler_manager() -> TaskSchedulerManager:

@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import List, Optional
+
 配置相关的 Pydantic Schema
 """
 
@@ -31,12 +33,12 @@ class ConfigItem(BaseModel):
     """配置项响应模型"""
 
     config_key: str = Field(..., description="配置键")
-    config_value: str | None = Field(None, description="配置值（已解密）")
-    comment: str | None = Field(None, description="配置说明")
-    created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
-    updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    config_value: Optional[str] = Field(None, description="配置值（已解密）")
+    comment: Optional[str] = Field(None, description="配置说明")
+    created_by: Optional[str] = Field(None, description="创建人")
+    created_time: Optional[str] = Field(None, description="创建时间（ISO格式）")
+    updated_by: Optional[str] = Field(None, description="修改人")
+    updated_time: Optional[str] = Field(None, description="修改时间（ISO格式）")
 
     class Config:
         from_attributes = True
@@ -57,18 +59,18 @@ class ConfigResponse(BaseModel):
     """配置响应"""
 
     config_key: str = Field(..., description="配置键")
-    config_value: str | None = Field(None, description="配置值（已解密）")
-    comment: str | None = Field(None, description="配置说明")
-    created_by: str | None = Field(None, description="创建人")
-    created_time: str | None = Field(None, description="创建时间（ISO格式）")
-    updated_by: str | None = Field(None, description="修改人")
-    updated_time: str | None = Field(None, description="修改时间（ISO格式）")
+    config_value: Optional[str] = Field(None, description="配置值（已解密）")
+    comment: Optional[str] = Field(None, description="配置说明")
+    created_by: Optional[str] = Field(None, description="创建人")
+    created_time: Optional[str] = Field(None, description="创建时间（ISO格式）")
+    updated_by: Optional[str] = Field(None, description="修改人")
+    updated_time: Optional[str] = Field(None, description="修改时间（ISO格式）")
 
 
 class ConfigListResponse(BaseModel):
     """配置列表响应"""
 
-    items: list[ConfigItem] = Field(..., description="配置列表")
+    items: List[ConfigItem] = Field(..., description="配置列表")
     total: int = Field(..., description="总记录数")
 
 
@@ -77,15 +79,15 @@ class ConfigCreateRequest(BaseModel):
 
     config_key: str = Field(..., description="配置键")
     config_value: str = Field(..., description="配置值（明文，会自动加密）")
-    comment: str | None = Field(None, description="配置说明")
+    comment: Optional[str] = Field(None, description="配置说明")
 
 
 class ConfigUpdateRequest(BaseModel):
     """更新配置请求"""
 
     config_key: str = Field(..., description="配置键")
-    config_value: str | None = Field(None, description="配置值（明文，会自动加密）")
-    comment: str | None = Field(None, description="配置说明")
+    config_value: Optional[str] = Field(None, description="配置值（明文，会自动加密）")
+    comment: Optional[str] = Field(None, description="配置说明")
 
 
 class ConfigDeleteRequest(BaseModel):
@@ -96,7 +98,7 @@ class ConfigDeleteRequest(BaseModel):
 class TushareTokenTestRequest(BaseModel):
     """Tushare Token 测试请求"""
 
-    token: str | None = Field(None, description="Token（可选，如果不提供则从数据库读取）")
+    token: Optional[str] = Field(None, description="Token（可选，如果不提供则从数据库读取）")
 
 
 class TushareTokenTestResponse(BaseModel):
@@ -104,4 +106,4 @@ class TushareTokenTestResponse(BaseModel):
 
     success: bool = Field(..., description="测试是否成功")
     message: str = Field(..., description="测试结果消息")
-    data_count: int | None = Field(None, description="测试接口返回的数据条数（如果成功）")
+    data_count: Optional[int] = Field(None, description="测试接口返回的数据条数（如果成功）")

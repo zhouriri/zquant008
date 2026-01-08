@@ -24,7 +24,7 @@
 任务执行器
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -43,7 +43,7 @@ class DataSyncExecutor(TaskExecutor):
     def get_task_type(self) -> TaskType:
         return TaskType.COMMON_TASK
 
-    def execute(self, db: Session, config: dict[str, Any], execution: TaskExecution | None = None) -> dict[str, Any]:
+    def execute(self, db: Session, config: dict[str, Any], execution: Optional[TaskExecution] = None) -> dict[str, Any]:
         """执行数据同步任务"""
         # 优先使用 task_action，向后兼容 task_type
         task_action = config.get("task_action")

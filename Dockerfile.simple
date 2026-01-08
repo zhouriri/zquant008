@@ -1,0 +1,96 @@
+# Copyright 2025 ZQuant Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# 简化版 Dockerfile - 跳过混淆
+# 阶段1: 前端构建
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/web
+
+# 复制前端依赖文件
+COPY web/package.json ./
+
+# 安装前端依赖
+RUN npm install
+
+# 复制前端源代码
+COPY web/ ./
+
+# 设置生产环境变量
+ENV NODE_ENV=production
+ENV REACT_APP_ENV=production
+
+# 构建前端
+RUN npm run build
+
+# 阶段2: 运行时镜像
+FROM python:3.11-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx \
+    curl \
+    procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 创建非 root 用户
+RUN useradd -m -u 1000 zquant && \
+    mkdir -p /app /var/log/nginx /var/lib/nginx && \
+    chown -R zquant:zquant /app /var/log/nginx /var/lib/nginx
+
+# 复制后端代码
+COPY --chown=zquant:zquant zquant/ ./zquant/
+
+# 复制后端依赖文件
+COPY zquant/requirements.txt ./
+
+# 安装 Python 依赖
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制前端构建产物
+COPY --from=frontend-builder --chown=zquant:zquant /app/web/dist ./web/dist
+
+# 复制 Nginx 配置
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/nginx-site.conf /etc/nginx/conf.d/default.conf
+
+# 复制启动脚本
+COPY docker/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# 创建必要的目录
+RUN mkdir -p /app/logs && \
+    chown -R zquant:zquant /app/logs
+
+# 暴露端口
+EXPOSE 80
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# 切换到非 root 用户
+USER zquant
+
+# 启动命令
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]

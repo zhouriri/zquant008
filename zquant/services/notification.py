@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 通知服务
 """
 
@@ -39,7 +41,7 @@ class NotificationService:
 
     @staticmethod
     def create_notification(
-        db: Session, notification_data: NotificationCreate, created_by: str | None = None
+        db: Session, notification_data: NotificationCreate, created_by: Optional[str] = None
     ) -> Notification:
         """创建通知"""
         # 检查用户是否存在
@@ -75,8 +77,8 @@ class NotificationService:
         user_id: int,
         skip: int = 0,
         limit: int = 20,
-        is_read: bool | None = None,
-        type: NotificationType | None = None,
+        is_read: Optional[bool] = None,
+        type: Optional[NotificationType] = None,
         order_by: str = "created_time",
         order: str = "desc",
     ) -> tuple[list[Notification], int]:

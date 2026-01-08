@@ -25,7 +25,7 @@
 提供统一的API响应格式，包括成功响应和错误响应。
 """
 
-from typing import Any, Generic, TypeVar
+from typing import Any, Dict, Generic, Optional, TypeVar, List
 
 from pydantic import BaseModel, Field
 
@@ -42,7 +42,7 @@ class BaseResponse(BaseModel, Generic[T]):
 
     success: bool = Field(..., description="操作是否成功")
     message: str = Field(..., description="响应消息")
-    data: T | None = Field(None, description="响应数据")
+    data: Optional[T] = Field(None, description="响应数据")
     code: int = Field(200, description="响应状态码")
 
     class Config:
@@ -74,8 +74,8 @@ class ErrorResponse(BaseResponse[None]):
     """
 
     success: bool = Field(False, description="操作是否成功")
-    error_code: str | None = Field(None, description="错误代码")
-    error_detail: dict[str, Any] | None = Field(None, description="错误详情")
+    error_code: Optional[str] = Field(None, description="错误代码")
+    error_detail: Optional[Dict[str, Any]] = Field(None, description="错误详情")
 
     class Config:
         """Pydantic配置"""
@@ -92,7 +92,7 @@ class ErrorResponse(BaseResponse[None]):
         }
 
 
-class PaginatedResponse(BaseResponse[list[T]]):
+class PaginatedResponse(BaseResponse[List[T]]):
     """
     分页响应模型
 

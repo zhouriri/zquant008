@@ -17,7 +17,7 @@
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, List, Optional
 import time
 
 import pandas as pd
@@ -108,8 +108,8 @@ class CryptoDataSyncService:
         self,
         symbol: str,
         interval: str,
-        start_time: datetime | None = None,
-        end_time: datetime | None = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
         limit: int = 1000,
     ) -> int:
         """
@@ -197,7 +197,7 @@ class CryptoDataSyncService:
     def sync_all_klines(
         self,
         interval: str,
-        symbols: list[str] | None = None,
+        symbols: List[str] | None = None,
         days_back: int = 7,
     ) -> dict[str, int]:
         """

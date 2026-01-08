@@ -21,6 +21,8 @@
 #     - Repository: https://github.com/yoyoung/zquant
 
 """
+from typing import Optional
+
 策略服务
 """
 
@@ -41,11 +43,11 @@ class StrategyService:
         user_id: int,
         name: str,
         code: str,
-        description: str | None = None,
-        category: str | None = None,
-        params_schema: str | None = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        params_schema: Optional[str] = None,
         is_template: bool = False,
-        created_by: str | None = None,
+        created_by: Optional[str] = None,
     ) -> Strategy:
         """创建策略"""
         strategy = Strategy(
@@ -68,7 +70,7 @@ class StrategyService:
         return strategy
 
     @staticmethod
-    def get_strategy(db: Session, strategy_id: int, user_id: int | None = None) -> Strategy | None:
+    def get_strategy(db: Session, strategy_id: int, user_id: Optional[int] = None) -> Strategy | None:
         """
         获取策略详情
 
@@ -99,12 +101,12 @@ class StrategyService:
         db: Session,
         strategy_id: int,
         user_id: int,
-        name: str | None = None,
-        description: str | None = None,
-        category: str | None = None,
-        code: str | None = None,
-        params_schema: str | None = None,
-        updated_by: str | None = None,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        code: Optional[str] = None,
+        params_schema: Optional[str] = None,
+        updated_by: Optional[str] = None,
     ) -> Strategy | None:
         """更新策略"""
         strategy = StrategyService.get_strategy(db, strategy_id, user_id)
@@ -158,10 +160,10 @@ class StrategyService:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
-        category: str | None = None,
-        search: str | None = None,
-        is_template: bool | None = None,
-        order_by: str | None = None,
+        category: Optional[str] = None,
+        search: Optional[str] = None,
+        is_template: Optional[bool] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> list[Strategy]:
         """获取策略列表（支持分类筛选、搜索、排序）"""
@@ -204,7 +206,7 @@ class StrategyService:
 
     @staticmethod
     def get_template_strategies(
-        db: Session, category: str | None = None, skip: int = 0, limit: int = 100
+        db: Session, category: Optional[str] = None, skip: int = 0, limit: int = 100
     ) -> list[Strategy]:
         """获取模板策略列表（所有用户可见）"""
         query = db.query(Strategy).filter(Strategy.is_template == True)
@@ -221,10 +223,10 @@ class StrategyService:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
-        category: str | None = None,
-        search: str | None = None,
-        is_template: bool | None = None,
-        order_by: str | None = None,
+        category: Optional[str] = None,
+        search: Optional[str] = None,
+        is_template: Optional[bool] = None,
+        order_by: Optional[str] = None,
         order: str = "desc",
     ) -> list[Strategy]:
         """

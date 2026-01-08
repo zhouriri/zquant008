@@ -26,7 +26,7 @@
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Callable
+from typing import Any, Callable, Dict, Optional
 
 
 @dataclass
@@ -86,7 +86,7 @@ class Context:
     current_date: date  # 当前日期
     portfolio: Portfolio  # 投资组合
     config: dict  # 回测配置
-    _get_daily_basic_func: Callable[[str, date], dict | None] | None = None  # 获取每日指标数据的函数
+    _get_daily_basic_func: Optional[Callable[[str, date], Optional[Dict[str, Any]]]] = None  # 获取每日指标数据的函数
 
     def __init__(self, initial_cash: float, config: dict):
         self.portfolio = Portfolio(cash=initial_cash)
@@ -94,7 +94,7 @@ class Context:
         self.current_date = None  # 将在引擎中设置
         self._get_daily_basic_func = None  # 将在引擎中设置
 
-    def order(self, symbol: str, quantity: float, price: float | None = None):
+    def order(self, symbol: str, quantity: float, price: Optional[float] = None):
         """
         下单（由策略调用）
 
@@ -109,7 +109,7 @@ class Context:
         # 这个方法将在回测引擎中被重写
         # 策略通过context.order()调用，引擎会拦截并处理
 
-    def order_target(self, symbol: str, target_quantity: float, price: float | None = None):
+    def order_target(self, symbol: str, target_quantity: float, price: Optional[float] = None):
         """
         目标持仓下单
 
@@ -125,7 +125,7 @@ class Context:
             return self.order(symbol, quantity, price)
         return None
 
-    def order_value(self, symbol: str, value: float, price: float | None = None):
+    def order_value(self, symbol: str, value: float, price: Optional[float] = None):
         """
         按金额下单
 
@@ -144,7 +144,7 @@ class Context:
             return self.order(symbol, quantity, price)
         return None
 
-    def order_target_value(self, symbol: str, target_value: float, price: float | None = None):
+    def order_target_value(self, symbol: str, target_value: float, price: Optional[float] = None):
         """
         目标市值下单
 
@@ -162,7 +162,7 @@ class Context:
             return self.order_target(symbol, target_quantity, price)
         return None
 
-    def get_daily_basic(self, symbol: str, trade_date: date | None = None) -> dict | None:
+    def get_daily_basic(self, symbol: str, trade_date: Optional[date] = None) -> Optional[Dict[str, Any]]:
         """
         获取每日指标数据
 
